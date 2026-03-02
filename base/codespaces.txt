@@ -2,16 +2,11 @@ conda config --add channels defaults
 conda config --add channels conda-forge
 conda config --set channel_priority strict
 conda clean -a -y
-conda config --remove-key channels
-conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
-conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free
-conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r
-conda config --set show_channel_urls yes
 conda create -n cpu python=3.12 -y
 echo $SHELL
 conda init bash
 source ~/.bashrc
 conda activate cpu
-
+conda install -n cpu notebook -y
 pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 \
   --index-url https://download.pytorch.org/whl/cpu
