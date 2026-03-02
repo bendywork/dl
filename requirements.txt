@@ -1,0 +1,3 @@
+jieba
+scikit_learn
+torch

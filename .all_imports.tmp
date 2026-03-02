@@ -1,0 +1,149 @@
+# import modules & set up logging
+
+import logging
+
+import os
+
+
+
+import numpy as np
+
+
+
+import gensim
+
+from gensim.models import word2vec
+
+
+
+import jieba.analyse
+
+import jieba
+# set up logging
+
+logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+sentence_file_path = './datas/in_the_name_of_people.txt'
+
+word_file_path = './datas/cut_words_of_in_the_name_of_people.txt'
+
+model_file_path1 = './datas/gensim_word2vec1.w2v'
+
+model_file_path2 = './datas/gensim_word2vec2.bin'
+
+model_file_path3 = './datas/gensim_word2vec3_{}.npy'
+# 人民的名义 小说分词
+
+jieba.suggest_freq('沙瑞金',True)
+
+jieba.suggest_freq('田国富',True)
+
+jieba.suggest_freq('高育良',True)
+
+jieba.suggest_freq('侯亮平',True)
+
+jieba.suggest_freq('钟小艾', True)
+
+jieba.suggest_freq('陈岩石', True)
+
+jieba.suggest_freq('欧阳菁', True)
+
+jieba.suggest_freq('易学习', True)
+
+jieba.suggest_freq('王大路', True)
+
+jieba.suggest_freq('蔡成功', True)
+
+jieba.suggest_freq('孙连城', True)
+
+jieba.suggest_freq('季昌明', True)
+
+jieba.suggest_freq('丁义珍', True)
+
+jieba.suggest_freq('郑西坡', True)
+
+jieba.suggest_freq('赵东来', True)
+
+jieba.suggest_freq('高小琴', True)
+
+jieba.suggest_freq('赵瑞龙', True)
+
+jieba.suggest_freq('林华华', True)
+
+jieba.suggest_freq('陆亦可', True)
+
+jieba.suggest_freq('刘新建', True)
+
+jieba.suggest_freq('刘庆祝', True)
+
+jieba.suggest_freq('京州市', True)
+
+jieba.suggest_freq('副市长', True)
+
+jieba.suggest_freq('赵德汉',True)
+
+jieba.suggest_freq('H大学',True)
+
+jieba.suggest_freq('H省',True)
+
+jieba.suggest_freq('政法系', True)
+
+jieba.suggest_freq(('哥', '求'), True)
+
+
+
+word_cnt = {}
+
+total_word_cnt = 0
+
+
+
+with open(word_file_path,'w', encoding='utf-8') as writer:
+
+    with open(sentence_file_path, 'r', encoding='utf-8') as reader:
+
+        # 加载所有数据
+
+        content = reader.read()
+
+        
+
+        # 分词
+
+        content = jieba.lcut(content)
+
+
+
+        # 统计各个单词出现的次数
+
+        for word in content:
+
+            word_cnt[word] = word_cnt.get(word, 0) + 1
+
+            total_word_cnt += 1
+
+        
+
+        # 合并结果
+
+        result = ' '.join(content)
+
+        
+
+        # 结果输出
+
+        writer.write(result)
+
+print("Done!!!")
+## 计算单词的词频(获取最多的十个)
+
+
+
+word_freq = []
+
+for word in word_cnt.keys():
+
+    word_freq.append([word, word_cnt[word] / total_word_cnt])
+
+sorted_word_freq = sorted(word_freq, key=lambda t: t[1], reverse=True)
+
+sorted_word_freq[:100]

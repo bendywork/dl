@@ -1,0 +1,253 @@
+[W 2026-03-02 06:52:57.478 ServerApp] ServerApp.token config is deprecated in 2.0. Use IdentityProvider.token.
+[I 2026-03-02 06:52:57.977 ServerApp] jupyter_lsp | extension was successfully linked.
+[I 2026-03-02 06:52:57.980 ServerApp] jupyter_server_mathjax | extension was successfully linked.
+[I 2026-03-02 06:52:57.983 ServerApp] jupyter_server_terminals | extension was successfully linked.
+[W 2026-03-02 06:52:57.985 LabApp] 'allow_origin' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[I 2026-03-02 06:52:57.987 ServerApp] jupyterlab | extension was successfully linked.
+[I 2026-03-02 06:52:57.987 ServerApp] jupyterlab_git | extension was successfully linked.
+[I 2026-03-02 06:52:57.987 ServerApp] nbdime | extension was successfully linked.
+[I 2026-03-02 06:52:57.991 ServerApp] notebook | extension was successfully linked.
+[I 2026-03-02 06:52:58.218 ServerApp] notebook_shim | extension was successfully linked.
+[W 2026-03-02 06:52:58.242 ServerApp] All authentication is disabled.  Anyone who can connect to this server will be able to run code.
+[I 2026-03-02 06:52:58.243 ServerApp] notebook_shim | extension was successfully loaded.
+[I 2026-03-02 06:52:58.245 ServerApp] jupyter_lsp | extension was successfully loaded.
+[I 2026-03-02 06:52:58.245 ServerApp] jupyter_server_mathjax | extension was successfully loaded.
+[I 2026-03-02 06:52:58.247 ServerApp] jupyter_server_terminals | extension was successfully loaded.
+[I 2026-03-02 06:52:58.251 LabApp] JupyterLab extension loaded from /home/codespace/.local/lib/python3.12/site-packages/jupyterlab
+[I 2026-03-02 06:52:58.251 LabApp] JupyterLab application directory is /home/codespace/.local/share/jupyter/lab
+[I 2026-03-02 06:52:58.251 LabApp] Extension Manager is 'pypi'.
+[I 2026-03-02 06:52:58.292 ServerApp] jupyterlab | extension was successfully loaded.
+[I 2026-03-02 06:52:58.297 ServerApp] jupyterlab_git | extension was successfully loaded.
+[I 2026-03-02 06:52:58.409 ServerApp] nbdime | extension was successfully loaded.
+[I 2026-03-02 06:52:58.431 ServerApp] notebook | extension was successfully loaded.
+[I 2026-03-02 06:52:58.441 ServerApp] Serving notebooks from local directory: /workspaces/dl
+[I 2026-03-02 06:52:58.445 ServerApp] Jupyter Server 2.17.0 is running at:
+[I 2026-03-02 06:52:58.445 ServerApp] http://codespaces-c704ec:8888/tree
+[I 2026-03-02 06:52:58.447 ServerApp]     http://127.0.0.1:8888/tree
+[I 2026-03-02 06:52:58.447 ServerApp] Use Control-C to stop this server and shut down all kernels (twice to skip confirmation).
+[I 2026-03-02 06:52:58.665 ServerApp] Skipped non-installed server(s): basedpyright, bash-language-server, dockerfile-language-server-nodejs, javascript-typescript-langserver, jedi-language-server, julia-language-server, pyrefly, pyright, python-language-server, python-lsp-server, r-languageserver, sql-language-server, texlab, typescript-language-server, unified-language-server, vscode-css-languageserver-bin, vscode-html-languageserver-bin, vscode-json-languageserver-bin, yaml-language-server
+[I 2026-03-02 06:53:04.973 ServerApp] 302 GET / (@127.0.0.1) 0.42ms
+[W 2026-03-02 06:53:07.707 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/application-extension:shell?1772434388222 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/shell.json
+[W 2026-03-02 06:53:07.707 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/shell.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/shell.json)
+[W 2026-03-02 06:53:07.708 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/application-extension:shell?1772434388222 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 3.40ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/tree?
+[W 2026-03-02 06:53:08.126 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/tree-extension:widget?1772434388629 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/tree-extension/widget.json
+[W 2026-03-02 06:53:08.126 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/tree-extension/widget.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/tree-extension/widget.json)
+[W 2026-03-02 06:53:08.127 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/tree-extension:widget?1772434388629 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 3.68ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/tree?
+[W 2026-03-02 06:53:08.132 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:scroll-output?1772434388629 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/scroll-output.json
+[W 2026-03-02 06:53:08.132 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/scroll-output.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/scroll-output.json)
+[W 2026-03-02 06:53:08.133 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:scroll-output?1772434388629 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 4.88ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/tree?
+[W 2026-03-02 06:53:08.141 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/application-extension:top?1772434388628 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/top.json
+[W 2026-03-02 06:53:08.142 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/top.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/top.json)
+[W 2026-03-02 06:53:08.142 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/application-extension:top?1772434388628 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 3.80ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/tree?
+[W 2026-03-02 06:53:08.148 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:full-width-notebook?1772434388629 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/full-width-notebook.json
+[W 2026-03-02 06:53:08.148 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/full-width-notebook.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/full-width-notebook.json)
+[W 2026-03-02 06:53:08.149 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:full-width-notebook?1772434388629 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 4.53ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/tree?
+[W 2026-03-02 06:53:08.154 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:checkpoints?1772434388629 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/checkpoints.json
+[W 2026-03-02 06:53:08.154 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/checkpoints.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/checkpoints.json)
+[W 2026-03-02 06:53:08.155 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:checkpoints?1772434388629 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 4.09ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/tree?
+[I 2026-03-02 06:53:13.563 ServerApp] Writing notebook-signing key to /home/codespace/.local/share/jupyter/notebook_secret
+[W 2026-03-02 06:53:13.567 ServerApp] Notebook day01/02_gensim基本操作一.ipynb is not trusted
+[W 2026-03-02 06:53:14.812 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/application-extension:shell?1772434395340 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/shell.json
+[W 2026-03-02 06:53:14.813 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/shell.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/shell.json)
+[W 2026-03-02 06:53:14.813 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/application-extension:shell?1772434395340 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 2.83ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/notebooks/day01/02_gensim%E5%9F%BA%E6%9C%AC%E6%93%8D%E4%BD%9C%E4%B8%80.ipynb
+[W 2026-03-02 06:53:15.356 ServerApp] Notebook day01/02_gensim基本操作一.ipynb is not trusted
+[W 2026-03-02 06:53:15.467 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:scroll-output?1772434395921 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/scroll-output.json
+[W 2026-03-02 06:53:15.467 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/scroll-output.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/scroll-output.json)
+[W 2026-03-02 06:53:15.470 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:scroll-output?1772434395921 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 32.15ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/notebooks/day01/02_gensim%E5%9F%BA%E6%9C%AC%E6%93%8D%E4%BD%9C%E4%B8%80.ipynb
+[W 2026-03-02 06:53:15.474 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:full-width-notebook?1772434395921 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/full-width-notebook.json
+[W 2026-03-02 06:53:15.475 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/full-width-notebook.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/full-width-notebook.json)
+[W 2026-03-02 06:53:15.478 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:full-width-notebook?1772434395921 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 37.84ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/notebooks/day01/02_gensim%E5%9F%BA%E6%9C%AC%E6%93%8D%E4%BD%9C%E4%B8%80.ipynb
+[W 2026-03-02 06:53:15.483 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:checkpoints?1772434395921 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/checkpoints.json
+[W 2026-03-02 06:53:15.483 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/checkpoints.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/notebook-extension/checkpoints.json)
+[W 2026-03-02 06:53:15.487 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/notebook-extension:checkpoints?1772434395921 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 43.21ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/notebooks/day01/02_gensim%E5%9F%BA%E6%9C%AC%E6%93%8D%E4%BD%9C%E4%B8%80.ipynb
+[W 2026-03-02 06:53:15.498 ServerApp] 404 GET /lab/api/settings/@jupyter-notebook/application-extension:top?1772434395921 (127.0.0.1): Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/top.json
+[W 2026-03-02 06:53:15.498 LabApp] wrote error: 'Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/top.json'
+    Traceback (most recent call last):
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 1846, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/tornado/web.py", line 3375, in wrapper
+        return method(self, *args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_handler.py", line 58, in get
+        result, warnings = get_settings(
+                           ^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 385, in get_settings
+        schema, version = _get_schema(schemas_dir, schema_name, overrides, labextensions_path)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/codespace/.local/lib/python3.12/site-packages/jupyterlab_server/settings_utils.py", line 61, in _get_schema
+        raise web.HTTPError(404, notfound_error % path)
+    tornado.web.HTTPError: HTTP 404: Not Found (Schema not found: /home/codespace/.local/share/jupyter/lab/schemas/@jupyter-notebook/application-extension/top.json)
+[W 2026-03-02 06:53:15.502 LabApp] 404 GET /lab/api/settings/@jupyter-notebook/application-extension:top?1772434395921 (bf3665af92524b3cbfe36312579ecae5@127.0.0.1) 42.01ms referer=https://legendary-dollop-r45rxgq6q4qp3xq9q-8888.app.github.dev/notebooks/day01/02_gensim%E5%9F%BA%E6%9C%AC%E6%93%8D%E4%BD%9C%E4%B8%80.ipynb
+[I 2026-03-02 06:53:16.838 ServerApp] Kernel started: 4a3b3990-e2de-44f3-b0fc-9aa0db3353ec
+[I 2026-03-02 06:53:18.050 ServerApp] Connecting to kernel 4a3b3990-e2de-44f3-b0fc-9aa0db3353ec.
+[W 2026-03-02 06:53:18.052 ServerApp] The websocket_ping_timeout (90000) cannot be longer than the websocket_ping_interval (30000).
+    Setting websocket_ping_timeout=30000
+[I 2026-03-02 06:53:18.735 ServerApp] Starting buffering for 4a3b3990-e2de-44f3-b0fc-9aa0db3353ec:e05d4406-2780-4e00-ae3d-ad5a33e6d3bf
+[I 2026-03-02 06:53:18.964 ServerApp] Connecting to kernel 4a3b3990-e2de-44f3-b0fc-9aa0db3353ec.
+[I 2026-03-02 06:53:19.676 ServerApp] Starting buffering for 4a3b3990-e2de-44f3-b0fc-9aa0db3353ec:56e2d86d-131b-4700-81d2-65c5771615ce
+[I 2026-03-02 06:53:20.129 ServerApp] Connecting to kernel 4a3b3990-e2de-44f3-b0fc-9aa0db3353ec.
+[I 2026-03-02 06:53:21.045 ServerApp] Connecting to kernel 4a3b3990-e2de-44f3-b0fc-9aa0db3353ec.
+[W 2026-03-02 06:54:33.815 ServerApp] Notebook day01/01_jieba基本操作.ipynb is not trusted
+[I 2026-03-02 06:55:16.636 ServerApp] Saving file at /day01/02_gensim基本操作一.ipynb
+[W 2026-03-02 06:55:16.637 ServerApp] Notebook day01/02_gensim基本操作一.ipynb is not trusted
