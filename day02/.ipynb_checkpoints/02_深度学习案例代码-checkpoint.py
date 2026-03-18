@@ -190,7 +190,7 @@ def training():
 # noinspection DuplicatedCode
 def interface01():
     # 1. 模型恢复
-    obj = torch.load("output/02/models/000099.pkl", map_location='cpu', weights_only=False)
+    obj = torch.load("./output/02/models/000099.pkl", map_location='cpu')
     net = obj['net']
     net.eval()  # 进入推理阶段
     print(f"模型恢复完成: \n{net}\n\n")
@@ -218,10 +218,6 @@ def interface01():
             .round(3).tolist()
         result = list(map(lambda t: {'id': t[0], 'proba': t[1]}, zip(y_pred_idx_per_sample, y_pred_proba_per_sample)))
         print(result)
-
-def test_hoot_pre_feature(self, _m, _m_input, _m_output):
-    print("test_hoot_pre_feature")
-    return None
 
 
 def interface02():
