@@ -68,7 +68,7 @@ def training():
     print(f"转换后训练数据shape形状为: {type(x_train)} - {x_train.shape}")
     print(f"转换后评估数据shape形状为: {type(x_test)} - {x_test.shape}")
 
-    # 3. 模型创建
+    # 3. 模型创建 最大迭代十次 创建一个逻辑回归的模型对象
     algo = LogisticRegression(max_iter=10)
     # algo = DecisionTreeClassifier()
 
@@ -108,6 +108,20 @@ def training():
                 ensure_ascii=False  # 中文不进行编码输出，直接输出中文
             )
 
+    if isinstance(algo, DecisionTreeClassifier):
+        json_dump_file = "./output/01/ml-decisTree.json"
+        with open(json_dump_file, "w", encoding="utf-8") as writer:
+            json.dump(
+                {
+                    'poly': poly.get_feature_names_out(['x1', 'x2']).tolist(),  # 获取多项式的组合规则，并转换为list输出
+                    'algo': {
+                        'tree': algo.tree_.to_dict()  # 获取决策树对象，并转换为dict输出
+                    }
+                },  # 持久化的对象
+                writer,  # 输出文件对象
+                indent=2,
+                ensure_ascii=False
+            )
 
 def interface():
     # 1. 模型恢复
