@@ -1,9 +1,12 @@
+import json
+import os
 from sklearn import metrics
 from sklearn.datasets import make_circles
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 import numpy as np
 from sklearn.preprocessing import PolynomialFeatures
+import joblib
 
 
 # 机器学习模型训练复习
@@ -83,10 +86,50 @@ class MachineLearning:
         print(f"训练数据上的分类报告: \n{metrics.classification_report(self.y_train, self.pred_train)}\n")
         print(f"评估数据上的分类报告: \n{metrics.classification_report(self.y_test, self.pred_test)}\n")
 
-
-    def evaluate(self, test_data):
-        print(f"Evaluating {self.model} with test data: {test_data}")
+    # 模型持久化与恢复
+    def save_model_with_file(self, file_path):
+        print(f"Saving model to {file_path}...")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        model_obj = {'model': self.model, 'poly': self.poly}
+        joblib.dump(model_obj, file_path)
     
+    # 从文件中加载模型
+    def load_model_with_file(self, file_path):
+        print(f"Loading model from {file_path}...")
+        model_obj = joblib.load(file_path)
+        poly = model_obj['poly']
+        algo = model_obj['model']
+        return poly, algo
+    
+    # 将模型保存为JSON格式
+    def save_model_with_json(self, file_path):
+        print(f"Saving model to {file_path} in JSON format...")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        if isinstance(self.model, LogisticRegression):
+            json_dump_file = file_path
+            with open(json_dump_file, "w", encoding="utf-8") as writer:
+                json.dump(
+                    {
+                        'poly': self.poly.get_feature_names_out(['x1', 'x2']).tolist(),  # 获取多项式的组合规则，并转换为list输出
+                        'algo': {
+                            'intercept': self.model.intercept_.tolist(),  # 获取LR的截距项，并转换为list输出
+                            'coef': self.model.coef_.tolist()  # 提取LR的参数项，并转换为list输出(json默认仅支持普通python类型)
+                        }
+                    },  # 持久化的对象
+                    writer,  # 输出文件对象
+                    indent=2,  # json格式化空格 -- 每个级别前面空2个空格
+                    ensure_ascii=False  # 中文不进行编码输出，直接输出中文
+                )
+    
+    # 从JSON文件中加载模型
+    def load_model_with_json(self, file_path):
+        print(f"Loading model from {file_path} in JSON format...")
+        with open(file_path, "r", encoding="utf-8") as reader:
+            model_data = json.load(reader)
+            poly_features = model_data['poly']
+            algo_params = model_data['algo']
+            print(f"模型恢复完成: {poly_features} -- {algo_params}")
+            return LogisticRegression(intercept=np.array(algo_params['intercept']), coef=np.array(algo_params['coef'])), poly_features
 
 if __name__ == "__main__":
     ml_model = MachineLearning()

@@ -208,7 +208,74 @@ self.x_test = self.poly.transform(self.x_test)
 
 ---
 
-## 7. 完整复习案例代码
+## 7. 模型持久化：JSON vs joblib
+
+训练好的模型需要保存下来，避免每次使用都重新训练。主要有两种方式。
+
+### JSON 持久化（摘要参数存储）
+
+```python
+import json
+
+json_dump_file = "./output/01/ml.json"
+with open(json_dump_file, "w", encoding="utf-8") as writer:
+    json.dump(
+        {
+            'poly': poly.get_feature_names_out(['x1', 'x2']).tolist(),  # 多项式组合规则
+            'algo': {
+                'intercept': algo.intercept_.tolist(),  # 截距项
+                'coef': algo.coef_.tolist()             # 系数项
+            }
+        },
+        writer,
+        indent=2,           # 每级缩进2个空格，格式化输出
+        ensure_ascii=False  # 中文直接输出，不转义为 \uXXXX
+    )
+```
+
+**为什么要 `.tolist()`：** `numpy` 数组不是标准 Python 类型，`json.dump` 无法序列化，必须先转成 Python 原生 list。
+
+**存储内容示例：**
+```json
+{
+  "poly": ["1", "x1", "x2", "x1^2", "x1 x2", "x2^2"],
+  "algo": {
+    "intercept": [-0.123],
+    "coef": [[1.23, -0.45, 2.11, 0.33, -1.02, 1.87]]
+  }
+}
+```
+
+### joblib 持久化（完整模型存储）
+
+```python
+import joblib
+
+joblib.dump(model, "./output/01/ml.joblib")  # 保存
+model = joblib.load("./output/01/ml.joblib") # 加载，直接推理
+```
+
+### 两种方式对比
+
+| 对比项 | JSON（摘要参数） | joblib（完整模型） |
+|--------|----------------|------------------|
+| 存储内容 | 关键参数（系数、截距、规则） | 完整 Python 对象（含所有状态） |
+| 跨语言 | ✅ Java/Go/C++ 等任何语言均可读取 | ❌ 仅限 Python |
+| 恢复方式 | 需要手动重建模型（读参数→赋值） | 直接 `load` 即可推理 |
+| 文件大小 | 小（只有数字） | 大（含完整对象结构） |
+| 使用场景 | 跨语言部署、模型导出给其他系统 | Python 内部复用、快速原型 |
+| 局限性 | 需要自己实现推理逻辑 | 强依赖 Python + sklearn 版本 |
+
+### 核心结论
+
+> - **JSON**：存的是"模型学到了什么"（参数摘要），任何语言都能读懂并复现推理逻辑，适合**生产部署、跨系统集成**
+> - **joblib**：存的是"模型本身"（Python 对象序列化），拿来就用，适合**Python 内部快速复用**，但换个语言或 sklearn 版本可能就失效
+
+你的理解完全正确。JSON 方式本质上是把模型的"知识"翻译成通用格式，而 joblib 是把 Python 对象直接冷冻保存。
+
+---
+
+## 8. 完整复习案例代码
 
 ```python
 from sklearn import metrics
