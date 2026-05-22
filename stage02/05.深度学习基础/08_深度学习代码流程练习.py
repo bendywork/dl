@@ -1,10 +1,16 @@
 from sklearn.datasets import make_circles
 from sklearn.model_selection import train_test_split
 from torch import nn
+from torch import optim
+import torch
 
-class DeepLearning_Classify(object):
+# 深度学习代码流程练习
+# 分类网络搭建流程
+class DeepLearning_Classify(nn.Module):
     
+    # 自定义网络结构
     def __init__(self, in_features: int, num_classes: int):
+        super(DeepLearning_Classify, self).__init__()
         print("深度学习代码流程练习")
         self.model = None
         self.x_train = None
@@ -13,11 +19,12 @@ class DeepLearning_Classify(object):
         self.y_test = None
         self.in_features = in_features
         self.num_classes = num_classes
+        # 定义网络结构 
         self.features = nn.Sequential(
-            nn.Linear(self.in_features, 16),
-            nn.Sigmoid(), 
-            nn.Linear(16, 24),
-            nn.Sigmoid()
+            nn.Linear(self.in_features, 8),
+            nn.ReLU(), 
+            nn.Linear(8, 24),
+            nn.ReLU()
         )
         self.classify = nn.Linear(24, self.num_classes)
 

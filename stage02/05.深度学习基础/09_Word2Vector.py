@@ -1,0 +1,39 @@
+import jieba
+
+def cut_words(text):
+    return " ".join(jieba.cut(text))
+
+
+def test01():
+    text = "我爱自然语言处理"
+    print(cut_words(text))
+
+def test02():
+    # 一段话
+    text = "自然语言处理是人工智能领域的一个重要分支，旨在使计算机能够理解和处理人类语言。它涉及多个方面，包括文本分析、语义理解、机器翻译等。通过自然语言处理技术，我们可以实现自动文本分类、情感分析、问答系统等应用，从而提升人机交互的效率和质量。随着深度学习的发展，自然语言处理的性能得到了显著提升，未来在各个领域的应用前景非常广阔。"
+    print(cut_words(text))
+
+
+def testCBOW():
+    # CBOW模型
+    from gensim.models import Word2Vec
+    #1 Word2Vec 只使用局部信息，无法捕捉全局语义关系
+    sentences = [
+        "我 爱 自然语言处理",
+        "自然语言处理 是 人工智能 领域 的 一个 重要 分支",
+        "它 涉及 多个 方面 包括 文本分析 语义理解 机器翻译 等",
+        "通过 自然语言处理 技术 我们 可以 实现 自动文本分类 情感分析 问答系统 等 应用",
+        "从而 提升 人机交互 的 效率 和 质量",
+        "随着 深度学习 的 发展 自然语言处理 的 性能 得到了 显著提升",
+        "未来 在 各个 领域 的 应用 前景 非常 广阔"
+    ]
+    model = Word2Vec(sentences, vector_size=100, window=5, min_count=1, workers=4)
+    print(model.wv['自然语言处理'])
+
+    #2 CBOW本质上是计算词向量之间的余弦相似度，SkipGram也是如此
+
+
+
+if __name__ == "__main__":
+    # test01()
+    testCBOW()

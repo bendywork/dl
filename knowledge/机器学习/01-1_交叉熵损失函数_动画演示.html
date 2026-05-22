@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交叉熵损失函数 — 交互式动画演示</title>
+<style>
+:root{--bg:#0f1117;--card:#1a1d27;--border:#2a2d3a;--text:#e4e4e7;--muted:#71717a;--accent:#f97316;--blue:#3b82f6;--green:#22c55e;--purple:#a855f7;--red:#ef4444;--cyan:#06b6d4}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'SF Mono','Fira Code','Consolas',monospace;overflow-x:hidden}
+.container{max-width:1100px;margin:0 auto;padding:24px}
+h1{text-align:center;font-size:26px;color:var(--accent);margin-bottom:6px}
+.sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:28px}
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--card);border-radius:12px;padding:4px;border:1px solid var(--border)}
+.tab{flex:1;padding:10px 12px;border:none;border-radius:8px;background:0;color:var(--muted);font-family:inherit;font-size:12px;cursor:pointer;transition:.3s;text-align:center}
+.tab:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.tab.on{background:var(--accent);color:#000;font-weight:700}
+.panel{display:none}.panel.show{display:block}
+canvas{display:block;margin:0 auto;border-radius:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.card h3{color:var(--accent);font-size:15px;margin-bottom:10px}
+.card p{line-height:1.8;font-size:13px;color:#b0b0b8}
+.hl{color:var(--accent);font-weight:700}.hl-b{color:var(--blue);font-weight:700}.hl-g{color:var(--green);font-weight:700}.hl-r{color:var(--red);font-weight:700}.hl-p{color:var(--purple);font-weight:700}
+.slider-row{display:flex;align-items:center;gap:12px;margin:12px 0;flex-wrap:wrap}
+.slider-row label{font-size:12px;color:var(--muted);min-width:120px}
+input[type=range]{flex:1;min-width:200px;accent-color:var(--accent)}
+.val{font-size:14px;font-weight:700;min-width:60px;text-align:right}
+.eq{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:10px;padding:14px 20px;text-align:center;font-size:15px;margin-bottom:16px;min-height:50px;display:flex;align-items:center;justify-content:center;line-height:1.6}
+.legend{display:flex;gap:20px;justify-content:center;margin:12px 0;font-size:12px}
+.legend span{display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>交叉熵损失函数</h1>
+<p class="sub">交互式动画 · 信息论根源 → BCE vs MSE → 梯度对比</p>
+
+<div class="tabs">
+<button class="tab on" onclick="sw(0)">1. 信息量与熵</button>
+<button class="tab" onclick="sw(1)">2. 交叉熵直觉</button>
+<button class="tab" onclick="sw(2)">3. BCE vs MSE</button>
+<button class="tab" onclick="sw(3)">4. 梯度对比</button>
+</div>
+
+<!-- Panel 0: 信息量与熵 -->
+<div class="panel show" id="p0">
+<div class="card">
+<h3>信息量 I(p) = -log₂(p)：事件越罕见，信息量越大</h3>
+<p>拖动滑块改变概率 p，观察信息量如何变化。</p>
+<div class="slider-row">
+<label>事件概率 p</label>
+<input type="range" id="s0_p" min="0.01" max="1" step="0.01" value="0.5" oninput="drawP0()">
+<span class="val" id="v0_p">0.50</span>
+</div>
+<div class="eq" id="eq0">I(0.50) = -log₂(0.50) = 1.00 bits</div>
+</div>
+<canvas id="c0" width="700" height="320"></canvas>
+<div class="card">
+<h3>熵 H(P)：分布的平均不确定性</h3>
+<p>拖动滑块改变硬币偏向，观察熵的变化。<span class="hl">公平硬币熵最大，偏向硬币熵降低。</span></p>
+<div class="slider-row">
+<label>正面概率 p</label>
+<input type="range" id="s0_coin" min="0.01" max="0.99" step="0.01" value="0.5" oninput="drawP0()">
+<span class="val" id="v0_coin">0.50</span>
+</div>
+<div class="eq" id="eq0b">H([0.50, 0.50]) = 1.00 bits（最大不确定性）</div>
+</div>
+</div>
+
+<!-- Panel 1: 交叉熵直觉 -->
+<div class="panel" id="p1">
+<div class="card">
+<h3>交叉熵 H(P,Q)：用 Q 编码 P 的代价</h3>
+<p>真实分布 P 固定，拖动滑块改变模型预测 Q。<span class="hl">Q 越接近 P，交叉熵越低。</span></p>
+<div class="slider-row">
+<label>真实分布 P(正类)</label>
+<input type="range" id="s1_p" min="0.01" max="0.99" step="0.01" value="0.9" oninput="drawP1()">
+<span class="val" id="v1_p">0.90</span>
+</div>
+<div class="slider-row">
+<label>模型预测 Q(正类)</label>
+<input type="range" id="s1_q" min="0.01" max="0.99" step="0.01" value="0.9" oninput="drawP1()">
+<span class="val" id="v1_q">0.90</span>
+</div>
+<div class="eq" id="eq1">H(P,Q) = 0.4690 | KL(P||Q) = 0.0000 | Q=P ✓</div>
+</div>
+<canvas id="c1" width="700" height="300"></canvas>
+</div>
+
+<!-- Panel 2: BCE vs MSE -->
+<div class="panel" id="p2">
+<div class="card">
+<h3>BCE vs MSE 惩罚力度对比（y=1 正类）</h3>
+<p>拖动滑块改变预测概率 ŷ，观察两种损失的差异。<span class="hl-r">预测越错，BCE 惩罚越狠（趋向∞）</span>，MSE 最多到 1.0。</p>
+<div class="slider-row">
+<label>预测概率 ŷ</label>
+<input type="range" id="s2_yp" min="0.01" max="0.99" step="0.01" value="0.9" oninput="drawP2()">
+<span class="val" id="v2_yp">0.90</span>
+</div>
+<div class="eq" id="eq2">ŷ=0.90 → BCE=0.105 | MSE=0.010</div>
+</div>
+<canvas id="c2" width="700" height="380"></canvas>
+<div class="card">
+<p><span class="hl">核心差异</span>：ŷ=0.001 时 MSE=0.001（几乎无感），BCE=6.9（严厉惩罚）。交叉熵对"自信且错误"<span class="hl-r">零容忍</span>。</p>
+</div>
+</div>
+
+<!-- Panel 3: 梯度对比 -->
+<div class="panel" id="p3">
+<div class="card">
+<h3>梯度对比：为什么交叉熵学得快</h3>
+<p>sigmoid + MSE：梯度 = (ŷ-y)×ŷ(1-ŷ)，ŷ 接近 0 或 1 时<span class="hl-r">梯度消失</span>。<br>
+sigmoid + BCE：梯度 = ŷ-y，<span class="hl-g">始终有效</span>。</p>
+<div class="slider-row">
+<label>预测概率 ŷ (y=1)</label>
+<input type="range" id="s3_yp" min="0.01" max="0.99" step="0.01" value="0.5" oninput="drawP3()">
+<span class="val" id="v3_yp">0.50</span>
+</div>
+<div class="eq" id="eq3">ŷ=0.50 → MSE梯度=-0.125 | BCE梯度=-0.500</div>
+</div>
+<canvas id="c3" width="700" height="360"></canvas>
+<div class="card">
+<p>BCE 的 log 抵消了 sigmoid 导数中的 ŷ(1-ŷ)，这是数学上的精妙设计。<br>ŷ=0.01 时：MSE 梯度 = -0.01（几乎不动），BCE 梯度 = -0.99（<span class="hl-g">强力纠正</span>）。</p>
+</div>
+</div>
+</div>
+
+<script>
+// Tab switching
+function sw(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',j===i));
+  document.querySelectorAll('.panel').forEach((p,j)=>p.classList.toggle('show',j===i));
+  if(i===0)drawP0();if(i===1)drawP1();if(i===2)drawP2();if(i===3)drawP3();
+}
+
+// Canvas setup helper
+function setupCanvas(id){
+  const c=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const w=+c.getAttribute('width'),h=+c.getAttribute('height');
+  c.width=w*dpr;c.height=h*dpr;c.style.width=w+'px';c.style.height=h+'px';
+  const ctx=c.getContext('2d');ctx.scale(dpr,dpr);
+  return{ctx,w,h};
+}
+
+// Draw helpers
+function drawAxes(ctx,x,y,w,h,xlabel,ylabel,xmin,xmax,ymin,ymax){
+  ctx.save();
+  ctx.strokeStyle='#2a2d3a';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+h);ctx.lineTo(x+w,y+h);ctx.stroke();
+  ctx.fillStyle='#71717a';ctx.font='11px "SF Mono",monospace';ctx.textAlign='center';
+  for(let i=0;i<=4;i++){
+    const v=xmin+(xmax-xmin)*i/4;
+    const px=x+w*i/4;
+    ctx.fillText(v.toFixed(1),px,y+h+14);
+  }
+  ctx.textAlign='right';
+  for(let i=0;i<=4;i++){
+    const v=ymin+(ymax-ymin)*i/4;
+    const py=y+h-h*i/4;
+    ctx.fillText(v.toFixed(1),x-8,py+4);
+  }
+  ctx.fillStyle='#71717a';ctx.font='12px "SF Mono",monospace';
+  ctx.textAlign='center';ctx.fillText(xlabel,x+w/2,y+h+30);
+  ctx.save();ctx.translate(x-36,y+h/2);ctx.rotate(-Math.PI/2);ctx.fillText(ylabel,0,0);ctx.restore();
+  ctx.restore();
+}
+
+function toScreen(x,y,ox,oy,w,h,xmin,xmax,ymin,ymax){
+  return[ox+w*(x-xmin)/(xmax-xmin),oy+h-(h*(y-ymin)/(ymax-ymin))];
+}
+
+// Panel 0: 信息量与熵
+function drawP0(){
+  const p=+document.getElementById('s0_p').value;
+  const coin=+document.getElementById('s0_coin').value;
+  document.getElementById('v0_p').textContent=p.toFixed(2);
+  document.getElementById('v0_coin').textContent=coin.toFixed(2);
+
+  const I=-Math.log2(p);
+  document.getElementById('eq0').innerHTML=`I(${p.toFixed(2)}) = -log₂(${p.toFixed(2)}) = ${I.toFixed(2)} bits`;
+
+  const H=-(coin*Math.log2(coin)+(1-coin)*Math.log2(1-coin));
+  document.getElementById('eq0b').innerHTML=`H([${coin.toFixed(2)}, ${(1-coin).toFixed(2)}]) = ${H.toFixed(2)} bits${coin<0.4||coin>0.6?' (偏向硬币，不确定性低)':' (接近公平，不确定性高)'}`;
+
+  const{ctx,w,h}=setupCanvas('c0');
+
+  // Left: I(p) curve
+  ctx.fillStyle='#1a1d27';ctx.fillRect(0,0,w,h);
+  drawAxes(ctx,60,20,280,260,'p','I(p)',0,1,0,7);
+  ctx.beginPath();ctx.strokeStyle='#f97316';ctx.lineWidth=2;
+  for(let i=1;i<=200;i++){
+    const pi=i/200;
+    const[sx,sy]=toScreen(pi,-Math.log2(pi),60,20,280,260,0,1,0,7);
+    i===1?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy);
+  }
+  ctx.stroke();
+  // Current point
+  const[cx,cy]=toScreen(p,I,60,20,280,260,0,1,0,7);
+  ctx.beginPath();ctx.arc(cx,cy,6,0,Math.PI*2);ctx.fillStyle='#f97316';ctx.fill();
+  ctx.fillStyle='#f97316';ctx.font='600 12px "SF Mono",monospace';ctx.textAlign='left';
+  ctx.fillText(`I=${I.toFixed(2)}`,cx+10,cy-4);
+
+  ctx.fillStyle='#71717a';ctx.font='11px "SF Mono",monospace';ctx.textAlign='center';
+  ctx.fillText('信息量 I(p) = -log₂(p)',200,h-8);
+
+  // Right: entropy bar chart
+  const bars=[
+    {label:'公平\n[.5,.5]',p:[0.5,0.5],color:'#3b82f6'},
+    {label:'当前\n硬币',p:[coin,1-coin],color:'#f97316'},
+    {label:'偏向\n[.9,.1]',p:[0.9,0.1],color:'#a855f7'},
+  ];
+  const barX=420,barW=60,gap=30;
+  bars.forEach((b,i)=>{
+    const H2=-(b.p[0]*Math.log2(b.p[0])+b.p[1]*Math.log2(b.p[1]));
+    const bh=H2/1.1*220;
+    const bx=barX+i*(barW+gap);
+    const by=280-bh;
+    ctx.fillStyle=b.color+'40';ctx.strokeStyle=b.color;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.roundRect(bx,by,barW,bh,4);ctx.fill();ctx.stroke();
+    ctx.fillStyle=b.color;ctx.font='700 13px "SF Mono",monospace';ctx.textAlign='center';
+    ctx.fillText(H2.toFixed(2),bx+barW/2,by-6);
+    ctx.fillStyle='#8a8a9a';ctx.font='10px "SF Mono",monospace';
+    const lines=b.label.split('\n');
+    lines.forEach((l,li)=>ctx.fillText(l,bx+barW/2,296+li*12));
+  });
+  ctx.fillStyle='#71717a';ctx.font='11px "SF Mono",monospace';ctx.textAlign='center';
+  ctx.fillText('熵 H(P) = 平均不确定性',560,h-8);
+}
+
+// Panel 1: 交叉熵直觉
+function drawP1(){
+  const p=+document.getElementById('s1_p').value;
+  const q=+document.getElementById('s1_q').value;
+  document.getElementById('v1_p').textContent=p.toFixed(2);
+  document.getElementById('v1_q').textContent=q.toFixed(2);
+
+  const P=[p,1-p],Q=[q,1-q];
+  const HP=-(P[0]*Math.log2(P[0])+P[1]*Math.log2(P[1]));
+  const HPQ=-(P[0]*Math.log2(Q[0])+P[1]*Math.log2(Q[1]));
+  const KL=HPQ-HP;
+
+  document.getElementById('eq1').innerHTML=`H(P,Q)=${HPQ.toFixed(3)} | H(P)=${HP.toFixed(3)} | KL(P||Q)=${KL.toFixed(3)}${KL<0.01?' → Q≈P ✓':KL<0.5?' → Q 偏离一些':' → Q 严重偏离！'}`;
+
+  const{ctx,w,h}=setupCanvas('c1');
+  ctx.fillStyle='#1a1d27';ctx.fillRect(0,0,w,h);
+
+  // Bar comparison: H(P), H(P,Q), KL
+  const maxV=Math.max(HPQ,3);
+  const bars=[
+    {label:'H(P)\n熵',val:HP,color:'#22c55e'},
+    {label:'H(P,Q)\n交叉熵',val:HPQ,color:'#f97316'},
+    {label:'KL(P||Q)\n额外代价',val:KL,color:'#ef4444'},
+  ];
+  const bw=120,gap=40,ox=160;
+  bars.forEach((b,i)=>{
+    const bh=Math.max(b.val/maxV*200,4);
+    const bx=ox+i*(bw+gap);
+    const by=240-bh;
+    ctx.fillStyle=b.color+'30';ctx.strokeStyle=b.color;ctx.lineWidth=2;
+    ctx.beginPath();ctx.roundRect(bx,by,bw,bh,6);ctx.fill();ctx.stroke();
+    ctx.fillStyle=b.color;ctx.font='700 14px "SF Mono",monospace';ctx.textAlign='center';
+    ctx.fillText(b.val.toFixed(3),bx+bw/2,by-8);
+    const lines=b.label.split('\n');
+    lines.forEach((l,li)=>{ctx.fillStyle='#8a8a9a';ctx.font='11px "SF Mono",monospace';ctx.fillText(l,bx+bw/2,260+li*14);});
+  });
+
+  // Distribution visualization
+  ctx.fillStyle='#71717a';ctx.font='12px "SF Mono",monospace';ctx.textAlign='left';
+  ctx.fillText(`P = [${P[0].toFixed(2)}, ${P[1].toFixed(2)}] (真实)`,20,20);
+  ctx.fillText(`Q = [${Q[0].toFixed(2)}, ${Q[1].toFixed(2)}] (预测)`,20,36);
+
+  // Mini bars for P and Q
+  const miniX=20,miniY=60,miniW=100,miniH=16;
+  ctx.fillStyle='#22c55e40';ctx.fillRect(miniX,miniY,P[0]*miniW,miniH);
+  ctx.fillStyle='#22c55e';ctx.font='10px "SF Mono",monospace';ctx.fillText('P正',miniX+4,miniY+12);
+  ctx.fillStyle='#22c55e40';ctx.fillRect(miniX,miniY+20,P[1]*miniW,miniH);
+  ctx.fillText('P负',miniX+4,miniY+32);
+
+  ctx.fillStyle='#f9731640';ctx.fillRect(miniX+130,miniY,Q[0]*miniW,miniH);
+  ctx.fillStyle='#f97316';ctx.fillText('Q正',miniX+134,miniY+12);
+  ctx.fillStyle='#f9731640';ctx.fillRect(miniX+130,miniY+20,Q[1]*miniW,miniH);
+  ctx.fillText('Q负',miniX+134,miniY+32);
+}
+
+// Panel 2: BCE vs MSE
+function drawP2(){
+  const yp=+document.getElementById('s2_yp').value;
+  document.getElementById('v2_yp').textContent=yp.toFixed(2);
+
+  const bce=-Math.log(yp);
+  const mse=(yp-1)**2;
+  document.getElementById('eq2').innerHTML=`ŷ=${yp.toFixed(2)} → BCE=${bce.toFixed(3)} | MSE=${mse.toFixed(3)}`;
+
+  const{ctx,w,h}=setupCanvas('c2');
+  ctx.fillStyle='#1a1d27';ctx.fillRect(0,0,w,h);
+
+  drawAxes(ctx,60,20,620,300,'ŷ (预测概率)','Loss',0,1,0,8);
+
+  // BCE curve
+  ctx.beginPath();ctx.strokeStyle='#f97316';ctx.lineWidth=2.5;
+  for(let i=1;i<=300;i++){
+    const pi=i/300*0.99+0.01;
+    const[ sx,sy]=toScreen(pi,-Math.log(pi),60,20,620,300,0,1,0,8);
+    i===1?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy);
+  }
+  ctx.stroke();
+
+  // MSE curve
+  ctx.beginPath();ctx.strokeStyle='#3b82f6';ctx.lineWidth=2.5;
+  for(let i=1;i<=300;i++){
+    const pi=i/300*0.99+0.01;
+    const[sx,sy]=toScreen(pi,(pi-1)**2,60,20,620,300,0,1,0,8);
+    i===1?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy);
+  }
+  ctx.stroke();
+
+  // Current point on both
+  const[bx,by]=toScreen(yp,bce,60,20,620,300,0,1,0,8);
+  ctx.beginPath();ctx.arc(bx,by,6,0,Math.PI*2);ctx.fillStyle='#f97316';ctx.fill();
+  const[mx,my]=toScreen(yp,mse,60,20,620,300,0,1,0,8);
+  ctx.beginPath();ctx.arc(mx,my,6,0,Math.PI*2);ctx.fillStyle='#3b82f6';ctx.fill();
+
+  // Vertical line from ŷ
+  ctx.setLineDash([4,4]);ctx.strokeStyle='#71717a';ctx.lineWidth=1;
+  const[vx]=toScreen(yp,0,60,20,620,300,0,1,0,8);
+  ctx.beginPath();ctx.moveTo(vx,20);ctx.lineTo(vx,320);ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Legend
+  ctx.font='600 12px "SF Mono",monospace';
+  ctx.fillStyle='#f97316';ctx.fillText('■ BCE = -log(ŷ)',540,46);
+  ctx.fillStyle='#3b82f6';ctx.fillText('■ MSE = (ŷ-1)²',540,62);
+
+  // Annotations
+  ctx.fillStyle='#ef4444';ctx.font='11px "SF Mono",monospace';ctx.textAlign='left';
+  ctx.fillText('ŷ→0 时',70,50);
+  ctx.fillText('BCE→∞ 严厉',70,64);
+  ctx.fillText('MSE→1 温和',70,78);
+}
+
+// Panel 3: Gradient comparison
+function drawP3(){
+  const yp=+document.getElementById('s3_yp').value;
+  document.getElementById('v3_yp').textContent=yp.toFixed(2);
+
+  const mse_grad=(yp-1)*yp*(1-yp);
+  const bce_grad=yp-1;
+  document.getElementById('eq3').innerHTML=`ŷ=${yp.toFixed(2)} → MSE梯度=${mse_grad.toFixed(4)} | BCE梯度=${bce_grad.toFixed(4)}`;
+
+  const{ctx,w,h}=setupCanvas('c3');
+  ctx.fillStyle='#1a1d27';ctx.fillRect(0,0,w,h);
+
+  drawAxes(ctx,60,20,620,280,'ŷ (预测概率)','梯度大小',0,1,-1,0.1);
+
+  // MSE gradient curve (absolute value for display)
+  ctx.beginPath();ctx.strokeStyle='#3b82f6';ctx.lineWidth=2.5;
+  for(let i=1;i<=300;i++){
+    const pi=i/300*0.99+0.01;
+    const g=(pi-1)*pi*(1-pi);
+    const[sx,sy]=toScreen(pi,g,60,20,620,280,0,1,-1,0.1);
+    i===1?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy);
+  }
+  ctx.stroke();
+
+  // BCE gradient curve
+  ctx.beginPath();ctx.strokeStyle='#22c55e';ctx.lineWidth=2.5;
+  for(let i=1;i<=300;i++){
+    const pi=i/300*0.99+0.01;
+    const g=pi-1;
+    const[sx,sy]=toScreen(pi,g,60,20,620,280,0,1,-1,0.1);
+    i===1?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy);
+  }
+  ctx.stroke();
+
+  // Zero line
+  const[,zy]=toScreen(0,0,60,20,620,280,0,1,-1,0.1);
+  ctx.setLineDash([4,4]);ctx.strokeStyle='#2a2d3a';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(60,zy);ctx.lineTo(680,zy);ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Current points
+  const[bx,by]=toScreen(yp,bce_grad,60,20,620,280,0,1,-1,0.1);
+  ctx.beginPath();ctx.arc(bx,by,6,0,Math.PI*2);ctx.fillStyle='#22c55e';ctx.fill();
+  const[mx,my]=toScreen(yp,mse_grad,60,20,620,280,0,1,-1,0.1);
+  ctx.beginPath();ctx.arc(mx,my,6,0,Math.PI*2);ctx.fillStyle='#3b82f6';ctx.fill();
+
+  // Legend
+  ctx.font='600 12px "SF Mono",monospace';ctx.textAlign='left';
+  ctx.fillStyle='#22c55e';ctx.fillText('■ BCE梯度 = ŷ-y',530,46);
+  ctx.fillStyle='#3b82f6';ctx.fillText('■ MSE梯度 = (ŷ-y)ŷ(1-ŷ)',530,62);
+
+  // Annotation
+  ctx.fillStyle='#ef4444';ctx.font='11px "SF Mono",monospace';
+  ctx.fillText('ŷ≈0 或 ŷ≈1 时',70,50);
+  ctx.fillText('MSE梯度→0 消失！',70,64);
+  ctx.fillText('BCE梯度≈-1 仍有效',70,78);
+}
+
+// Init
+drawP0();drawP1();drawP2();drawP3();
+</script>
+</body>
+</html>
