@@ -120,6 +120,7 @@ def training():
     # 定义hook
     # handle = net.features.register_forward_hook(_hook_fn)
     # handle.remove()  # 删除，不进行hook操作
+    name, param = net.named_parameters()  # 获取模型的所有参数对象
 
     # 3. 模型训练+模型评估+模型持久化
     total_epoch = 100
@@ -146,8 +147,8 @@ def training():
             loss = loss_fn(score, batch_y_train)
 
             # 反向过程
-            opt.zero_grad()  # 重置当前优化器对应的所有参数的梯度为0
-            loss.backward()  # 计算和当前损失相同的所有参数的梯度值
+            opt.zero_grad()  # 重置当前优化器对应的所有参数的梯度为0 防止梯度累计
+            loss.backward()  # 计算和当前损失相同的所有参数的梯度值 
             opt.step()  # 参数更新
 
             print(f"Train Epoch {epoch}/{total_epoch} Batch {batch_idx}/{total_train_batch} Loss:{loss.item():.3f}")
@@ -180,7 +181,7 @@ def training():
         torch.save(
             {
                 'net': net,  # 模型对象(参数 + 结构)
-                'net_param': net.state_dict(),  # 模型网络对应的所有参数
+                'net_param': net.state_dict(),  # 模型网络对应的所有参数(name_parameter不会返回模型结构相关的参数对象)
                 'epoch': epoch
             },
             os.path.join(model_output_dir, f"{epoch:06d}.pkl")
