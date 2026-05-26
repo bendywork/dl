@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Embedding 词嵌入动画演示</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+           background: #0f0f1a; color: #e0e0e0; padding: 20px; }
+    h1 { text-align: center; color: #7eb8f7; margin-bottom: 8px; font-size: 22px; }
+    .subtitle { text-align: center; color: #888; margin-bottom: 24px; font-size: 14px; }
+
+    .section { background: #1a1a2e; border: 1px solid #2a2a4a;
+               border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .section h2 { color: #a0c4ff; font-size: 16px; margin-bottom: 14px; }
+
+    /* ─── Pipeline 动画 ─── */
+    .pipeline { display: flex; align-items: center; justify-content: center;
+                flex-wrap: wrap; gap: 8px; }
+    .box { border-radius: 8px; padding: 10px 14px; text-align: center;
+           font-size: 13px; min-width: 70px; }
+    .box.word  { background: #2d3561; border: 1px solid #4a5899; color: #b0c4ff; }
+    .box.index { background: #1f4035; border: 1px solid #2e6b55; color: #6effc8; }
+    .box.vec   { background: #3d2040; border: 1px solid #6a3a7a; color: #d4a0ff; }
+    .arrow { font-size: 20px; color: #555; }
+
+    /* ─── 查找表可视化 ─── */
+    .lookup-wrap { display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; }
+    .matrix { display: flex; flex-direction: column; gap: 4px; }
+    .matrix-row { display: flex; gap: 4px; align-items: center; }
+    .cell { width: 52px; height: 34px; border-radius: 6px; display: flex;
+            align-items: center; justify-content: center; font-size: 11px;
+            font-family: monospace; transition: all 0.4s; }
+    .cell.word-label { background: transparent; border: none; color: #888;
+                       font-size: 12px; width: 40px; justify-content: flex-end;
+                       padding-right: 6px; }
+    .cell.dim-label  { background: transparent; border: none; color: #555;
+                       font-size: 11px; height: 20px; }
+    .cell.normal  { background: #252540; border: 1px solid #3a3a60; color: #aaa; }
+    .cell.active  { background: #4a2070; border: 1px solid #9050d0; color: #e0b0ff;
+                    transform: scale(1.08); box-shadow: 0 0 10px #7030b0; }
+    .cell.highlight { background: #1e4d30; border: 1px solid #3eb870; color: #70ffa0; }
+
+    .lookup-result { background: #1a1a2e; border: 1px solid #3a3a60;
+                     border-radius: 10px; padding: 16px; min-width: 180px; }
+    .lookup-result h3 { color: #888; font-size: 13px; margin-bottom: 10px; }
+    .result-vec { display: flex; gap: 6px; flex-wrap: wrap; }
+    .val-box { background: #1e4d30; border: 1px solid #3eb870; color: #70ffa0;
+               border-radius: 6px; padding: 6px 10px; font-family: monospace;
+               font-size: 13px; min-width: 60px; text-align: center; }
+
+    /* ─── Shape 变换 ─── */
+    .shape-flow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .shape-box { border-radius: 10px; padding: 12px 18px; text-align: center; }
+    .shape-box.s1 { background: #1f3055; border: 1px solid #3a6090; }
+    .shape-box.s2 { background: #1f4035; border: 1px solid #2e6b55; }
+    .shape-box.s3 { background: #3d2040; border: 1px solid #6a3a7a; }
+    .shape-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+    .shape-val   { font-size: 16px; color: #e0e0e0; font-family: monospace; font-weight: bold; }
+
+    /* ─── Controls ─── */
+    .controls { display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+    button { padding: 8px 20px; border-radius: 20px; border: none; cursor: pointer;
+             font-size: 13px; font-weight: 600; transition: all 0.2s; }
+    .btn-primary { background: #5060d0; color: #fff; }
+    .btn-primary:hover { background: #6070e0; }
+    .btn-secondary { background: #2a2a4a; color: #aaa; border: 1px solid #3a3a6a; }
+    .btn-secondary:hover { background: #3a3a5a; color: #ddd; }
+    .word-btn { padding: 6px 14px; background: #1f3055; color: #7eb8f7;
+                border: 1px solid #3a6090; border-radius: 16px; font-size: 13px; }
+    .word-btn.selected { background: #4a5899; color: #fff; border-color: #7eb8f7; }
+
+    /* ─── Info ─── */
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                 gap: 12px; }
+    .info-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px;
+                 padding: 14px; }
+    .info-card h3 { color: #a0c4ff; font-size: 13px; margin-bottom: 8px; }
+    .info-card p  { color: #bbb; font-size: 13px; line-height: 1.6; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 10px;
+           font-size: 11px; margin: 2px; }
+    .tag.green  { background: #1e4d30; color: #70ffa0; border: 1px solid #3eb870; }
+    .tag.purple { background: #3d2040; color: #d4a0ff; border: 1px solid #6a3a7a; }
+    .tag.blue   { background: #1f3055; color: #7eb8f7; border: 1px solid #3a6090; }
+
+    .step-label { font-size: 11px; color: #666; text-align: center; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<h1>📖 Embedding 词嵌入 — 动画演示</h1>
+<p class="subtitle">把文字变成向量的"查找表" — 神经网络处理文字的第一步</p>
+
+<!-- Section 1: 完整流程 -->
+<div class="section">
+  <h2>🔄 完整数据流：文字 → 索引 → 向量</h2>
+  <div class="pipeline" id="pipeline">
+    <!-- 动态生成 -->
+  </div>
+</div>
+
+<!-- Section 2: 查找表交互 -->
+<div class="section">
+  <h2>🗂 可学习的查找表（点击词查看对应向量）</h2>
+  <p style="color:#666; font-size:13px; margin-bottom:12px;">
+    Embedding 本质是一个 <strong style="color:#a0c4ff">vocab_size × embed_dim</strong> 的权重矩阵，
+    输入词的索引，返回对应行的向量。
+  </p>
+  <div class="lookup-wrap">
+    <div>
+      <div style="display:flex; gap:4px; margin-bottom:4px;">
+        <div class="cell word-label"></div>
+        <div class="cell dim-label" style="width:52px">dim0</div>
+        <div class="cell dim-label" style="width:52px">dim1</div>
+        <div class="cell dim-label" style="width:52px">dim2</div>
+        <div class="cell dim-label" style="width:52px">dim3</div>
+      </div>
+      <div class="matrix" id="lookup-matrix"></div>
+    </div>
+    <div class="lookup-result">
+      <h3>查询结果</h3>
+      <div id="result-word" style="color:#a0c4ff; font-size:15px; margin-bottom:8px; font-weight:bold;">点击左侧词</div>
+      <div class="result-vec" id="result-vec">
+        <div class="val-box" style="background:#252540; color:#555; border-color:#3a3a60">—</div>
+        <div class="val-box" style="background:#252540; color:#555; border-color:#3a3a60">—</div>
+        <div class="val-box" style="background:#252540; color:#555; border-color:#3a3a60">—</div>
+        <div class="val-box" style="background:#252540; color:#555; border-color:#3a3a60">—</div>
+      </div>
+      <div style="margin-top:14px; font-size:12px; color:#666;">
+        ↑ 这些值在训练中会<br>不断调整，让意思相近的词<br>向量距离变近
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <div id="word-btns" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+  </div>
+</div>
+
+<!-- Section 3: Shape 变换 -->
+<div class="section">
+  <h2>📐 Tensor Shape 变换</h2>
+  <div class="shape-flow">
+    <div class="shape-box s1">
+      <div class="shape-label">输入（词索引）</div>
+      <div class="shape-val">(batch, seq_len)</div>
+      <div class="shape-label" style="margin-top:6px">e.g. (2, 5)</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="shape-box s2">
+      <div class="shape-label">Embedding 层</div>
+      <div class="shape-val">nn.Embedding</div>
+      <div class="shape-label" style="margin-top:6px">vocab×embed 矩阵查找</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="shape-box s3">
+      <div class="shape-label">输出（词向量序列）</div>
+      <div class="shape-val">(batch, seq_len, embed_dim)</div>
+      <div class="shape-label" style="margin-top:6px">e.g. (2, 5, 128)</div>
+    </div>
+  </div>
+  <div style="margin-top:16px; display:flex; gap:20px; flex-wrap:wrap;">
+    <div style="font-size:13px; color:#888;">
+      <span class="tag blue">batch=2</span> 2个句子同时处理<br>
+      <span class="tag green">seq_len=5</span> 每句最多5个词<br>
+      <span class="tag purple">embed_dim=128</span> 每个词用128维向量表示
+    </div>
+    <div style="font-size:13px; color:#888; line-height:1.8;">
+      <strong style="color:#a0c4ff">关键：</strong>每个整数索引都变成了一个实数向量<br>
+      这个向量是<strong style="color:#70ffa0">可学习的</strong>，会随训练更新
+    </div>
+  </div>
+</div>
+
+<!-- Section 4: 核心要点 -->
+<div class="section">
+  <h2>💡 核心要点</h2>
+  <div class="info-grid">
+    <div class="info-card">
+      <h3>为什么不用 one-hot？</h3>
+      <p>one-hot 是 vocab_size 维稀疏向量，维度巨大且<strong style="color:#f0a060">无语义信息</strong>。Embedding 压缩到 128/256 维，且相似词向量相近。</p>
+    </div>
+    <div class="info-card">
+      <h3>本质是什么？</h3>
+      <p>Embedding = <strong style="color:#7eb8f7">one-hot × 权重矩阵</strong>。但跳过稀疏乘法，直接用索引<strong style="color:#70ffa0">取对应行</strong>，效率更高。</p>
+    </div>
+    <div class="info-card">
+      <h3>padding_idx</h3>
+      <p>设置 <code style="color:#d4a0ff">padding_idx=0</code> 后，&lt;pad&gt; 的向量<strong style="color:#70ffa0">保持全零</strong>，反向传播时梯度也为零，不影响其他词学习。</p>
+    </div>
+    <div class="info-card">
+      <h3>预训练 vs 随机初始化</h3>
+      <p>可加载 Word2Vec、GloVe、BERT 的预训练向量作为初始值，让模型从更好的起点开始训练（<strong style="color:#f0a060">迁移学习</strong>）。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── 数据 ───
+const vocab = ["<pad>", "我", "爱", "深度", "学习"];
+// 固定的"伪训练后"权重，用于演示
+const weights = [
+  [ 0.00,  0.00,  0.00,  0.00],
+  [ 0.82, -0.31,  0.54,  0.19],
+  [ 0.61,  0.70, -0.22,  0.45],
+  [-0.44,  0.35,  0.88, -0.60],
+  [-0.51,  0.28,  0.77, -0.52],
+];
+
+// ─── Part1: Pipeline ───
+function buildPipeline() {
+  const sentence = ["我", "爱", "深度", "学习"];
+  const indices  = [1, 2, 3, 4];
+  const container = document.getElementById('pipeline');
+  container.innerHTML = '';
+
+  sentence.forEach((w, i) => {
+    const wBox = document.createElement('div');
+    wBox.innerHTML = `<div class="box word">${w}</div><div class="step-label">词</div>`;
+    wBox.style.textAlign = 'center';
+    container.appendChild(wBox);
+
+    const arr1 = document.createElement('div');
+    arr1.innerHTML = '<div class="arrow">→</div>';
+    container.appendChild(arr1);
+
+    const iBox = document.createElement('div');
+    iBox.innerHTML = `<div class="box index">${indices[i]}</div><div class="step-label">索引</div>`;
+    iBox.style.textAlign = 'center';
+    container.appendChild(iBox);
+
+    const arr2 = document.createElement('div');
+    arr2.innerHTML = '<div class="arrow">→</div>';
+    container.appendChild(arr2);
+
+    const vec = weights[indices[i]].map(v => v.toFixed(2));
+    const vBox = document.createElement('div');
+    vBox.innerHTML = `<div class="box vec">[${vec.join(', ')}]</div><div class="step-label">向量</div>`;
+    vBox.style.textAlign = 'center';
+    container.appendChild(vBox);
+
+    if (i < sentence.length - 1) {
+      const sep = document.createElement('div');
+      sep.style.cssText = 'width:100%; height:1px; background:#2a2a4a; margin:4px 0;';
+      // 不加，保持横排
+    }
+  });
+}
+
+// ─── Part2: 查找表 ───
+let selectedRow = -1;
+
+function buildMatrix() {
+  const matrix = document.getElementById('lookup-matrix');
+  matrix.innerHTML = '';
+  vocab.forEach((w, r) => {
+    const row = document.createElement('div');
+    row.className = 'matrix-row';
+    row.style.cursor = 'pointer';
+    row.onclick = () => selectRow(r);
+
+    const label = document.createElement('div');
+    label.className = 'cell word-label';
+    label.textContent = w;
+    row.appendChild(label);
+
+    weights[r].forEach((v, c) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell normal';
+      cell.id = `cell-${r}-${c}`;
+      cell.textContent = v.toFixed(2);
+      row.appendChild(cell);
+    });
+    matrix.appendChild(row);
+  });
+}
+
+function selectRow(r) {
+  // 重置所有
+  vocab.forEach((_, row) => {
+    weights[row].forEach((_, col) => {
+      const c = document.getElementById(`cell-${row}-${col}`);
+      if (c) c.className = 'cell normal';
+    });
+  });
+  // 高亮选中行
+  weights[r].forEach((_, col) => {
+    const c = document.getElementById(`cell-${r}-${col}`);
+    if (c) c.className = 'cell active';
+  });
+  selectedRow = r;
+
+  // 更新结果区
+  document.getElementById('result-word').textContent =
+    `"${vocab[r]}"  (索引 ${r})`;
+  const rv = document.getElementById('result-vec');
+  rv.innerHTML = weights[r].map(v =>
+    `<div class="val-box">${v.toFixed(2)}</div>`
+  ).join('');
+
+  // 更新按钮状态
+  document.querySelectorAll('.word-btn').forEach((btn, i) => {
+    btn.classList.toggle('selected', i === r);
+  });
+}
+
+function buildWordBtns() {
+  const container = document.getElementById('word-btns');
+  vocab.forEach((w, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'word-btn';
+    btn.textContent = w;
+    btn.onclick = () => selectRow(i);
+    container.appendChild(btn);
+  });
+}
+
+// ─── Init ───
+buildPipeline();
+buildMatrix();
+buildWordBtns();
+selectRow(1);  // 默认选"我"
+</script>
+</body>
+</html>

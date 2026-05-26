@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卷积操作动画演示</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #e0e0e0; font-family: 'Consolas', monospace; overflow-x: hidden; }
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+h1 { text-align: center; font-size: 28px; margin-bottom: 8px; color: #00d2ff; }
+.subtitle { text-align: center; color: #888; margin-bottom: 30px; font-size: 14px; }
+
+.demo-section { background: #16213e; border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 1px solid #0f3460; }
+.demo-title { font-size: 20px; color: #00d2ff; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.demo-title span { font-size: 14px; color: #888; font-weight: normal; }
+
+.grid-container { display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; }
+.matrix-wrap { text-align: center; }
+.matrix-label { font-size: 14px; color: #888; margin-bottom: 6px; }
+.matrix { display: inline-grid; gap: 2px; }
+.cell { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; border-radius: 4px; transition: all 0.2s; }
+.cell-input { background: #1a1a2e; border: 1px solid #333; color: #ccc; }
+.cell-kernel { background: #0f3460; color: #00d2ff; border: 1px solid #1a5276; }
+.cell-highlight { background: #2d4059 !important; border-color: #00d2ff !important; color: #fff !important; box-shadow: 0 0 8px rgba(0,210,255,0.4); }
+.cell-active-kernel { background: #1a5276 !important; border-color: #ff6b6b !important; color: #ff6b6b !important; }
+.cell-output { background: #1a1a2e; border: 1px solid #333; color: #ccc; }
+.cell-filled { background: #0a3d62; border-color: #00d2ff; color: #00d2ff; }
+.cell-multiply { background: #4a1942; border-color: #e94560; color: #e94560; }
+
+.operator { font-size: 36px; color: #555; font-weight: bold; }
+
+.controls { display: flex; justify-content: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.btn { padding: 8px 20px; border: 1px solid #0f3460; background: #16213e; color: #00d2ff; border-radius: 6px; cursor: pointer; font-size: 14px; font-family: inherit; transition: all 0.2s; }
+.btn:hover { background: #0f3460; }
+.btn.active { background: #0f3460; border-color: #00d2ff; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.calc-display { text-align: center; margin-top: 16px; font-size: 15px; min-height: 24px; color: #e94560; }
+.calc-detail { color: #aaa; font-size: 13px; margin-top: 4px; }
+
+.info-box { background: #0a3d62; border-radius: 8px; padding: 16px; margin-top: 16px; font-size: 13px; line-height: 1.8; }
+.info-box strong { color: #00d2ff; }
+.info-box .tag { display: inline-block; background: #0f3460; padding: 2px 8px; border-radius: 4px; margin: 2px; font-size: 12px; }
+
+.filter-selector { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.filter-btn { padding: 6px 14px; border: 1px solid #333; background: #1a1a2e; color: #aaa; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; transition: all 0.2s; }
+.filter-btn.active { background: #0f3460; border-color: #00d2ff; color: #00d2ff; }
+.filter-btn:hover { border-color: #555; }
+
+/* 针雕类比区域 */
+.pin-art-section { background: linear-gradient(135deg, #16213e 0%, #0f3460 100%); border-radius: 12px; padding: 30px; margin-bottom: 24px; border: 1px solid #1a5276; }
+.pin-art-grid { display: flex; align-items: center; justify-content: center; gap: 40px; flex-wrap: wrap; }
+.pin-container { text-align: center; }
+.pin-board { display: inline-grid; grid-template-columns: repeat(12, 8px); gap: 2px; background: #333; padding: 8px; border-radius: 8px; }
+.pin { width: 8px; height: var(--pin-h, 20px); background: linear-gradient(to top, #666, #bbb); border-radius: 2px; transition: height 0.4s, background 0.4s; }
+.pin.pressed { background: linear-gradient(to top, #e94560, #ff6b6b); }
+.pin-art-label { margin-top: 10px; font-size: 14px; color: #888; }
+.pin-art-arrow { font-size: 40px; color: #e94560; }
+.pin-art-desc { max-width: 400px; font-size: 14px; line-height: 1.8; color: #ccc; }
+.pin-art-desc strong { color: #00d2ff; }
+
+/* RGB卷积 */
+.rgb-section { display: flex; align-items: flex-start; justify-content: center; gap: 16px; flex-wrap: wrap; }
+.rgb-channel { text-align: center; }
+.rgb-channel .matrix-label { font-weight: bold; }
+.rgb-r .cell-kernel { background: #3d0c0c; border-color: #e94560; color: #e94560; }
+.rgb-g .cell-kernel { background: #0c3d0c; border-color: #4ecdc4; color: #4ecdc4; }
+.rgb-b .cell-kernel { background: #0c0c3d; border-color: #6c5ce7; color: #6c5ce7; }
+.sum-symbol { font-size: 30px; color: #888; align-self: center; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>CNN 卷积操作动画演示</h1>
+<p class="subtitle">卷积核滑动扫描 · 点乘求和 · 特征提取 · 权重共享</p>
+
+<!-- ==================== 针雕类比 ==================== -->
+<div class="pin-art-section">
+  <div class="demo-title">🎯 针雕类比——理解卷积核</div>
+  <div class="pin-art-grid">
+    <div class="pin-container">
+      <div class="pin-board" id="pinBoard1"></div>
+      <div class="pin-art-label">模具按在位置A</div>
+    </div>
+    <div class="pin-art-arrow">→</div>
+    <div class="pin-container">
+      <div class="pin-board" id="pinBoard2"></div>
+      <div class="pin-art-label">模具按在位置B</div>
+    </div>
+    <div class="pin-art-desc">
+      <strong>卷积核 = 针雕模具</strong><br>
+      同一个模具，不管按在哪里，凹凸效果一致。<br>
+      同一个卷积核，不管扫到哪里，检测效果一致。<br>
+      这就是<strong>权重共享</strong>——9个参数在整张图上复用。
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 演示1: 卷积滑动过程 ==================== -->
+<div class="demo-section">
+  <div class="demo-title">📐 卷积滑动过程 <span>3×3卷积核在5×5输入上滑动</span></div>
+
+  <div class="filter-selector" id="filterSelector"></div>
+
+  <div class="grid-container">
+    <div class="matrix-wrap">
+      <div class="matrix-label">输入特征图 (5×5)</div>
+      <div class="matrix" id="inputMatrix" style="grid-template-columns: repeat(5, 44px);"></div>
+    </div>
+    <div class="operator">⊗</div>
+    <div class="matrix-wrap">
+      <div class="matrix-label">卷积核 (3×3)</div>
+      <div class="matrix" id="kernelMatrix" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+    <div class="operator">=</div>
+    <div class="matrix-wrap">
+      <div class="matrix-label">输出特征图 (3×3)</div>
+      <div class="matrix" id="outputMatrix" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+  </div>
+
+  <div class="calc-display" id="calcDisplay"></div>
+  <div class="calc-detail" id="calcDetail"></div>
+
+  <div class="controls">
+    <button class="btn" id="btnStep" onclick="stepConv()">单步滑动</button>
+    <button class="btn" id="btnAuto" onclick="toggleAuto()">自动播放</button>
+    <button class="btn" onclick="resetConv()">重置</button>
+  </div>
+
+  <div class="info-box">
+    <strong>卷积过程</strong>：卷积核（3×3小窗口）在输入上从左到右、从上到下滑动，<br>
+    每到一个位置，将窗口内的元素与卷积核<strong>逐元素相乘再求和</strong>，得到输出特征图的一个值。<br>
+    <span class="tag">权重共享</span> 同一个卷积核在所有位置共用同一组权重
+    <span class="tag">局部连接</span> 每次只看3×3区域而非全图
+    <span class="tag">平移不变</span> 同一特征不管在哪都能被检测到
+  </div>
+</div>
+
+<!-- ==================== 演示2: 不同卷积核效果 ==================== -->
+<div class="demo-section">
+  <div class="demo-title">🔍 不同卷积核提取不同特征 <span>点击切换卷积核查看输出差异</span></div>
+  <div class="grid-container" id="filterCompare"></div>
+  <div class="info-box">
+    <strong>关键理解</strong>：卷积核的权重是训练出来的，不是手工设计的。<br>
+    初始化随机 → 反向传播自动学习 → 收敛到有意义的模式检测器<br>
+    <span class="tag">浅层</span> 边缘/线条/纹理
+    <span class="tag">深层</span> 眼睛/轮子/语义
+  </div>
+</div>
+
+<!-- ==================== 演示3: 多通道卷积 ==================== -->
+<div class="demo-section">
+  <div class="demo-title">🎨 RGB多通道卷积 <span>3通道输入 × 1个卷积核 = 1张特征图</span></div>
+  <div class="rgb-section">
+    <div class="rgb-channel rgb-r">
+      <div class="matrix-label">R通道 × R权重</div>
+      <div class="matrix" id="rgbR" style="grid-template-columns: repeat(3, 38px);"></div>
+    </div>
+    <div class="sum-symbol">+</div>
+    <div class="rgb-channel rgb-g">
+      <div class="matrix-label">G通道 × G权重</div>
+      <div class="matrix" id="rgbG" style="grid-template-columns: repeat(3, 38px);"></div>
+    </div>
+    <div class="sum-symbol">+</div>
+    <div class="rgb-channel rgb-b">
+      <div class="matrix-label">B通道 × B权重</div>
+      <div class="matrix" id="rgbB" style="grid-template-columns: repeat(3, 38px);"></div>
+    </div>
+    <div class="sum-symbol">=</div>
+    <div class="matrix-wrap">
+      <div class="matrix-label">输出1个值</div>
+      <div class="matrix" id="rgbOut" style="grid-template-columns: repeat(1, 44px);"></div>
+    </div>
+  </div>
+  <div class="info-box">
+    <strong>RGB卷积</strong>：卷积核深度必须匹配输入通道数（3通道=3层权重）。<br>
+    每个通道分别点乘，三个结果求和 → 输出特征图的<strong>一个像素</strong>。<br>
+    64个卷积核 → 输出64张特征图叠在一起 → [H, W, 64]
+  </div>
+</div>
+
+</div>
+
+<script>
+// ============================================================
+// 数据定义
+// ============================================================
+const INPUT_5x5 = [
+  [1, 0, 1, 0, 1],
+  [0, 1, 0, 1, 0],
+  [1, 0, 1, 0, 1],
+  [0, 1, 0, 1, 0],
+  [1, 0, 1, 0, 1],
+];
+
+const FILTERS = {
+  '纵向边缘': { kernel: [[-1,0,1],[-1,0,1],[-1,0,1]], desc: '检测竖线，左暗右亮处响应最强' },
+  '横向边缘': { kernel: [[-1,-1,-1],[0,0,0],[1,1,1]], desc: '检测横线，上暗下亮处响应最强' },
+  '锐化': { kernel: [[0,-1,0],[-1,5,-1],[0,-1,0]], desc: '增强边缘对比度，中心权重5突出自身' },
+  '模糊': { kernel: [[1,1,1],[1,1,1],[1,1,1]], desc: '9个1求和再除9，局部平均抹平噪声' },
+};
+
+let currentFilter = '纵向边缘';
+let convPos = { i: 0, j: 0 };
+let outputValues = Array.from({length:3}, () => Array(3).fill(null));
+let autoInterval = null;
+let isAuto = false;
+
+// ============================================================
+// 针雕动画
+// ============================================================
+function initPinArt() {
+  const mold = [0,1,2,3,2,1,0,1,2,3,2,1];
+  for (const id of ['pinBoard1', 'pinBoard2']) {
+    const board = document.getElementById(id);
+    board.innerHTML = '';
+    for (let r = 0; r < 7; r++) {
+      for (let c = 0; c < 12; c++) {
+        const pin = document.createElement('div');
+        pin.className = 'pin';
+        const h = 8 + mold[c] * 6;
+        pin.style.setProperty('--pin-h', h + 'px');
+        if (mold[c] >= 2) pin.classList.add('pressed');
+        board.appendChild(pin);
+      }
+    }
+  }
+  // 动态动画：循环按压不同位置
+  let offset = 0;
+  setInterval(() => {
+    offset = (offset + 1) % 8;
+    const mold1 = [0,0,0,0,0,0,0,0,0,0,0,0].map((_, i) => {
+      const d = Math.abs(i - (3 + offset));
+      return Math.max(0, 4 - d);
+    });
+    const mold2 = [0,0,0,0,0,0,0,0,0,0,0,0].map((_, i) => {
+      const d = Math.abs(i - (9 - offset));
+      return Math.max(0, 4 - d);
+    });
+    updatePinBoard('pinBoard1', mold1);
+    updatePinBoard('pinBoard2', mold2);
+  }, 800);
+}
+
+function updatePinBoard(id, mold) {
+  const board = document.getElementById(id);
+  const pins = board.querySelectorAll('.pin');
+  pins.forEach((pin, idx) => {
+    const row = Math.floor(idx / 12);
+    const col = idx % 12;
+    const h = 8 + mold[col] * 5;
+    pin.style.setProperty('--pin-h', h + 'px');
+    pin.classList.toggle('pressed', mold[col] >= 2);
+  });
+}
+
+// ============================================================
+// 卷积滑动动画
+// ============================================================
+function initFilterSelector() {
+  const sel = document.getElementById('filterSelector');
+  sel.innerHTML = '';
+  Object.keys(FILTERS).forEach(name => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (name === currentFilter ? ' active' : '');
+    btn.textContent = name;
+    btn.onclick = () => {
+      currentFilter = name;
+      document.querySelectorAll('#filterSelector .filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      resetConv();
+    };
+    sel.appendChild(btn);
+  });
+}
+
+function renderInputMatrix() {
+  const el = document.getElementById('inputMatrix');
+  el.innerHTML = '';
+  const ki = convPos.i, kj = convPos.j;
+  for (let i = 0; i < 5; i++) {
+    for (let j = 0; j < 5; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell cell-input';
+      cell.textContent = INPUT_5x5[i][j];
+      if (i >= ki && i < ki + 3 && j >= kj && j < kj + 3) {
+        cell.classList.add('cell-highlight');
+      }
+      el.appendChild(cell);
+    }
+  }
+}
+
+function renderKernelMatrix() {
+  const el = document.getElementById('kernelMatrix');
+  el.innerHTML = '';
+  const k = FILTERS[currentFilter].kernel;
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell cell-kernel';
+      cell.textContent = k[i][j];
+      el.appendChild(cell);
+    }
+  }
+}
+
+function renderOutputMatrix() {
+  const el = document.getElementById('outputMatrix');
+  el.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      const cell = document.createElement('div');
+      if (outputValues[i][j] !== null) {
+        cell.className = 'cell cell-output cell-filled';
+        cell.textContent = outputValues[i][j];
+      } else {
+        cell.className = 'cell cell-output';
+        cell.textContent = '?';
+      }
+      el.appendChild(cell);
+    }
+  }
+}
+
+function computeCurrentPos() {
+  const k = FILTERS[currentFilter].kernel;
+  const ki = convPos.i, kj = convPos.j;
+  let sum = 0;
+  const details = [];
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      const v = INPUT_5x5[ki + i][kj + j] * k[i][j];
+      sum += v;
+      details.push(`${INPUT_5x5[ki+i][kj+j]}×${k[i][j]}`);
+    }
+  }
+  return { sum, details };
+}
+
+function stepConv() {
+  if (convPos.i > 2) return;
+
+  const { sum, details } = computeCurrentPos();
+  outputValues[convPos.i][convPos.j] = sum;
+
+  document.getElementById('calcDisplay').textContent =
+    `位置(${convPos.i},${convPos.j}): ${details.slice(0,5).join(' + ')} + ... = ${sum}`;
+  document.getElementById('calcDetail').textContent =
+    FILTERS[currentFilter].desc;
+
+  renderOutputMatrix();
+
+  // 移动到下一个位置
+  convPos.j++;
+  if (convPos.j > 2) {
+    convPos.j = 0;
+    convPos.i++;
+  }
+  if (convPos.i > 2) {
+    if (isAuto) toggleAuto();
+    document.getElementById('calcDisplay').textContent = '✅ 卷积完成！输出特征图已生成';
+    document.getElementById('btnStep').disabled = true;
+  }
+  renderInputMatrix();
+}
+
+function toggleAuto() {
+  if (isAuto) {
+    clearInterval(autoInterval);
+    isAuto = false;
+    document.getElementById('btnAuto').textContent = '自动播放';
+    document.getElementById('btnAuto').classList.remove('active');
+  } else {
+    isAuto = true;
+    document.getElementById('btnAuto').textContent = '暂停';
+    document.getElementById('btnAuto').classList.add('active');
+    autoInterval = setInterval(() => {
+      if (convPos.i > 2) { toggleAuto(); return; }
+      stepConv();
+    }, 600);
+  }
+}
+
+function resetConv() {
+  if (isAuto) toggleAuto();
+  convPos = { i: 0, j: 0 };
+  outputValues = Array.from({length:3}, () => Array(3).fill(null));
+  document.getElementById('calcDisplay').textContent = '点击「单步滑动」开始';
+  document.getElementById('calcDetail').textContent = '';
+  document.getElementById('btnStep').disabled = false;
+  renderInputMatrix();
+  renderKernelMatrix();
+  renderOutputMatrix();
+}
+
+// ============================================================
+// 不同卷积核对比
+// ============================================================
+function initFilterCompare() {
+  const container = document.getElementById('filterCompare');
+  container.innerHTML = '';
+
+  // 用一个有边缘的8×8输入
+  const input8 = [];
+  for (let i = 0; i < 8; i++) {
+    input8[i] = [];
+    for (let j = 0; j < 8; j++) {
+      input8[i][j] = j < 4 ? 0 : 1;
+    }
+  }
+
+  Object.entries(FILTERS).forEach(([name, { kernel }]) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'matrix-wrap';
+
+    const label = document.createElement('div');
+    label.className = 'matrix-label';
+    label.textContent = name;
+    label.style.color = '#00d2ff';
+    wrap.appendChild(label);
+
+    // 计算6×6输出
+    const output6 = [];
+    for (let i = 0; i < 6; i++) {
+      output6[i] = [];
+      for (let j = 0; j < 6; j++) {
+        let s = 0;
+        for (let ki = 0; ki < 3; ki++)
+          for (let kj = 0; kj < 3; kj++)
+            s += input8[i+ki][j+kj] * kernel[ki][kj];
+        output6[i][j] = name === '模糊' ? (s / 9).toFixed(1) : s;
+      }
+    }
+
+    // 找最大最小值做颜色映射
+    const vals = output6.flat().map(Number);
+    const vmin = Math.min(...vals), vmax = Math.max(...vals);
+
+    const grid = document.createElement('div');
+    grid.className = 'matrix';
+    grid.style.gridTemplateColumns = `repeat(6, 36px)`;
+
+    for (let i = 0; i < 6; i++) {
+      for (let j = 0; j < 6; j++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.width = '36px';
+        cell.style.height = '36px';
+        cell.style.fontSize = '11px';
+        cell.style.borderRadius = '3px';
+        const v = Number(output6[i][j]);
+        const t = vmax === vmin ? 0.5 : (v - vmin) / (vmax - vmin);
+        const r = Math.round(t * 180), b = Math.round((1-t) * 180);
+        cell.style.background = `rgb(${20+r},${30},${20+b})`;
+        cell.style.border = '1px solid #333';
+        cell.style.color = t > 0.5 ? '#00d2ff' : '#aaa';
+        cell.textContent = output6[i][j];
+        grid.appendChild(cell);
+      }
+    }
+    wrap.appendChild(grid);
+    container.appendChild(wrap);
+  });
+}
+
+// ============================================================
+// RGB多通道卷积
+// ============================================================
+function initRGBConv() {
+  const kernels = {
+    R: [[-1,0,1],[-1,0,1],[-1,0,1]],
+    G: [[-1,0,1],[-1,0,1],[-1,0,1]],
+    B: [[1,0,-1],[1,0,-1],[1,0,-1]],
+  };
+  const channels = {
+    R: [[1,0,1],[0,1,0],[1,0,1]],
+    G: [[0,1,0],[1,0,1],[0,1,0]],
+    B: [[1,1,0],[0,0,1],[1,0,1]],
+  };
+
+  let totalSum = 0;
+  ['R', 'G', 'B'].forEach(ch => {
+    const el = document.getElementById('rgb' + ch);
+    el.innerHTML = '';
+    let chSum = 0;
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell cell-kernel';
+        cell.style.width = '38px';
+        cell.style.height = '38px';
+        const v = channels[ch][i][j] * kernels[ch][i][j];
+        chSum += v;
+        cell.textContent = `${channels[ch][i][j]}×${kernels[ch][i][j]}`;
+        cell.style.fontSize = '10px';
+        el.appendChild(cell);
+      }
+    }
+    totalSum += chSum;
+  });
+
+  const outEl = document.getElementById('rgbOut');
+  outEl.innerHTML = '';
+  const cell = document.createElement('div');
+  cell.className = 'cell cell-filled';
+  cell.textContent = totalSum;
+  outEl.appendChild(cell);
+}
+
+// ============================================================
+// 初始化
+// ============================================================
+initPinArt();
+initFilterSelector();
+resetConv();
+initFilterCompare();
+initRGBConv();
+</script>
+</body>
+</html>

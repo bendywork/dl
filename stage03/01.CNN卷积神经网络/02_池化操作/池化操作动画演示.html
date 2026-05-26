@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>池化操作动画演示</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #e0e0e0; font-family: 'Consolas', monospace; }
+.container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+h1 { text-align: center; font-size: 28px; color: #4ecdc4; margin-bottom: 8px; }
+.subtitle { text-align: center; color: #888; margin-bottom: 30px; font-size: 14px; }
+
+.demo-section { background: #16213e; border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 1px solid #0f3460; }
+.demo-title { font-size: 20px; color: #4ecdc4; margin-bottom: 16px; }
+
+.flex-center { display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; }
+.matrix-wrap { text-align: center; }
+.matrix-label { font-size: 14px; color: #888; margin-bottom: 6px; }
+.matrix { display: inline-grid; gap: 2px; }
+
+.cell { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; border-radius: 4px; transition: all 0.3s; }
+.cell-input { background: #1a1a2e; border: 1px solid #333; color: #ccc; }
+.cell-highlight { background: #1a5276 !important; border-color: #4ecdc4 !important; box-shadow: 0 0 8px rgba(78,205,196,0.4); }
+.cell-max { background: #0a3d62 !important; border-color: #ff6b6b !important; color: #ff6b6b !important; box-shadow: 0 0 10px rgba(255,107,107,0.5); transform: scale(1.1); }
+.cell-avg-selected { background: #0a3d62 !important; border-color: #4ecdc4 !important; color: #4ecdc4 !important; }
+.cell-output { background: #1a1a2e; border: 1px solid #333; color: #888; }
+.cell-filled-max { background: #1a0a2e; border-color: #e94560; color: #e94560; }
+.cell-filled-avg { background: #0a1a2e; border-color: #4ecdc4; color: #4ecdc4; }
+.cell-pool-border { border: 2px dashed #4ecdc4 !important; }
+
+.operator { font-size: 32px; color: #555; font-weight: bold; }
+.arrow-down { font-size: 28px; color: #4ecdc4; text-align: center; margin: 8px 0; }
+
+.controls { display: flex; justify-content: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.btn { padding: 8px 20px; border: 1px solid #0f3460; background: #16213e; color: #4ecdc4; border-radius: 6px; cursor: pointer; font-size: 14px; font-family: inherit; transition: all 0.2s; }
+.btn:hover { background: #0f3460; }
+.btn.active { background: #0f3460; border-color: #4ecdc4; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.mode-switch { display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; }
+.mode-btn { padding: 6px 16px; border: 1px solid #333; background: #1a1a2e; color: #888; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; transition: all 0.2s; }
+.mode-btn.active { border-color: #4ecdc4; color: #4ecdc4; background: #0f3460; }
+
+.calc-display { text-align: center; margin-top: 12px; font-size: 14px; min-height: 20px; color: #e94560; }
+
+.info-box { background: #0a3d62; border-radius: 8px; padding: 16px; margin-top: 16px; font-size: 13px; line-height: 1.8; }
+.info-box strong { color: #4ecdc4; }
+
+/* 感受野动画 */
+.rf-canvas { display: block; margin: 0 auto; border-radius: 8px; background: #0d1b2a; }
+.rf-legend { display: flex; justify-content: center; gap: 16px; margin-top: 12px; font-size: 13px; flex-wrap: wrap; }
+.rf-legend-item { display: flex; align-items: center; gap: 6px; }
+.rf-color { width: 16px; height: 16px; border-radius: 3px; }
+
+/* 尺寸变化流程图 */
+.size-flow { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+.size-box { background: #0f3460; border: 1px solid #1a5276; border-radius: 8px; padding: 10px 16px; text-align: center; min-width: 80px; transition: all 0.3s; }
+.size-box.active { border-color: #4ecdc4; box-shadow: 0 0 12px rgba(78,205,196,0.3); }
+.size-box .size { font-size: 18px; font-weight: bold; color: #4ecdc4; }
+.size-box .label { font-size: 11px; color: #888; margin-top: 4px; }
+.flow-arrow { font-size: 24px; color: #555; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>CNN 池化操作动画演示</h1>
+<p class="subtitle">最大池化 · 平均池化 · 降维 · 感受野增大</p>
+
+<!-- ==================== 演示1: 池化滑动过程 ==================== -->
+<div class="demo-section">
+  <div class="demo-title">📐 池化滑动过程 <span>2×2窗口在4×4特征图上滑动</span></div>
+
+  <div class="mode-switch">
+    <button class="mode-btn active" onclick="setMode('max')">最大池化 Max</button>
+    <button class="mode-btn" onclick="setMode('avg')">平均池化 Avg</button>
+  </div>
+
+  <div class="flex-center">
+    <div class="matrix-wrap">
+      <div class="matrix-label">输入特征图 (4×4)</div>
+      <div class="matrix" id="inputMatrix" style="grid-template-columns: repeat(4, 48px);"></div>
+    </div>
+    <div class="operator">→</div>
+    <div class="matrix-wrap">
+      <div class="matrix-label" id="outputLabel">Max Pooling输出 (2×2)</div>
+      <div class="matrix" id="outputMatrix" style="grid-template-columns: repeat(2, 48px);"></div>
+    </div>
+  </div>
+
+  <div class="calc-display" id="calcDisplay">点击「单步滑动」开始</div>
+
+  <div class="controls">
+    <button class="btn" id="btnStep" onclick="stepPool()">单步滑动</button>
+    <button class="btn" id="btnAuto" onclick="toggleAuto()">自动播放</button>
+    <button class="btn" onclick="resetPool()">重置</button>
+  </div>
+
+  <div class="info-box">
+    <strong>最大池化</strong>：每个2×2区域取最大值 → 保留最显著的特征<br>
+    <strong>平均池化</strong>：每个2×2区域取平均值 → 保留整体趋势信息<br>
+    尺寸减半：4×4 → 2×2，面积缩小4倍，后续计算量大幅减少
+  </div>
+</div>
+
+<!-- ==================== 演示2: 卷积+池化完整流程 ==================== -->
+<div class="demo-section">
+  <div class="demo-title">🔄 卷积 + 池化完整流程 <span>特征提取 → 降维 → 再提取 → 再降维</span></div>
+
+  <div class="size-flow" id="sizeFlow">
+    <div class="size-box active"><div class="size">28×28</div><div class="label">原图</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="size-box"><div class="size">28×28</div><div class="label">Conv1</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="size-box"><div class="size">14×14</div><div class="label">Pool1</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="size-box"><div class="size">14×14</div><div class="label">Conv2</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="size-box"><div class="size">7×7</div><div class="label">Pool2</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="size-box"><div class="size">1×1</div><div class="label">FC</div></div>
+  </div>
+
+  <div class="info-box">
+    <strong>每次池化后尺寸减半</strong>，同时感受野翻倍增长：<br>
+    Conv1感受野 3×3 → Pool1后等效 5×5 → Conv2 7×7 → Pool2后等效 14×14<br>
+    越深的神经元"看"到的原图区域越大，最终能理解整张图的语义
+  </div>
+</div>
+
+<!-- ==================== 演示3: 感受野动画 ==================== -->
+<div class="demo-section">
+  <div class="demo-title">👁️ 感受野增长动画 <span>深层神经元在原图上"看到"的区域越来越大</span></div>
+  <canvas class="rf-canvas" id="rfCanvas" width="700" height="400"></canvas>
+  <div class="rf-legend">
+    <div class="rf-legend-item"><div class="rf-color" style="background:rgba(78,205,196,0.3)"></div> 层1感受野 3×3</div>
+    <div class="rf-legend-item"><div class="rf-color" style="background:rgba(233,69,96,0.3)"></div> 层2感受野 5×5</div>
+    <div class="rf-legend-item"><div class="rf-color" style="background:rgba(255,209,102,0.3)"></div> 层3感受野 9×9</div>
+    <div class="rf-legend-item"><div class="rf-color" style="background:rgba(108,92,231,0.3)"></div> 层4感受野 17×17</div>
+  </div>
+  <div class="controls" style="margin-top:16px">
+    <button class="btn" onclick="animateRF()">播放感受野增长</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ============================================================
+// 池化滑动动画
+// ============================================================
+const INPUT = [
+  [1, 3, 2, 1],
+  [4, 6, 5, 2],
+  [7, 3, 9, 4],
+  [2, 1, 6, 8],
+];
+
+let poolMode = 'max';
+let poolPos = { i: 0, j: 0 };
+let outputVals = Array.from({length:2}, () => Array(2).fill(null));
+let autoPoolInterval = null;
+let isAutoPool = false;
+
+function setMode(mode) {
+  poolMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('outputLabel').textContent =
+    mode === 'max' ? 'Max Pooling输出 (2×2)' : 'Avg Pooling输出 (2×2)';
+  resetPool();
+}
+
+function renderInput() {
+  const el = document.getElementById('inputMatrix');
+  el.innerHTML = '';
+  const pi = poolPos.i, pj = poolPos.j;
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell cell-input';
+      cell.textContent = INPUT[i][j];
+      // 当前池化窗口
+      if (i >= pi && i < pi + 2 && j >= pj && j < pj + 2) {
+        cell.classList.add('cell-highlight');
+        if (poolMode === 'max') {
+          // 找窗口内最大值
+          let maxVal = -Infinity;
+          for (let di = 0; di < 2; di++)
+            for (let dj = 0; dj < 2; dj++)
+              maxVal = Math.max(maxVal, INPUT[pi+di][pj+dj]);
+          if (INPUT[i][j] === maxVal) cell.classList.add('cell-max');
+        } else {
+          cell.classList.add('cell-avg-selected');
+        }
+      }
+      el.appendChild(cell);
+    }
+  }
+}
+
+function renderOutput() {
+  const el = document.getElementById('outputMatrix');
+  el.innerHTML = '';
+  const fillClass = poolMode === 'max' ? 'cell-filled-max' : 'cell-filled-avg';
+  for (let i = 0; i < 2; i++) {
+    for (let j = 0; j < 2; j++) {
+      const cell = document.createElement('div');
+      if (outputVals[i][j] !== null) {
+        cell.className = `cell cell-output ${fillClass}`;
+        cell.textContent = poolMode === 'avg' ? outputVals[i][j].toFixed(1) : outputVals[i][j];
+      } else {
+        cell.className = 'cell cell-output';
+        cell.textContent = '?';
+      }
+      el.appendChild(cell);
+    }
+  }
+}
+
+function computePool() {
+  const pi = poolPos.i, pj = poolPos.j;
+  if (poolMode === 'max') {
+    let maxVal = -Infinity;
+    for (let di = 0; di < 2; di++)
+      for (let dj = 0; dj < 2; dj++)
+        maxVal = Math.max(maxVal, INPUT[pi+di][pj+dj]);
+    return maxVal;
+  } else {
+    let sum = 0;
+    for (let di = 0; di < 2; di++)
+      for (let dj = 0; dj < 2; dj++)
+        sum += INPUT[pi+di][pj+dj];
+    return sum / 4;
+  }
+}
+
+function stepPool() {
+  if (poolPos.i > 2) return;
+
+  const val = computePool();
+  outputVals[poolPos.i / 2][poolPos.j / 2] = val;
+
+  const vals = [];
+  for (let di = 0; di < 2; di++)
+    for (let dj = 0; dj < 2; dj++)
+      vals.push(INPUT[poolPos.i+di][poolPos.j+dj]);
+
+  if (poolMode === 'max') {
+    const maxV = Math.max(...vals);
+    document.getElementById('calcDisplay').textContent =
+      `位置(${poolPos.i/2},${poolPos.j/2}): max(${vals.join(', ')}) = ${maxV}`;
+  } else {
+    document.getElementById('calcDisplay').textContent =
+      `位置(${poolPos.i/2},${poolPos.j/2}): avg(${vals.join(', ')}) = ${val.toFixed(1)}`;
+  }
+
+  renderOutput();
+
+  poolPos.j += 2;
+  if (poolPos.j > 2) { poolPos.j = 0; poolPos.i += 2; }
+  if (poolPos.i > 2) {
+    if (isAutoPool) toggleAuto();
+    document.getElementById('calcDisplay').textContent = '✅ 池化完成！4×4 → 2×2';
+    document.getElementById('btnStep').disabled = true;
+  }
+  renderInput();
+}
+
+function toggleAuto() {
+  if (isAutoPool) {
+    clearInterval(autoPoolInterval);
+    isAutoPool = false;
+    document.getElementById('btnAuto').textContent = '自动播放';
+    document.getElementById('btnAuto').classList.remove('active');
+  } else {
+    isAutoPool = true;
+    document.getElementById('btnAuto').textContent = '暂停';
+    document.getElementById('btnAuto').classList.add('active');
+    autoPoolInterval = setInterval(() => {
+      if (poolPos.i > 2) { toggleAuto(); return; }
+      stepPool();
+    }, 700);
+  }
+}
+
+function resetPool() {
+  if (isAutoPool) toggleAuto();
+  poolPos = { i: 0, j: 0 };
+  outputVals = Array.from({length:2}, () => Array(2).fill(null));
+  document.getElementById('calcDisplay').textContent = '点击「单步滑动」开始';
+  document.getElementById('btnStep').disabled = false;
+  renderInput();
+  renderOutput();
+}
+
+// ============================================================
+// 尺寸流程动画
+// ============================================================
+function animateSizeFlow() {
+  const boxes = document.querySelectorAll('#sizeFlow .size-box');
+  let idx = 0;
+  boxes.forEach(b => b.classList.remove('active'));
+  const interval = setInterval(() => {
+    boxes.forEach(b => b.classList.remove('active'));
+    if (idx < boxes.length) {
+      boxes[idx].classList.add('active');
+      idx++;
+    } else {
+      idx = 0;
+    }
+  }, 800);
+}
+
+// ============================================================
+// 感受野动画
+// ============================================================
+function animateRF() {
+  const canvas = document.getElementById('rfCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const gridSize = 14;
+  const cellSize = 22;
+  const offsetX = (W - gridSize * cellSize) / 2;
+  const offsetY = (H - gridSize * cellSize) / 2;
+
+  const layers = [
+    { size: 3, color: 'rgba(78,205,196,0.35)', border: '#4ecdc4', label: '层1: 3×3' },
+    { size: 5, color: 'rgba(233,69,96,0.25)', border: '#e94560', label: '层2: 5×5' },
+    { size: 9, color: 'rgba(255,209,102,0.2)', border: '#ffd166', label: '层3: 9×9' },
+    { size: 17, color: 'rgba(108,92,231,0.15)', border: '#6c5ce7', label: '层4: 17×17' },
+  ];
+
+  let currentLayer = 0;
+  let animSize = 0;
+
+  function drawGrid() {
+    ctx.fillStyle = '#0d1b2a';
+    ctx.fillRect(0, 0, W, H);
+
+    // 网格
+    for (let i = 0; i < gridSize; i++) {
+      for (let j = 0; j < gridSize; j++) {
+        ctx.fillStyle = (i + j) % 2 === 0 ? '#16213e' : '#1a2744';
+        ctx.fillRect(offsetX + j * cellSize, offsetY + i * cellSize, cellSize - 1, cellSize - 1);
+      }
+    }
+  }
+
+  function drawRF(layerIdx, size) {
+    const layer = layers[layerIdx];
+    const center = gridSize / 2;
+    const half = size / 2;
+    const x = offsetX + (center - half) * cellSize;
+    const y = offsetY + (center - half) * cellSize;
+    const w = size * cellSize;
+    const h = size * cellSize;
+
+    // 填充
+    ctx.fillStyle = layer.color;
+    ctx.fillRect(x, y, w, h);
+
+    // 边框
+    ctx.strokeStyle = layer.border;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+
+    // 标签
+    ctx.fillStyle = layer.border;
+    ctx.font = 'bold 14px Consolas';
+    ctx.fillText(layer.label, x + 4, y - 6);
+  }
+
+  function animate() {
+    drawGrid();
+
+    // 绘制已完成的层
+    for (let i = 0; i < currentLayer; i++) {
+      drawRF(i, layers[i].size);
+    }
+
+    // 当前层动画
+    if (currentLayer < layers.length) {
+      const targetSize = layers[currentLayer].size;
+      if (animSize < targetSize) {
+        animSize += 0.3;
+        drawRF(currentLayer, animSize);
+        requestAnimationFrame(animate);
+      } else {
+        drawRF(currentLayer, targetSize);
+        currentLayer++;
+        animSize = 0;
+        setTimeout(() => requestAnimationFrame(animate), 400);
+      }
+    }
+  }
+
+  currentLayer = 0;
+  animSize = 0;
+  animate();
+}
+
+// ============================================================
+// 初始化
+// ============================================================
+resetPool();
+animateSizeFlow();
+</script>
+</body>
+</html>
