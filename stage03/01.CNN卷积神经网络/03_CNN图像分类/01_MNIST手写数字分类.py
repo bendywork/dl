@@ -197,7 +197,7 @@ def plot_training_curves(train_losses, train_accs, test_losses, test_accs, save_
     ax2.grid(True)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(save_dir, 'training_curves.png'), dpi=150)
+    plt.savefig(os.path.join(save_dir, '12_CNN_MNIST训练曲线.png'), dpi=150)
     plt.show()
 
 
@@ -238,7 +238,7 @@ def visualize_predictions(model, device, test_loader, save_dir, num_samples=16):
 
     plt.suptitle('CNN预测结果（绿色=正确，红色=错误）', fontsize=14)
     plt.tight_layout()
-    plt.savefig(os.path.join(save_dir, 'predictions.png'), dpi=150)
+    plt.savefig(os.path.join(save_dir, '13_CNN_MNIST预测结果.png'), dpi=150)
     plt.show()
 
 
@@ -250,7 +250,7 @@ def main():
     BATCH_SIZE = 64
     EPOCHS = 10
     LEARNING_RATE = 0.001
-    SAVE_DIR = './output/cnn_mnist'
+    SAVE_DIR = os.path.join(os.path.dirname(__file__), '../../../../base/images')
     os.makedirs(SAVE_DIR, exist_ok=True)
 
     # 设备

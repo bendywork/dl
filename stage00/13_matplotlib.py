@@ -396,6 +396,6 @@ for i in y1 ** 2:
     plt.plot(y2)
     plt.pause(0.1)      # 暂停 0.1 秒
 
-plt.savefig('./img.jpg')   # 保存图像到指定路径
+plt.savefig('../../base/images/14_matplotlib_动态绘图示例.png')   # 保存图像到指定路径
 
 # === END p15 ===

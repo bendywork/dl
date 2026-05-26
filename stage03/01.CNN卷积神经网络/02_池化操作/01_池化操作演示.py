@@ -5,10 +5,13 @@
 - 池化的作用：降维 + 保留显著特征 + 增大感受野
 - stride和kernel_size对输出尺寸的影响
 """
+import os
 import numpy as np
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
+
+IMG_DIR = os.path.join(os.path.dirname(__file__), '../../../../base/images')
 
 
 # ============================================================
@@ -108,7 +111,7 @@ def demo_pooling_visual():
         ax.axis('off')
     plt.suptitle('池化操作对比', fontsize=14)
     plt.tight_layout()
-    plt.savefig('pooling_demo.png', dpi=150)
+    plt.savefig(os.path.join(IMG_DIR, '09_CNN_池化操作对比.png'), dpi=150)
     plt.show()
 
 
@@ -154,7 +157,7 @@ def demo_conv_then_pool():
         ax.axis('off')
     plt.suptitle('卷积 + 池化', fontsize=14)
     plt.tight_layout()
-    plt.savefig('conv_pool_demo.png', dpi=150)
+    plt.savefig(os.path.join(IMG_DIR, '10_CNN_卷积加池化流程.png'), dpi=150)
     plt.show()
 
 

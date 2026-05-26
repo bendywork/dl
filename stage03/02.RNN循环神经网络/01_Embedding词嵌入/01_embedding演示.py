@@ -5,11 +5,14 @@ Embedding 词嵌入 — 从零理解
 关键思想：相似的词，向量空间里距离近（king - man + woman ≈ queen）
 """
 
+import os
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.rcParams['font.family'] = 'Arial Unicode MS'  # Mac 中文字体
+
+IMG_DIR = os.path.join(os.path.dirname(__file__), '../../../../base/images')
 
 # ─────────────────────────────────────────
 # Part 1: Embedding 的本质 — 一张可学习的查找表
@@ -140,9 +143,9 @@ plt.xlabel("PC1")
 plt.ylabel("PC2")
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
-plt.savefig("embedding_visualization.png", dpi=120)
+plt.savefig(os.path.join(IMG_DIR, "08_RNN_Embedding词嵌入可视化.png"), dpi=120)
 plt.show()
-print("图已保存为 embedding_visualization.png")
+print("图已保存: base/images/08_RNN_Embedding词嵌入可视化.png")
 
 print("\n✅ Embedding 演示完成！")
 print("\n【核心总结】")

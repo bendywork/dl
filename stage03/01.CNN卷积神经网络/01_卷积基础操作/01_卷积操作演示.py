@@ -5,11 +5,14 @@
 - 对比不同卷积核提取的不同特征（边缘、锐化、模糊）
 - 验证PyTorch nn.Conv2d与手动实现结果一致
 """
+import os
 import numpy as np
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 from PIL import Image
+
+IMG_DIR = os.path.join(os.path.dirname(__file__), '../../../../base/images')
 
 
 # ============================================================
@@ -150,9 +153,9 @@ def demo_image_convolution():
 
     plt.suptitle('不同卷积核提取的特征对比', fontsize=14)
     plt.tight_layout()
-    plt.savefig('conv_filters_demo.png', dpi=150)
+    plt.savefig(os.path.join(IMG_DIR, '11_CNN_卷积核特征提取对比.png'), dpi=150)
     plt.show()
-    print("图片已保存: conv_filters_demo.png")
+    print("图片已保存: base/images/11_CNN_卷积核特征提取对比.png")
 
 
 # ============================================================

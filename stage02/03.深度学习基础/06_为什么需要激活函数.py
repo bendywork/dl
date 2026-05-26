@@ -158,4 +158,4 @@ ax.set_ylabel('x2')
 ax.legend()
 
 plt.tight_layout()
-plt.savefig('../../base/out/activation_comparison.png', dpi=150)
+plt.savefig('../../base/images/07_深度学习_激活函数对比.png', dpi=150)
