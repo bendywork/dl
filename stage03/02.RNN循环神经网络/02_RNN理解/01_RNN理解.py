@@ -52,28 +52,32 @@ def tt_with_fc():
         问题：token之间没有进行特征的交互，token特征向量的提取仅基于当前token，没有考虑上下文
     :return:
     """
+    # bs个样本 每个样本由t个token组成，每个token对应的稠密特征向量的维度大小为e
     bs, t, e = 1, 5, 128
+    # 全连接层，输入特征向量的维度大小为e，输出特征向量的维度大小为2e
     linear = nn.Linear(e, e * 2, dtype=torch.float32)
+    # token_embs: [bs,t,e] --> bs个样本，每个样本由t个token组成，每个token对应的稠密特征向量的维度大小为e
     token_embs = torch.randn(bs, t, e, dtype=torch.float32)  # 一般为上一个模块的输出特征向量
 
-    # 5. 全连接提取特征向量
+    # # 5. 全连接提取特征向量
     token_new_embs = linear(token_embs)  # [bs,t,e] * [e,2e] + [2e] --> [bs,t,2e]
     print(token_new_embs.shape)
 
-    ## PS: 将全连接的过程拆开写
+    # ## PS: 将全连接的过程拆开写
     token_new_embs2 = []
     for i in range(t):
-        # 当前时刻的输入特征向量
-        xi = token_embs[:, i, :]  # [bs,e]
-        # 当前时刻的输入特征向量进行提取转换
+    #     # 当前时刻的输入特征向量
+    #     xi = token_embs[:, i, :]  # [bs,e]
+        xi = token_embs[:, i, :]  # [bs,e] 这里是索引会降低维度 不是切片
+    # 当前时刻的输入特征向量进行提取转换
         hi = torch.matmul(xi, linear.weight.T) + linear.bias  # [bs,e] * [e,2e] + [2e] --> [bs,2e]
-        # 合并输出
+    #     # 合并输出 索引降低了一个维度，所以这里需要补充一个维度
         oi = hi[:, None]  # [bs,2e] --> [bs, 1, 2e]
         token_new_embs2.append(oi)
     token_new_embs2 = torch.concat(token_new_embs2, dim=1)
     print(torch.max(torch.abs(token_new_embs2 - token_new_embs)))
 
-    # 6. 文本特征向量
+    # # 6. 文本特征向量 将bs，t，e的token特征向量融合成bs，e的文本特征向量 最后做一个加权平均得出结果
     text_emb = torch.mean(token_new_embs, dim=1)
     print(text_emb.shape)
 
@@ -86,7 +90,9 @@ def tt_with_conv1d():
     """
     bs, t, e = 1, 5, 128
     dtype = torch.float32
-    conv1d = nn.Conv1d(e, 2 * e, 3, 1, padding=1, dtype=dtype)
+    # 1D卷积，输入特征向量的维度大小为e，输出特征向量的维度大小为2e，卷积核大小为3，步长为1，padding为1
+    conv1d = nn.Conv1d(in_channels=e, out_channels=2 * e, kernel_size=3, stride=1, padding=1, dtype=dtype)
+    # 模拟做token-embedding的过程，得到token特征向量
     token_embs = torch.randn(bs, t, e, dtype=dtype)  # 一般为上一个模块的输出特征向量
 
     # 5. 提取特征向量
@@ -337,10 +343,10 @@ def tt_with_rnn05():
 
 if __name__ == '__main__':
     # t0()
-    tt_with_fc()
+    # tt_with_fc()
     # tt_with_conv1d()
     # tt_with_rnn01()
-    # tt_with_rnn02()
+    tt_with_rnn02()
     # tt_with_rnn03()
     # tt_with_rnn04()
     # tt_with_rnn05()
