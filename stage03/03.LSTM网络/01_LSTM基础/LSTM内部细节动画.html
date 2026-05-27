@@ -3,1151 +3,1075 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LSTM 内部机制详解</title>
+<title>LSTM 内部细节动画 — 逐步计算</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--fg:#e6edf3;--fg2:#8b949e;--fg3:#484f58;
+  --border:#30363d;--accent:#58a6ff;
+  --phase0:#6e7681;--phase1:#8b949e;--phase2:#e94560;--phase3:#ff6b81;--phase4:#c0392b;
+  --phase5:#53d8fb;--phase6:#c084fc;--phase7:#00d98b;--phase8:#f5a623;--phase9:#ffd700;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:'Noto Sans SC',sans-serif}
+code,.mono{font-family:'JetBrains Mono',monospace}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+#app{display:flex;flex-direction:column;height:100vh;width:100vw}
+#topbar{flex:0 0 48px;display:flex;align-items:center;padding:0 20px;background:var(--bg2);border-bottom:1px solid var(--border);gap:16px}
+#topbar .phase-label{font-size:13px;color:var(--fg2);white-space:nowrap}
+#topbar .step-label{font-size:13px;color:var(--fg);font-weight:500;white-space:nowrap}
+#progress-wrap{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+#progress-bar{height:100%;width:0%;transition:width 0.4s ease;border-radius:3px}
+#main{flex:1;display:flex;overflow:hidden;min-height:0}
+#diagram-panel{flex:0 0 42%;display:flex;align-items:center;justify-content:center;padding:16px;position:relative;overflow:hidden;border-right:1px solid var(--border)}
+#detail-panel{flex:1;overflow-y:auto;padding:24px 32px;scrollbar-width:thin;scrollbar-color:var(--fg3) transparent}
+#detail-panel::-webkit-scrollbar{width:6px}
+#detail-panel::-webkit-scrollbar-thumb{background:var(--fg3);border-radius:3px}
 
-  :root {
-    --bg: #1a1a2e;
-    --bg2: #16213e;
-    --bg3: #0f3460;
-    --accent: #e94560;
-    --accent2: #53d8fb;
-    --accent3: #00d98b;
-    --text: #e0e0e0;
-    --text-dim: #8888aa;
-    --card: #1e2746;
-    --border: #2a3a5c;
-    --glow-forget: #e94560;
-    --glow-input: #53d8fb;
-    --glow-output: #f5a623;
-    --glow-cell: #00d98b;
-    --glow-candidate: #c084fc;
-  }
+#navbar{flex:0 0 56px;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--bg2);border-top:1px solid var(--border);padding:0 20px}
+.nav-btn{background:var(--bg3);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:6px 16px;font-size:13px;cursor:pointer;font-family:'Noto Sans SC',sans-serif;transition:all .15s}
+.nav-btn:hover{background:var(--border);border-color:var(--fg3)}
+.nav-btn:active{transform:scale(0.96)}
+.nav-btn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:500}
+.nav-btn.primary:hover{background:#79b8ff}
+#phase-select{background:var(--bg3);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:6px 12px;font-size:13px;font-family:'Noto Sans SC',sans-serif;cursor:pointer}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+.step-number{font-size:12px;color:var(--fg3);margin-bottom:4px;letter-spacing:1px}
+.step-title{font-size:20px;font-weight:700;margin-bottom:12px;line-height:1.4}
+.step-calc{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:16px;font-family:'JetBrains Mono',monospace;font-size:15px;line-height:1.8;white-space:pre-wrap}
+.step-calc .val{color:var(--accent)}
+.step-calc .op{color:var(--fg3)}
+.step-calc .res{color:var(--phase7);font-weight:600}
+.step-why{background:rgba(0,217,139,0.08);border-left:3px solid var(--phase7);padding:12px 16px;margin-bottom:16px;border-radius:0 8px 8px 0;font-size:14px;line-height:1.7}
+.step-why .label{color:var(--phase7);font-weight:600;margin-right:6px}
+.step-context{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-family:'JetBrains Mono',monospace;font-size:14px;line-height:1.6;white-space:pre-wrap}
+.step-context .current-part{color:var(--accent);font-weight:600;background:rgba(88,166,255,0.12);padding:1px 4px;border-radius:3px}
+.step-context .dim-part{color:var(--fg3)}
+.step-running{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;line-height:1.7;white-space:pre-wrap}
+.step-running .label{color:var(--phase9);font-weight:600;margin-bottom:6px;display:block}
+.step-running .acc{font-family:'JetBrains Mono',monospace;color:var(--phase9)}
+.step-interpret{background:rgba(192,132,252,0.08);border-left:3px solid var(--phase6);padding:12px 16px;margin-bottom:16px;border-radius:0 8px 8px 0;font-size:14px;line-height:1.7}
+.step-interpret .label{color:var(--phase6);font-weight:600;margin-right:6px}
 
-  /* Title */
-  .title-bar {
-    text-align: center;
-    padding: 18px 20px 10px;
-    background: linear-gradient(135deg, var(--bg2), var(--bg3));
-    border-bottom: 1px solid var(--border);
-    position: relative;
-  }
-  .title-bar h1 {
-    font-size: 26px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    background: linear-gradient(90deg, var(--accent2), var(--accent3));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .title-bar .subtitle {
-    font-size: 13px;
-    color: var(--text-dim);
-    margin-top: 4px;
-  }
+#lstm-svg{width:100%;max-width:520px;height:auto}
+#lstm-svg text{font-family:'JetBrains Mono','Noto Sans SC',monospace;fill:var(--fg2)}
+#lstm-svg .gate-label{font-family:'Noto Sans SC',sans-serif;font-size:13px}
 
-  /* Main layout */
-  .main-container {
-    display: flex;
-    height: calc(100vh - 80px);
-    overflow: hidden;
-  }
+.phase-badge{display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:600;margin-right:8px}
+.detail-section{margin-bottom:8px}
+.detail-section-title{font-size:13px;color:var(--fg3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
 
-  /* Left: LSTM Diagram */
-  .diagram-panel {
-    width: 42%;
-    min-width: 420px;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    background: radial-gradient(ellipse at center, rgba(15,52,96,0.4) 0%, transparent 70%);
-  }
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn 0.3s ease forwards}
 
-  /* Right: Step details */
-  .detail-panel {
-    width: 58%;
-    padding: 20px 28px;
-    overflow-y: auto;
-    border-left: 1px solid var(--border);
-    background: var(--bg2);
-  }
-  .detail-panel::-webkit-scrollbar { width: 6px; }
-  .detail-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-  .detail-panel::-webkit-scrollbar-track { background: transparent; }
+.c0{color:var(--phase0)}.c1{color:var(--phase1)}.c2{color:var(--phase2)}.c3{color:var(--phase3)}
+.c4{color:var(--phase4)}.c5{color:var(--phase5)}.c6{color:var(--phase6)}.c7{color:var(--phase7)}
+.c8{color:var(--phase8)}.c9{color:var(--phase9)}
+.bg0{background:var(--phase0)}.bg1{background:var(--phase1)}.bg2{background:var(--phase2)}.bg3{background:var(--phase3)}
+.bg4{background:var(--phase4)}.bg5{background:var(--phase5)}.bg6{background:var(--phase6)}.bg7{background:var(--phase7)}
+.bg8{background:var(--phase8)}.bg9{background:var(--phase9)}
 
-  /* SVG Diagram */
-  .lstm-svg-container {
-    width: 100%;
-    max-width: 480px;
-  }
-  .lstm-svg-container svg { width: 100%; height: auto; }
-
-  /* Step indicator */
-  .step-indicator {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  .step-dot {
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: var(--border);
-    transition: all 0.4s ease;
-    cursor: pointer;
-  }
-  .step-dot.active {
-    background: var(--accent2);
-    box-shadow: 0 0 10px var(--accent2);
-    transform: scale(1.3);
-  }
-  .step-dot:hover { transform: scale(1.2); }
-
-  /* Step content */
-  .step-title {
-    font-size: 22px;
-    font-weight: 700;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .step-badge {
-    font-size: 12px;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-weight: 500;
-  }
-  .step-desc {
-    font-size: 14px;
-    color: var(--text-dim);
-    margin-bottom: 16px;
-    line-height: 1.6;
-  }
-
-  /* Formula box */
-  .formula-box {
-    background: rgba(0,0,0,0.3);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px 20px;
-    margin-bottom: 16px;
-    position: relative;
-  }
-  .formula-box .label {
-    font-size: 12px;
-    color: var(--text-dim);
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  .formula {
-    font-family: 'Courier New', 'Consolas', monospace;
-    font-size: 17px;
-    line-height: 1.7;
-    color: #fff;
-    white-space: pre-wrap;
-  }
-  .formula .op { color: var(--accent2); }
-  .formula .fn { color: var(--accent3); font-weight: 700; }
-  .formula .dim { color: var(--accent); font-size: 12px; vertical-align: sub; }
-  .formula .highlight {
-    padding: 1px 4px;
-    border-radius: 3px;
-    background: rgba(83, 216, 251, 0.15);
-  }
-
-  /* Numerical example */
-  .numerical-box {
-    background: rgba(0,0,0,0.25);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 18px;
-    margin-bottom: 14px;
-  }
-  .numerical-box .label {
-    font-size: 12px;
-    color: var(--text-dim);
-    margin-bottom: 8px;
-    letter-spacing: 1px;
-  }
-  .num-row {
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    line-height: 1.8;
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-  }
-  .num-row .varname {
-    color: var(--accent2);
-    min-width: 70px;
-    text-align: right;
-  }
-  .num-row .eq { color: var(--text-dim); }
-  .num-row .val { color: #fff; }
-  .num-row .note { color: var(--text-dim); font-size: 12px; margin-left: 8px; }
-
-  /* Intuition box */
-  .intuition-box {
-    background: linear-gradient(135deg, rgba(0,217,139,0.08), rgba(83,216,251,0.08));
-    border: 1px solid rgba(0,217,139,0.3);
-    border-radius: 10px;
-    padding: 14px 18px;
-    margin-bottom: 14px;
-  }
-  .intuition-box .label {
-    font-size: 12px;
-    color: var(--accent3);
-    margin-bottom: 6px;
-    font-weight: 700;
-  }
-  .intuition-box p {
-    font-size: 14px;
-    line-height: 1.7;
-    color: var(--text);
-  }
-
-  /* Matrix display */
-  .matrix-display {
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    line-height: 1.5;
-    color: #ccc;
-    margin: 6px 0;
-    white-space: pre;
-  }
-  .matrix-display .bracket { color: var(--text-dim); }
-  .matrix-display .num { color: #fff; }
-  .matrix-display .pos { color: var(--accent3); }
-  .matrix-display .neg { color: var(--accent); }
-
-  /* Small curve plot */
-  .curve-container {
-    display: inline-block;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px;
-    margin: 8px 0;
-  }
-  .curve-container canvas { display: block; }
-
-  /* Navigation */
-  .nav-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 52px;
-    background: linear-gradient(180deg, transparent, var(--bg) 30%);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 16px;
-    z-index: 100;
-    padding-bottom: 4px;
-  }
-  .nav-btn {
-    padding: 8px 28px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--card);
-    color: var(--text);
-    font-size: 14px;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.25s ease;
-    user-select: none;
-  }
-  .nav-btn:hover { border-color: var(--accent2); color: var(--accent2); }
-  .nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-  .nav-btn.primary {
-    background: linear-gradient(135deg, var(--bg3), #1a5276);
-    border-color: var(--accent2);
-    color: var(--accent2);
-  }
-  .nav-btn.primary:hover { background: var(--bg3); }
-  .step-counter {
-    color: var(--text-dim);
-    font-size: 13px;
-    min-width: 60px;
-    text-align: center;
-  }
-
-  /* Animated elements */
-  .fade-in { animation: fadeIn 0.5s ease forwards; }
-  @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-
-  .pulse-glow {
-    animation: pulseGlow 1.5s ease-in-out infinite;
-  }
-  @keyframes pulseGlow {
-    0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
-    50% { filter: drop-shadow(0 0 12px currentColor); }
-  }
-
-  /* Data flow animation on SVG */
-  .flow-particle {
-    fill: var(--accent2);
-    opacity: 0;
-  }
-  .flow-particle.animate {
-    animation: flowMove 1.5s ease-in-out infinite;
-  }
-
-  /* Color coding for forget/keep */
-  .tag-forget {
-    color: var(--accent);
-    font-weight: 700;
-    font-size: 13px;
-  }
-  .tag-keep {
-    color: var(--accent3);
-    font-weight: 700;
-    font-size: 13px;
-  }
-
-  /* Responsive */
-  @media (max-width: 900px) {
-    .main-container { flex-direction: column; height: auto; }
-    .diagram-panel, .detail-panel { width: 100%; min-width: unset; }
-    .diagram-panel { min-height: 360px; }
-    .detail-panel { border-left: none; border-top: 1px solid var(--border); min-height: 400px; }
-  }
+.kbd{display:inline-block;background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:1px 6px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--fg2)}
 </style>
 </head>
 <body>
-
-<div class="title-bar">
-  <h1>LSTM 内部机制详解</h1>
-  <div class="subtitle">长短期记忆网络 — 逐步动画演示与矩阵计算</div>
-</div>
-
-<div class="main-container">
-  <!-- Left: LSTM Diagram -->
-  <div class="diagram-panel">
-    <div class="lstm-svg-container" id="svgContainer"></div>
-    <div class="step-indicator" id="stepIndicator"></div>
+<div id="app">
+  <div id="topbar">
+    <span class="phase-label" id="phase-text">Phase 0/9</span>
+    <span class="step-label" id="step-text">Step 1</span>
+    <div id="progress-wrap"><div id="progress-bar"></div></div>
+    <span id="phase-name" style="font-size:12px;color:var(--fg3);white-space:nowrap"></span>
   </div>
-
-  <!-- Right: Step Details -->
-  <div class="detail-panel" id="detailPanel">
-    <!-- Dynamic content injected by JS -->
+  <div id="main">
+    <div id="diagram-panel">
+      <svg id="lstm-svg" viewBox="0 0 540 420"></svg>
+    </div>
+    <div id="detail-panel"></div>
   </div>
-</div>
-
-<!-- Navigation -->
-<div class="nav-bar">
-  <button class="nav-btn" id="btnPrev" onclick="prevStep()">上一步</button>
-  <span class="step-counter" id="stepCounter">0 / 4</span>
-  <button class="nav-btn primary" id="btnNext" onclick="nextStep()">下一步</button>
-  <button class="nav-btn" onclick="resetSteps()">重置</button>
+  <div id="navbar">
+    <button class="nav-btn" onclick="jump(-5)" title="后退5步">⏪ -5</button>
+    <button class="nav-btn" onclick="prev()" title="上一步">◀ 上一步</button>
+    <select id="phase-select" onchange="jumpToPhase(this.value)" title="跳转到Phase">
+      <option value="0">Phase 0: 输入理解</option>
+      <option value="1">Phase 1: 向量拼接</option>
+      <option value="2">Phase 2: 遗忘门权重</option>
+      <option value="3">Phase 3: 遗忘门矩阵乘</option>
+      <option value="4">Phase 4: 遗忘门激活</option>
+      <option value="5">Phase 5: 输入门</option>
+      <option value="6">Phase 6: 候选值</option>
+      <option value="7">Phase 7: 细胞状态更新</option>
+      <option value="8">Phase 8: 输出门</option>
+      <option value="9">Phase 9: 最终输出</option>
+    </select>
+    <button class="nav-btn primary" onclick="next()" title="下一步">下一步 ▶</button>
+    <button class="nav-btn" onclick="jump(5)" title="快进5步">+5 ⏩</button>
+    <button class="nav-btn" id="autoplay-btn" onclick="toggleAutoplay()" title="自动播放">▶ 自动</button>
+    <span style="margin-left:12px;font-size:11px;color:var(--fg3)">
+      <span class="kbd">&larr;</span><span class="kbd">&rarr;</span> 单步
+      <span class="kbd">&uarr;</span><span class="kbd">&darr;</span> 5步
+      <span class="kbd">Space</span> 自动
+    </span>
+  </div>
 </div>
 
 <script>
-// ============ CONSTANTS & NUMERICAL DATA ============
+// ============================================================
+// NUMERICAL SETUP
+// ============================================================
 const d = 3, h = 2;
-
-// Inputs
 const x_t = [0.5, -0.3, 0.8];
 const h_prev = [0.1, 0.6];
 const C_prev = [0.8, -0.2];
+const concat = [0.1, 0.6, 0.5, -0.3, 0.8];
 
-// Concatenated input [h_{t-1}, x_t]
-const concat = [...h_prev, ...x_t]; // [0.1, 0.6, 0.5, -0.3, 0.8]
-
-// Weight matrices (2x5)
-const W_f = [[0.2, -0.1, 0.3, 0.1, -0.2],
-             [0.1,  0.4,-0.2, 0.3,  0.1]];
+const W_f = [[0.2, -0.1, 0.3, 0.1, -0.2],[0.1, 0.4, -0.2, 0.3, 0.1]];
 const b_f = [0.0, 0.0];
-
-const W_i = [[ 0.3, 0.1,-0.1, 0.2, 0.4],
-             [-0.2, 0.3, 0.5, 0.1,-0.1]];
+const W_i = [[0.3, 0.1, -0.1, 0.2, 0.4],[-0.2, 0.3, 0.5, 0.1, -0.1]];
 const b_i = [0.1, -0.1];
-
-const W_C = [[ 0.1,-0.3, 0.2, 0.4,-0.1],
-             [ 0.5, 0.2,-0.4, 0.1, 0.3]];
+const W_C = [[0.1, -0.3, 0.2, 0.4, -0.1],[0.5, 0.2, -0.4, 0.1, 0.3]];
 const b_C = [0.0, 0.1];
-
-const W_o = [[-0.1, 0.2, 0.3,-0.2, 0.1],
-             [ 0.4,-0.1, 0.2, 0.3, 0.2]];
+const W_o = [[-0.1, 0.2, 0.3, -0.2, 0.1],[0.4, -0.1, 0.2, 0.3, 0.2]];
 const b_o = [0.0, 0.0];
 
-// ============ MATH HELPERS ============
-function matVecMul(M, v) {
-  return M.map(row => row.reduce((s, w, j) => s + w * v[j], 0));
-}
-function vecAdd(a, b) { return a.map((v, i) => v + b[i]); }
-function sigmoid(z) { return 1 / (1 + Math.exp(-z)); }
-function tanh_fn(z) { return Math.tanh(z); }
-function hadamard(a, b) { return a.map((v, i) => v * b[i]); }
+function sigmoid(z){ return 1/(1+Math.exp(-z)); }
+function fmt(v,d=4){ return Number(v).toFixed(d); }
+function fmtS(v,d=4){ return (v>=0?' ':'')+fmt(v,d); }
 
-function fmt(v, decimals=4) {
-  return v.toFixed(decimals);
-}
-function fmtArr(arr, decimals=4) {
-  return '[ ' + arr.map(v => fmt(v, decimals)).join(', ') + ' ]';
-}
-
-// ============ COMPUTE ALL VALUES ============
-const f_t = vecAdd(matVecMul(W_f, concat), b_f).map(sigmoid);
-const i_t = vecAdd(matVecMul(W_i, concat), b_i).map(sigmoid);
-const C_tilde = vecAdd(matVecMul(W_C, concat), b_C).map(tanh_fn);
-const C_t = vecAdd(hadamard(f_t, C_prev), hadamard(i_t, C_tilde));
-const o_t = vecAdd(matVecMul(W_o, concat), b_o).map(sigmoid);
-const tanh_Ct = C_t.map(tanh_fn);
-const h_t = hadamard(o_t, tanh_Ct);
-
-// Intermediate raw values (before activation)
-const f_raw = vecAdd(matVecMul(W_f, concat), b_f);
-const i_raw = vecAdd(matVecMul(W_i, concat), b_i);
-const C_raw = vecAdd(matVecMul(W_C, concat), b_C);
-const o_raw = vecAdd(matVecMul(W_o, concat), b_o);
-
-// ============ STEP DEFINITIONS ============
-const steps = [
-  // Step 0
-  {
-    title: '输入准备',
-    badge: 'Step 0',
-    badgeColor: '#8888aa',
-    desc: 'LSTM 在时间步 t 接收两个输入：当前输入向量 x_t 和上一时刻的隐藏状态 h_{t-1}。LSTM 的核心操作是将二者拼接后统一处理。',
-    formulaSection: function() {
-      return `
-        <div class="formula-box">
-          <div class="label">维度说明</div>
-          <div class="formula">
-<span class="highlight">x_t</span> ∈ R<sup><span class="dim">d</span></sup>    d = ${d} (输入维度)
-<span class="highlight">h_{t-1}</span> ∈ R<sup><span class="dim">h</span></sup>    h = ${h} (隐藏维度)
-<span class="highlight">[h_{t-1}, x_t]</span> ∈ R<sup><span class="dim">d+h</span></sup> = R<sup><span class="dim">${d+h}</span></sup>  (拼接后)
-
-拼接操作：
-  <span class="op">concat</span> = [ h<sub>t-1</sub> , x<sub>t</sub> ]
-       = [ ${fmtArr(h_prev)} , ${fmtArr(x_t)} ]
-       = ${fmtArr(concat)}
-          </div>
-        </div>`;
-    },
-    numericalSection: function() {
-      return `
-        <div class="numerical-box">
-          <div class="label">数值示例</div>
-          <div class="num-row"><span class="varname">x_t</span><span class="eq">=</span><span class="val">${fmtArr(x_t)}</span><span class="note">← 当前输入 (d=${d})</span></div>
-          <div class="num-row"><span class="varname">h_{t-1}</span><span class="eq">=</span><span class="val">${fmtArr(h_prev)}</span><span class="note">← 上一步隐藏状态 (h=${h})</span></div>
-          <div class="num-row"><span class="varname">C_{t-1}</span><span class="eq">=</span><span class="val">${fmtArr(C_prev)}</span><span class="note">← 上一步细胞状态</span></div>
-          <div class="num-row"><span class="varname">concat</span><span class="eq">=</span><span class="val">${fmtArr(concat)}</span><span class="note">← 拼接后维度 = ${d+h}</span></div>
-        </div>`;
-    },
-    intuitionSection: function() {
-      return `
-        <div class="intuition-box">
-          <div class="label">直觉理解</div>
-          <p>LSTM 把「上一步的输出 h」和「这一步的输入 x」拼在一起，作为一个整体送给所有门。<br>
-          这样每个门都能同时参考"历史记忆"和"当前信息"，做出更智能的决策。<br>
-          所有权重矩阵 W 的列数都是 ${d+h}，行数都是 ${h}，这样才能与拼接向量相乘。</p>
-        </div>`;
-    },
-    svgHighlight: 'input'
-  },
-  // Step 1
-  {
-    title: '遗忘门 (Forget Gate)',
-    badge: 'Step 1',
-    badgeColor: '#e94560',
-    desc: '遗忘门决定从旧细胞状态 C_{t-1} 中丢弃哪些信息。输出 f_t 中每个元素接近 0 表示"遗忘"，接近 1 表示"保留"。',
-    formulaSection: function() {
-      return `
-        <div class="formula-box">
-          <div class="label">遗忘门公式</div>
-          <div class="formula">
-<span class="fn">f_t</span> = <span class="fn">σ</span>( W<sub>f</sub> · [h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>f</sub> )
-
-  W<sub>f</sub> ∈ R<sup><span class="dim">${h}×${d+h}</span></sup> , b<sub>f</sub> ∈ R<sup><span class="dim">${h}</span></sup>
-
-  <span class="fn">σ</span>(z) = 1 / (1 + e<sup>-z</sup>)    ← Sigmoid 函数
-
-  <span class="tag-forget">f_t ≈ 0 → 遗忘</span>     <span class="tag-keep">f_t ≈ 1 → 保留</span>
-          </div>
-        </div>
-        <div class="curve-container">
-          <canvas id="sigmoidCurve" width="240" height="120"></canvas>
-        </div>`;
-    },
-    numericalSection: function() {
-      return `
-        <div class="numerical-box">
-          <div class="label">逐步计算</div>
-          <div class="num-row"><span class="varname">W_f · concat</span><span class="eq">=</span><span class="val">${fmtArr(matVecMul(W_f, concat))}</span></div>
-          <div class="num-row"><span class="varname">+ b_f</span><span class="eq">=</span><span class="val">${fmtArr(f_raw)}</span><span class="note">← sigmoid 输入</span></div>
-          <div class="num-row"><span class="varname">σ(...)</span><span class="eq">=</span><span class="val" style="color:var(--accent)">${fmtArr(f_t)}</span><span class="note">← 遗忘门输出</span></div>
-        </div>
-        <div class="numerical-box">
-          <div class="label">权重矩阵 W_f (${h}×${d+h})</div>
-          <div class="matrix-display">${matrixToString(W_f)}</div>
-        </div>`;
-    },
-    intuitionSection: function() {
-      return `
-        <div class="intuition-box">
-          <div class="label">直觉理解</div>
-          <p>遗忘门就像一个"选择性擦除器"：它对细胞状态中的每个值逐一判断——这个信息还有用吗？<br>
-          Sigmoid 把输出压缩到 [0,1]：<br>
-          &bull; <span class="tag-forget">接近 0 = 大力遗忘</span>（乘以旧状态后值接近0，相当于删掉）<br>
-          &bull; <span class="tag-keep">接近 1 = 完全保留</span>（旧状态原样保留）<br><br>
-          在我们的例子中，f_t = ${fmtArr(f_t)}，<br>
-          第1维 ${fmt(f_t[0])} → 较强保留，第2维 ${fmt(f_t[1])} → 较强保留。</p>
-        </div>`;
-    },
-    svgHighlight: 'forget'
-  },
-  // Step 2
-  {
-    title: '输入门 (Input Gate)',
-    badge: 'Step 2',
-    badgeColor: '#53d8fb',
-    desc: '输入门决定哪些新信息将被写入细胞状态。它包含两部分：i_t 控制写入多少，C_tilde 提供写入的候选内容。',
-    formulaSection: function() {
-      return `
-        <div class="formula-box">
-          <div class="label">输入门公式</div>
-          <div class="formula">
-<span class="fn">i_t</span> = <span class="fn">σ</span>( W<sub>i</sub> · [h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>i</sub> )
-          <span class="note" style="color:var(--text-dim);font-size:13px">← 控制写入量</span>
-
-<span class="fn">C̃_t</span> = <span class="fn">tanh</span>( W<sub>C</sub> · [h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>C</sub> )
-          <span class="note" style="color:var(--text-dim);font-size:13px">← 候选新内容</span>
-
-  W<sub>i</sub>, W<sub>C</sub> ∈ R<sup><span class="dim">${h}×${d+h}</span></sup>
-
-  <span class="fn">tanh</span>(z) = (e<sup>z</sup> - e<sup>-z</sup>) / (e<sup>z</sup> + e<sup>-z</sup>)    ∈ [-1, +1]
-          </div>
-        </div>
-        <div class="curve-container">
-          <canvas id="tanhCurve" width="240" height="120"></canvas>
-        </div>`;
-    },
-    numericalSection: function() {
-      return `
-        <div class="numerical-box">
-          <div class="label">输入门 i_t 计算</div>
-          <div class="num-row"><span class="varname">W_i · concat</span><span class="eq">=</span><span class="val">${fmtArr(matVecMul(W_i, concat))}</span></div>
-          <div class="num-row"><span class="varname">+ b_i</span><span class="eq">=</span><span class="val">${fmtArr(i_raw)}</span></div>
-          <div class="num-row"><span class="varname">σ(...)</span><span class="eq">=</span><span class="val" style="color:var(--accent2)">${fmtArr(i_t)}</span><span class="note">← 输入门输出</span></div>
-        </div>
-        <div class="numerical-box">
-          <div class="label">候选值 C̃_t 计算</div>
-          <div class="num-row"><span class="varname">W_C · concat</span><span class="eq">=</span><span class="val">${fmtArr(matVecMul(W_C, concat))}</span></div>
-          <div class="num-row"><span class="varname">+ b_C</span><span class="eq">=</span><span class="val">${fmtArr(C_raw)}</span></div>
-          <div class="num-row"><span class="varname">tanh(...)</span><span class="eq">=</span><span class="val" style="color:var(--glow-candidate)">${fmtArr(C_tilde)}</span><span class="note">← 候选新值</span></div>
-        </div>
-        <div class="numerical-box">
-          <div class="label">权重矩阵</div>
-          <div style="display:flex;gap:20px;flex-wrap:wrap;">
-            <div><div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">W_i (${h}×${d+h})</div><div class="matrix-display">${matrixToString(W_i)}</div></div>
-            <div><div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">W_C (${h}×${d+h})</div><div class="matrix-display">${matrixToString(W_C)}</div></div>
-          </div>
-        </div>`;
-    },
-    intuitionSection: function() {
-      return `
-        <div class="intuition-box">
-          <div class="label">直觉理解</div>
-          <p>输入门像"写入审核员"，分两步工作：<br>
-          &bull; <b>i_t</b>（Sigmoid）：决定每个维度"允不允许写入"——0=不许写，1=全部写<br>
-          &bull; <b>C̃_t</b>（tanh）：生成"要写什么新内容"——值域[-1,1]表示增减方向<br><br>
-          两者逐元素相乘 i_t ⊙ C̃_t 后，就是实际写入细胞状态的新信息。<br><br>
-          本例中：i_t = ${fmtArr(i_t)}，C̃_t = ${fmtArr(C_tilde)}<br>
-          写入量 = i ⊙ C̃ = ${fmtArr(hadamard(i_t, C_tilde))}</p>
-        </div>`;
-    },
-    svgHighlight: 'inputGate'
-  },
-  // Step 3
-  {
-    title: '细胞状态更新 (Cell State Update)',
-    badge: 'Step 3',
-    badgeColor: '#00d98b',
-    desc: '这是 LSTM 最核心的一步！旧细胞状态经过遗忘门筛选后，加上输入门筛选的新内容，得到新的细胞状态 C_t。',
-    formulaSection: function() {
-      return `
-        <div class="formula-box">
-          <div class="label">细胞状态更新公式</div>
-          <div class="formula">
-<span class="fn">C_t</span> = <span style="color:var(--accent)">f_t</span> ⊙ C<sub>t-1</sub>  +  <span style="color:var(--accent2)">i_t</span> ⊙ <span style="color:#c084fc">C̃_t</span>
-
-   ↑↑↑↑↑↑↑↑↑↑       ↑↑↑↑↑↑↑↑↑↑
-   <span style="color:var(--accent)">旧记忆×遗忘门</span>   <span style="color:var(--accent2)">新内容×输入门</span>
-
-  ⊙ = Hadamard积（逐元素相乘）
-
-  C_t ∈ R<sup><span class="dim">${h}</span></sup>  是 LSTM 的"长期记忆"
-          </div>
-        </div>`;
-    },
-    numericalSection: function() {
-      const forgetPart = hadamard(f_t, C_prev);
-      const inputPart = hadamard(i_t, C_tilde);
-      return `
-        <div class="numerical-box">
-          <div class="label">逐步计算 — 遗忘部分</div>
-          <div class="num-row"><span class="varname" style="color:var(--accent)">f_t</span><span class="eq">=</span><span class="val" style="color:var(--accent)">${fmtArr(f_t)}</span><span class="note">← 遗忘门</span></div>
-          <div class="num-row"><span class="varname">C_{t-1}</span><span class="eq">=</span><span class="val">${fmtArr(C_prev)}</span><span class="note">← 旧细胞状态</span></div>
-          <div class="num-row"><span class="varname" style="color:var(--accent)">f ⊙ C</span><span class="eq">=</span><span class="val" style="color:var(--accent)">${fmtArr(forgetPart)}</span><span class="note">← 旧记忆保留量</span></div>
-        </div>
-        <div class="numerical-box">
-          <div class="label">逐步计算 — 输入部分</div>
-          <div class="num-row"><span class="varname" style="color:var(--accent2)">i_t</span><span class="eq">=</span><span class="val" style="color:var(--accent2)">${fmtArr(i_t)}</span><span class="note">← 输入门</span></div>
-          <div class="num-row"><span class="varname" style="color:#c084fc">C̃_t</span><span class="eq">=</span><span class="val" style="color:#c084fc">${fmtArr(C_tilde)}</span><span class="note">← 候选新值</span></div>
-          <div class="num-row"><span class="varname" style="color:var(--accent2)">i ⊙ C̃</span><span class="eq">=</span><span class="val" style="color:var(--accent2)">${fmtArr(inputPart)}</span><span class="note">← 新写入内容</span></div>
-        </div>
-        <div class="numerical-box" style="border-color:var(--accent3);background:rgba(0,217,139,0.06)">
-          <div class="label" style="color:var(--accent3)">最终结果</div>
-          <div class="num-row"><span class="varname" style="color:var(--accent3)">C_t</span><span class="eq">=</span><span class="val" style="color:var(--accent3);font-size:16px;font-weight:700">${fmtArr(C_t)}</span></div>
-          <div class="num-row" style="margin-top:4px"><span class="varname"></span><span class="eq"></span><span class="val" style="color:var(--text-dim);font-size:12px">= ${fmtArr(forgetPart)} + ${fmtArr(inputPart)}</span></div>
-        </div>`;
-    },
-    intuitionSection: function() {
-      return `
-        <div class="intuition-box">
-          <div class="label">直觉理解 — 核心机制</div>
-          <p>想象 C_t 是一本"记事本"：<br>
-          &bull; <span style="color:var(--accent)">红色部分 f⊙C：用橡皮擦掉旧内容</span>（f 接近0的部分被擦掉更多）<br>
-          &bull; <span style="color:var(--accent2)">蓝色部分 i⊙C̃：用笔写上新内容</span>（i 接近1的部分写入更多）<br><br>
-          <b>这就是 LSTM 解决梯度消失的关键</b>：<br>
-          如果遗忘门 f_t ≈ 1，则 C_t ≈ C_{t-1}，<br>
-          旧记忆几乎原样传递——梯度可以跨越很多时间步而不衰减！<br>
-          这条"细胞状态高速公路"是 LSTM 的精髓。</p>
-        </div>`;
-    },
-    svgHighlight: 'cell'
-  },
-  // Step 4
-  {
-    title: '输出门 (Output Gate)',
-    badge: 'Step 4',
-    badgeColor: '#f5a623',
-    desc: '输出门决定细胞状态中的哪些信息应该作为当前隐藏状态 h_t 输出。细胞状态先经过 tanh 压缩到 [-1,1]，再由输出门筛选。',
-    formulaSection: function() {
-      return `
-        <div class="formula-box">
-          <div class="label">输出门公式</div>
-          <div class="formula">
-<span class="fn">o_t</span> = <span class="fn">σ</span>( W<sub>o</sub> · [h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>o</sub> )
-       <span class="note" style="color:var(--text-dim);font-size:13px">← 输出门：决定暴露多少</span>
-
-<span class="fn">h_t</span> = o_t ⊙ <span class="fn">tanh</span>(C_t)
-       <span class="note" style="color:var(--text-dim);font-size:13px">← 最终隐藏状态输出</span>
-
-  W<sub>o</sub> ∈ R<sup><span class="dim">${h}×${d+h}</span></sup> , b<sub>o</sub> ∈ R<sup><span class="dim">${h}</span></sup>
-  h_t ∈ R<sup><span class="dim">${h}</span></sup>  是 LSTM 的"短期输出"
-          </div>
-        </div>`;
-    },
-    numericalSection: function() {
-      return `
-        <div class="numerical-box">
-          <div class="label">输出门 o_t 计算</div>
-          <div class="num-row"><span class="varname">W_o · concat</span><span class="eq">=</span><span class="val">${fmtArr(matVecMul(W_o, concat))}</span></div>
-          <div class="num-row"><span class="varname">+ b_o</span><span class="eq">=</span><span class="val">${fmtArr(o_raw)}</span></div>
-          <div class="num-row"><span class="varname">σ(...)</span><span class="eq">=</span><span class="val" style="color:var(--glow-output)">${fmtArr(o_t)}</span><span class="note">← 输出门</span></div>
-        </div>
-        <div class="numerical-box">
-          <div class="label">隐藏状态 h_t 计算</div>
-          <div class="num-row"><span class="varname" style="color:var(--accent3)">C_t</span><span class="eq">=</span><span class="val" style="color:var(--accent3)">${fmtArr(C_t)}</span><span class="note">← 新细胞状态</span></div>
-          <div class="num-row"><span class="varname">tanh(C_t)</span><span class="eq">=</span><span class="val">${fmtArr(tanh_Ct)}</span><span class="note">← 压缩到[-1,1]</span></div>
-          <div class="num-row"><span class="varname">o_t</span><span class="eq">=</span><span class="val" style="color:var(--glow-output)">${fmtArr(o_t)}</span><span class="note">← 输出门筛选</span></div>
-        </div>
-        <div class="numerical-box" style="border-color:var(--glow-output);background:rgba(245,166,35,0.06)">
-          <div class="label" style="color:var(--glow-output)">最终输出</div>
-          <div class="num-row"><span class="varname" style="color:var(--glow-output)">h_t</span><span class="eq">=</span><span class="val" style="color:var(--glow-output);font-size:16px;font-weight:700">${fmtArr(h_t)}</span></div>
-          <div class="num-row" style="margin-top:4px"><span class="varname"></span><span class="eq"></span><span class="val" style="color:var(--text-dim);font-size:12px">= ${fmtArr(o_t)} ⊙ ${fmtArr(tanh_Ct)}</span></div>
-        </div>
-        <div class="numerical-box">
-          <div class="label">权重矩阵 W_o (${h}×${d+h})</div>
-          <div class="matrix-display">${matrixToString(W_o)}</div>
-        </div>`;
-    },
-    intuitionSection: function() {
-      return `
-        <div class="intuition-box">
-          <div class="label">直觉理解</div>
-          <p>输出门像一个"发言人"：<br>
-          &bull; 细胞状态 C_t 包含了丰富的长期记忆，但不是所有信息都需要现在说出来<br>
-          &bull; tanh(C_t) 将记忆"标准化"到 [-1,1] 范围<br>
-          &bull; 输出门 o_t 决定每个维度"说多少"——0=闭嘴，1=全说<br><br>
-          <b>关键区分</b>：<br>
-          &bull; C_t = <span style="color:var(--accent3)">长期记忆</span>（跨越多个时间步传递）<br>
-          &bull; h_t = <span style="color:var(--glow-output)">短期输出</span>（当前时间步对外暴露的信息）<br><br>
-          本例最终输出：h_t = ${fmtArr(h_t)}</p>
-        </div>`;
-    },
-    svgHighlight: 'output'
+function dotProduct(W, vec, row){
+  let products = [];
+  let sum = 0;
+  for(let j=0;j<vec.length;j++){
+    let p = W[row][j]*vec[j];
+    products.push(p);
+    sum += p;
   }
+  return {products, sum};
+}
+
+// Compute all intermediate values
+const f_dot0 = dotProduct(W_f, concat, 0);
+const f_dot1 = dotProduct(W_f, concat, 1);
+const f_raw = [f_dot0.sum + b_f[0], f_dot1.sum + b_f[1]];
+const f_t = [sigmoid(f_raw[0]), sigmoid(f_raw[1])];
+
+const i_dot0 = dotProduct(W_i, concat, 0);
+const i_dot1 = dotProduct(W_i, concat, 1);
+const i_raw = [i_dot0.sum + b_i[0], i_dot1.sum + b_i[1]];
+const i_t = [sigmoid(i_raw[0]), sigmoid(i_raw[1])];
+
+const Cc_dot0 = dotProduct(W_C, concat, 0);
+const Cc_dot1 = dotProduct(W_C, concat, 1);
+const Cc_raw = [Cc_dot0.sum + b_C[0], Cc_dot1.sum + b_C[1]];
+const C_tilde = [Math.tanh(Cc_raw[0]), Math.tanh(Cc_raw[1])];
+
+const forget_part = [f_t[0]*C_prev[0], f_t[1]*C_prev[1]];
+const input_part = [i_t[0]*C_tilde[0], i_t[1]*C_tilde[1]];
+const C_t = [forget_part[0]+input_part[0], forget_part[1]+input_part[1]];
+
+const o_dot0 = dotProduct(W_o, concat, 0);
+const o_dot1 = dotProduct(W_o, concat, 1);
+const o_raw = [o_dot0.sum + b_o[0], o_dot1.sum + b_o[1]];
+const o_t = [sigmoid(o_raw[0]), sigmoid(o_raw[1])];
+
+const tanh_C = [Math.tanh(C_t[0]), Math.tanh(C_t[1])];
+const h_t = [o_t[0]*tanh_C[0], o_t[1]*tanh_C[1]];
+
+// ============================================================
+// PHASE DEFINITIONS
+// ============================================================
+const phases = [
+  {name:"输入理解", color:"var(--phase0)", ci:0, startStep:1},
+  {name:"向量拼接", color:"var(--phase1)", ci:1, startStep:9},
+  {name:"遗忘门 · 权重理解", color:"var(--phase2)", ci:2, startStep:19},
+  {name:"遗忘门 · 矩阵乘法", color:"var(--phase3)", ci:3, startStep:29},
+  {name:"遗忘门 · 偏置与激活", color:"var(--phase4)", ci:4, startStep:43},
+  {name:"输入门 i_t", color:"var(--phase5)", ci:5, startStep:55},
+  {name:"候选值 C~_t", color:"var(--phase6)", ci:6, startStep:69},
+  {name:"细胞状态更新 C_t", color:"var(--phase7)", ci:7, startStep:81},
+  {name:"输出门 o_t", color:"var(--phase8)", ci:8, startStep:95},
+  {name:"最终隐藏状态 h_t", color:"var(--phase9)", ci:9, startStep:107}
 ];
 
-// ============ MATRIX DISPLAY HELPER ============
-function matrixToString(M) {
-  return M.map(row => {
-    return '[ ' + row.map(v => {
-      const s = v >= 0 ? ' ' + fmt(v,1) : fmt(v,1);
-      return `<span class="${v >= 0 ? 'pos' : 'neg'}">${s}</span>`;
-    }).join(', ') + ' ]';
-  }).join('\n');
+function getPhaseForStep(stepN){
+  for(let i=phases.length-1;i>=0;i--){
+    if(stepN >= phases[i].startStep) return phases[i];
+  }
+  return phases[0];
 }
 
-// ============ SVG LSTM DIAGRAM ============
-function buildSVG() {
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const container = document.getElementById('svgContainer');
+// ============================================================
+// BUILD ALL STEPS
+// ============================================================
+function buildSteps(){
+  const S = [];
+  let n = 0;
 
-  const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '0 0 460 380');
-  svg.setAttribute('xmlns', svgNS);
+  function add(obj){ obj.n = ++n; S.push(obj); }
 
-  // Helper
-  function el(tag, attrs, parent) {
-    const e = document.createElementNS(svgNS, tag);
-    for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
-    if (parent) parent.appendChild(e);
-    return e;
+  // ─── PHASE 0: 输入理解 (Steps 1-8) ───
+  add({phase:0, title:"时间步 t 的概念",
+    calc:"LSTM 按<span class='val'>时间步</span>处理序列数据\n每个时间步 t = 0, 1, 2, ... 处理一个输入",
+    why:"RNN/LSTM 的核心是<span class='val'>序列建模</span>——语言是逐词出现的，时序数据是逐时刻产生的。按时间步处理，让模型能捕捉前后依赖关系。",
+    context:"LSTM: 对 t = 0, 1, 2, ... 逐步执行",
+    active:'inputs'});
+
+  add({phase:0, title:"当前输入 x_t 是什么",
+    calc:"x_t = 一个时间步的<span class='val'>特征向量</span>\n例如：一个词的词嵌入 / 一个时刻的传感器读数",
+    why:"x_t 是模型在当前时间步看到的<span class='val'>外部信息</span>，相当于\"此刻正在阅读的词\"或\"此刻的观测值\"。",
+    context:"LSTM(x_t, h_{t-1}, C_{t-1}) → h_t, C_t\n      <span class='current-part'>x_t</span>",
+    active:'inputs'});
+
+  add({phase:0, title:"x_t 的维度 d=3",
+    calc:"d = <span class='val'>3</span>（输入维度）\n每个元素代表一个特征维度",
+    why:"维度 d 决定了输入向量的长度。本例 d=3 是为教学简化；实际中 NLP 的 d 可能是 300（Word2Vec）或 768（BERT）。",
+    context:"x_t ∈ ℝ^<span class='current-part'>d</span> = ℝ^3",
+    active:'inputs'});
+
+  add({phase:0, title:"x_t 的具体数值",
+    calc:"x_t = [<span class='val'>0.5</span>, <span class='val'>-0.3</span>, <span class='val'>0.8</span>]",
+    why:"三个特征值：0.5表示第1特征偏正，-0.3表示第2特征偏负，0.8表示第3特征较强正。这些值来自上游（如词嵌入层）。",
+    context:"x_t = <span class='current-part'>[0.5, -0.3, 0.8]</span>",
+    active:'inputs'});
+
+  add({phase:0, title:"上一时刻隐藏状态 h_{t-1}",
+    calc:"h_{t-1} = LSTM 的<span class='val'>短期记忆</span>\n上一时刻对外输出的信息摘要",
+    why:"h_{t-1} 是模型在 t-1 时刻的\"结论\"，携带了到上一刻为止的<span class='val'>序列上下文信息</span>。它如同\"你刚读过前文的印象\"。",
+    context:"LSTM(x_t, <span class='current-part'>h_{t-1}</span>, C_{t-1}) → h_t, C_t",
+    active:'inputs'});
+
+  add({phase:0, title:"h_{t-1} 的具体数值",
+    calc:"h_{t-1} = [<span class='val'>0.1</span>, <span class='val'>0.6</span>]\n维度 h = 2",
+    why:"h=2 是隐藏维度（本例简化）。实际中 h 通常是 128、256 甚至 1024。0.1和0.6是上一时间步的输出。",
+    context:"h_{t-1} = <span class='current-part'>[0.1, 0.6]</span> ∈ ℝ^h = ℝ^2",
+    active:'inputs'});
+
+  add({phase:0, title:"上一时刻细胞状态 C_{t-1}",
+    calc:"C_{t-1} = LSTM 的<span class='val'>长期记忆</span>\n跨时间步持续传递的内部状态",
+    why:"C_{t-1} 是 LSTM 区别于普通 RNN 的关键！它通过<span class='val'>加法更新</span>（而非乘法）传递，有效缓解梯度消失问题。如同\"你读完一本书记住的深层理解\"。",
+    context:"LSTM(x_t, h_{t-1}, <span class='current-part'>C_{t-1}</span>) → h_t, C_t",
+    active:'inputs'});
+
+  add({phase:0, title:"C_{t-1} 的具体数值",
+    calc:"C_{t-1} = [<span class='val'>0.8</span>, <span class='val'>-0.2</span>]\n维度 h = 2",
+    why:"0.8表示第1维长期记忆偏正（保留了正信息），-0.2表示第2维略负。这些值可以是任意实数，不限于[0,1]。",
+    context:"C_{t-1} = <span class='current-part'>[0.8, -0.2]</span> ∈ ℝ^h",
+    active:'inputs'});
+
+  // ─── PHASE 1: 向量拼接 (Steps 9-18) ───
+  add({phase:1, title:"为什么要拼接 [h_{t-1}, x_t]",
+    calc:"拼接目的：让<span class='val'>所有门</span>同时看到\"历史\"和\"当前\"",
+    why:"LSTM 的四个门（遗忘/输入/候选/输出）都需要根据\"之前的记忆\"和\"当前的输入\"来决策。拼接后只需一次矩阵乘法，而非分别计算两次。",
+    context:"<span class='current-part'>concat = [h_{t-1}; x_t]</span> → 供所有门使用",
+    active:'concat'});
+
+  add({phase:1, title:"拼接操作：首尾相连",
+    calc:"把 h_{t-1} 和 x_t <span class='val'>首尾相连</span>：\n[h_{t-1}[0], h_{t-1}[1], x_t[0], x_t[1], x_t[2]]",
+    why:"拼接（concatenation）是最简单的向量合并方式——不改变元素值，只是把它们排列在一起。这不是加权求和，不丢失信息。",
+    context:"concat = <span class='current-part'>[h_{t-1}; x_t]</span> = [0.1, 0.6, 0.5, -0.3, 0.8]",
+    active:'concat'});
+
+  add({phase:1, title:"h_{t-1} 填入前 h=2 个位置",
+    calc:"concat[0] = h_{t-1}[0] = <span class='val'>0.1</span>\nconcat[1] = h_{t-1}[1] = <span class='val'>0.6</span>",
+    why:"拼接规则：\"历史\"向量在前。这是因为权重矩阵的前 h 列对应 h_{t-1}，后 d 列对应 x_t，有明确的分工。",
+    context:"concat = [<span class='current-part'>0.1, 0.6</span>, _, _, _] ← h_{t-1}",
+    active:'concat'});
+
+  add({phase:1, title:"x_t 填入后 d=3 个位置",
+    calc:"concat[2] = x_t[0] = <span class='val'>0.5</span>\nconcat[3] = x_t[1] = <span class='val'>-0.3</span>\nconcat[4] = x_t[2] = <span class='val'>0.8</span>",
+    why:"\"当前\"向量在后。权重矩阵的后 d 列专门处理 x_t 的贡献。前后分工让模型能区分\"历史影响\"和\"当前影响\"。",
+    context:"concat = [0.1, 0.6, <span class='current-part'>0.5, -0.3, 0.8</span>] ← x_t",
+    active:'concat'});
+
+  add({phase:1, title:"拼接结果确认",
+    calc:"concat = [<span class='val'>0.1</span>, <span class='val'>0.6</span>, <span class='val'>0.5</span>, <span class='val'>-0.3</span>, <span class='val'>0.8</span>]",
+    why:"拼接完成！这个5维向量将成为所有四个门的共同输入。",
+    context:"<span class='current-part'>concat = [0.1, 0.6, 0.5, -0.3, 0.8]</span>",
+    active:'concat'});
+
+  add({phase:1, title:"拼接后的维度",
+    calc:"dim(concat) = h + d = <span class='val'>2 + 3 = 5</span>",
+    why:"拼接后维度 = 两个源向量维度之和。这使得权重矩阵的列数也变为 h+d=5。",
+    context:"concat ∈ ℝ^<span class='current-part'>5</span> = ℝ^{h+d}",
+    active:'concat'});
+
+  add({phase:1, title:"为什么不分开乘权重？— 参数量相同",
+    calc:"一个大 W: (h)×(h+d) = <span class='val'>2×5 = 10</span> 参数\n两个小 W: W_hh(h×h)+W_xh(h×d) = 2×2+2×3 = <span class='val'>4+6 = 10</span> 参数\n→ 参数量<span class='val'>完全相同</span>！",
+    why:"数学上，拼接后用一个大矩阵和分别用两个小矩阵是等价的。大矩阵的前h列就是W_hh，后d列就是W_xh。",
+    context:"W_f ∈ ℝ^{<span class='current-part'>h × (h+d)</span>} = ℝ^{2×5}",
+    active:'concat'});
+
+  add({phase:1, title:"拼接方式的工程优势",
+    calc:"拼接优势：\n1. <span class='val'>代码更简洁</span> — 一行矩阵乘法\n2. <span class='val'>GPU并行效率更高</span> — 单次GEMM调用\n3. <span class='val'>内存访问更连续</span> — 减少缓存未命中",
+    why:"在现代GPU上，一次大的矩阵乘法（2×5）比两次小的（2×2 和 2×3）更快，因为GPU的并行计算单元利用率更高。",
+    context:"W_f · concat = <span class='current-part'>一次矩阵乘法搞定</span>",
+    active:'concat'});
+
+  add({phase:1, title:"concat — 所有门的共享输入",
+    calc:"f_t = σ(W_f · <span class='val'>concat</span> + b_f)\ni_t = σ(W_i · <span class='val'>concat</span> + b_i)\nC~_t = tanh(W_C · <span class='val'>concat</span> + b_C)\no_t = σ(W_o · <span class='val'>concat</span> + b_o)",
+    why:"四个门都用 concat 作为输入，但各有自己的权重矩阵——就像四个人看同一份报告，但各自关注不同的内容。",
+    context:"<span class='current-part'>concat = [0.1, 0.6, 0.5, -0.3, 0.8]</span> → 驱动所有四个门",
+    active:'concat'});
+
+  // ─── PHASE 2: 遗忘门 — 权重理解 (Steps 19-28) ───
+  add({phase:2, title:"遗忘门的目的",
+    calc:"f_t = 决定从 C_{t-1} 中<span class='val'>遗忘/保留</span>哪些信息",
+    why:"不是所有旧信息都有用。比如阅读句子时，看到新主语后应该\"遗忘\"旧主语。遗忘门就是<span class='val'>选择性擦除</span>机制。",
+    context:"C_t = <span class='current-part'>f_t</span> ⊙ C_{t-1} + i_t ⊙ C~_t\n       ↑ 控制旧信息保留比例",
+    active:'forget'});
+
+  add({phase:2, title:"为什么需要遗忘？",
+    calc:"示例：\"我爱吃苹果，<span class='val'>但</span>他喜欢香蕉\"\n→ 看到\"但\"之后，应遗忘\"我\"的信息，保留\"他\"的信息",
+    why:"人类阅读时也会自然地\"忘记\"不再相关的上下文。遗忘门让LSTM能<span class='val'>主动丢弃</span>过时信息，避免干扰。",
+    context:"f_t ∈ [0,1]^h: 0=<span class='val'>完全遗忘</span>, 1=<span class='val'>完全保留</span>",
+    active:'forget'});
+
+  add({phase:2, title:"W_f 的维度 (2×5)",
+    calc:"W_f ∈ ℝ^{<span class='val'>2×5</span>}\n2行 → 输出2维（匹配h=2）\n5列 → 输入5维（匹配h+d=5）",
+    why:"矩阵乘法的维度规则：(输出维度)×(输入维度)。W_f 把5维concat映射到2维遗忘门输出。",
+    context:"f_t = σ(<span class='current-part'>W_f</span> · concat + b_f)\n      ℝ^{2×5}  ℝ^5  → ℝ^2",
+    active:'forget'});
+
+  add({phase:2, title:"W_f 第1行 — 控制输出第1维",
+    calc:"W_f[0] = [<span class='val'>0.2</span>, <span class='val'>-0.1</span>, <span class='val'>0.3</span>, <span class='val'>0.1</span>, <span class='val'>-0.2</span>]\n这一行决定 f_t[0] 的大小",
+    why:"矩阵第1行与concat的点积，决定遗忘门的第1个输出。每一行是一个\"决策规则\"——综合5个输入来决定第1维度的遗忘程度。",
+    context:"f_t[0] = σ(W_f[<span class='current-part'>0</span>] · concat + b_f[0])",
+    active:'forget'});
+
+  add({phase:2, title:"W_f 第2行 — 控制输出第2维",
+    calc:"W_f[1] = [<span class='val'>0.1</span>, <span class='val'>0.4</span>, <span class='val'>-0.2</span>, <span class='val'>0.3</span>, <span class='val'>0.1</span>]\n这一行决定 f_t[1] 的大小",
+    why:"第2行是另一个\"决策规则\"，它有不同的权重，因此可能产生不同的遗忘决策。两个维度独立控制。",
+    context:"f_t[1] = σ(W_f[<span class='current-part'>1</span>] · concat + b_f[1])",
+    active:'forget'});
+
+  add({phase:2, title:"每个权重的含义",
+    calc:"W_f[i][j] = <span class='val'>第j个输入</span>对<span class='val'>第i个输出</span>的贡献\n例：W_f[0][2]=0.3 → concat[2]=0.5(第3特征)\n对 f_t[0] 有<span class='val'>正向</span>贡献",
+    why:"权重是可学习的参数，训练过程中自动调整。正值意味着该输入促进\"保留\"（f_t→1），负值促进\"遗忘\"（f_t→0）。",
+    context:"f_t[i] = σ(Σ_j <span class='current-part'>W_f[i][j]</span> × concat[j] + b_f[i])",
+    active:'forget'});
+
+  add({phase:2, title:"正权重 vs 负权重",
+    calc:"正权重 → 该输入促进<span class='val'>保留</span>（f_t↑）\n负权重 → 该输入促进<span class='val'>遗忘</span>（f_t↓）",
+    why:"因为最终过sigmoid：正的点积→sigmoid→接近1（保留），负的点积→sigmoid→接近0（遗忘）。权重的正负直接控制这个倾向。",
+    context:"σ(z): z<span class='val'>大→1(保留)</span>, z<span class='val'>小→0(遗忘)</span>",
+    active:'forget'});
+
+  add({phase:2, title:"偏置 b_f 的含义",
+    calc:"b_f = [<span class='val'>0.0</span>, <span class='val'>0.0</span>]\n偏置 = 即使输入全0也有<span class='val'>基础倾向</span>",
+    why:"偏置是\"先验偏好\"。b_f>0 意味着默认倾向保留，b_f<0 意味着默认倾向遗忘。它让门即使在输入为零时也能做出决策。",
+    context:"f_t = σ(W_f·concat + <span class='current-part'>b_f</span>)",
+    active:'forget'});
+
+  add({phase:2, title:"b_f=[0,0] 的简化设定",
+    calc:"本例 b_f = [0, 0]，偏置<span class='val'>不起作用</span>\nσ(0) = 0.5 → 中性决策",
+    why:"为教学简化设为0。实际训练后偏置不会是0——它会被优化为有意义的值。",
+    context:"b_f = <span class='current-part'>[0, 0]</span> → 加偏置步骤无影响",
+    active:'forget'});
+
+  add({phase:2, title:"工程中 b_f 初始化为1的理由",
+    calc:"工程最佳实践：<span class='val'>b_f 初始化为 1</span>\n→ 训练初期 f_t ≈ 1 → 倾向<span class='val'>保留旧信息</span>",
+    why:"训练刚开始时权重很小（随机初始化），点积接近0。如果 b_f=0，则 f_t≈0.5，一半信息被随机丢弃。b_f=1 使 f_t≈0.73，更安全地保留旧信息，让梯度流更稳定。",
+    context:"σ(0+<span class='current-part'>1</span>) = σ(1) ≈ 0.73 → <span class='val'>偏向保留</span>",
+    active:'forget'});
+
+  // ─── PHASE 3: 遗忘门 — 矩阵乘法展开 (Steps 29-42) ───
+  add({phase:3, title:"矩阵乘法的本质：逐行点积",
+    calc:"W_f · concat = [<span class='val'>W_f[0]·concat</span>,\n                    <span class='val'>W_f[1]·concat</span>]\n每一行与concat做<span class='val'>点积</span>",
+    why:"矩阵-向量乘法 = 对矩阵的每一行，与向量做点积，得到输出向量的对应元素。这是线性代数最基本的运算。",
+    context:"W_f · concat = [<span class='current-part'>row0·concat</span>, row1·concat]",
+    active:'forget', running:"W_f · concat = [_, _]"});
+
+  // Row 0 individual multiplications
+  const f0p = [];
+  for(let j=0;j<5;j++){
+    let p = W_f[0][j]*concat[j];
+    f0p.push(p);
+    let acc = f0p.reduce((a,b)=>a+b,0);
+    add({phase:3, title:`W_f[0][${j}] × concat[${j}] = ${fmt(W_f[0][j])} × ${fmtS(concat[j])} = ${fmt(p)}`,
+      calc:`W_f[0][${j}] = <span class='val'>${fmt(W_f[0][j])}</span>\nconcat[${j}] = <span class='val'>${fmtS(concat[j])}</span>\n<span class='val'>${fmt(W_f[0][j])}</span> × <span class='val'>${fmtS(concat[j])}</span> = <span class='res'>${fmt(p)}</span>`,
+      why:j<2
+        ?`第${j}个输入来自 h_{t-1}[${j}]。W_f[0][${j}]=${fmt(W_f[0][j])} ${W_f[0][j]>0?'(正→促进保留)':'(负→促进遗忘)'}，h_{t-1}[${j}]=${concat[j]}。`
+        :`第${j}个输入来自 x_t[${j-2}]。W_f[0][${j}]=${fmt(W_f[0][j])} ${W_f[0][j]>0?'(正→促进保留)':'(负→促进遗忘)'}，x_t[${j-2}]=${concat[j]}。`,
+      context:`W_f[0]·concat = Σ(W_f[0][j]×concat[j])\n  = ... + <span class='current-part'>W_f[0][${j}]×concat[${j}]</span> = ${fmt(p)}`,
+      active:'forget',
+      running:`W_f[0]·concat 累计 = ${fmt(acc)}\n已加: ${f0p.map((v,k)=>`${fmt(W_f[0][k])}×${fmtS(concat[k])}=${fmt(v)}`).slice(0,j+1).join(' + ')}`});
   }
 
-  // Defs: gradients, filters
-  const defs = el('defs', {}, svg);
+  add({phase:3, title:`第1行求和：${f0p.map(v=>fmt(v)).join(' + ')} = ${fmt(f_dot0.sum)}`,
+    calc:`${f0p.map(v=>`<span class='val'>${fmt(v)}</span>`).join(' + ')}\n= <span class='res'>${fmt(f_dot0.sum)}</span>`,
+    why:`5个乘积相加得到第1行点积结果。${fmt(f_dot0.sum)}${f_dot0.sum>0?' 正数，过sigmoid后倾向保留':' 负数，过sigmoid后倾向遗忘'}。`,
+    context:`W_f[0]·concat = <span class='current-part'>${fmt(f_dot0.sum)}</span>`,
+    active:'forget', running:`W_f·concat = [${fmt(f_dot0.sum)}, _]`});
 
-  // Glow filter
-  const glowFilter = el('filter', { id: 'glow', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
-  el('feGaussianBlur', { stdDeviation: '4', result: 'blur' }, glowFilter);
-  const merge = el('feMerge', {}, glowFilter);
-  el('feMergeNode', { in: 'blur' }, merge);
-  el('feMergeNode', { in: 'SourceGraphic' }, merge);
+  // Row 1 individual multiplications
+  const f1p = [];
+  for(let j=0;j<5;j++){
+    let p = W_f[1][j]*concat[j];
+    f1p.push(p);
+    let acc = f1p.reduce((a,b)=>a+b,0);
+    add({phase:3, title:`W_f[1][${j}] × concat[${j}] = ${fmt(W_f[1][j])} × ${fmtS(concat[j])} = ${fmt(p)}`,
+      calc:`W_f[1][${j}] = <span class='val'>${fmt(W_f[1][j])}</span>\nconcat[${j}] = <span class='val'>${fmtS(concat[j])}</span>\n<span class='val'>${fmt(W_f[1][j])}</span> × <span class='val'>${fmtS(concat[j])}</span> = <span class='res'>${fmt(p)}</span>`,
+      why:j<2
+        ?`第${j}个输入来自 h_{t-1}[${j}]。W_f[1][${j}]=${fmt(W_f[1][j])} ${W_f[1][j]>0?'(正→促进保留)':'(负→促进遗忘)'}，h_{t-1}[${j}]=${concat[j]}。`
+        :`第${j}个输入来自 x_t[${j-2}]。W_f[1][${j}]=${fmt(W_f[1][j])} ${W_f[1][j]>0?'(正→促进保留)':'(负→促进遗忘)'}，x_t[${j-2}]=${concat[j]}。`,
+      context:`W_f[1]·concat = Σ(W_f[1][j]×concat[j])\n  = ... + <span class='current-part'>W_f[1][${j}]×concat[${j}]</span> = ${fmt(p)}`,
+      active:'forget',
+      running:`W_f[1]·concat 累计 = ${fmt(acc)}\n已加: ${f1p.map((v,k)=>`${fmt(W_f[1][k])}×${fmtS(concat[k])}=${fmt(v)}`).slice(0,j+1).join(' + ')}`});
+  }
 
-  // Arrow marker
-  const marker = el('marker', { id: 'arrow', viewBox: '0 0 10 10', refX: '9', refY: '5',
-    markerWidth: '6', markerHeight: '6', orient: 'auto-start-reverse' }, defs);
-  el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#5a6a8a' }, marker);
+  add({phase:3, title:`第2行求和：${f1p.map(v=>fmt(v)).join(' + ')} = ${fmt(f_dot1.sum)}`,
+    calc:`${f1p.map(v=>`<span class='val'>${fmt(v)}</span>`).join(' + ')}\n= <span class='res'>${fmt(f_dot1.sum)}</span>`,
+    why:`5个乘积相加得到第2行点积结果。${fmt(f_dot1.sum)}${f_dot1.sum>0?' 正数，过sigmoid后倾向保留':' 负数，过sigmoid后倾向遗忘'}。`,
+    context:`W_f[1]·concat = <span class='current-part'>${fmt(f_dot1.sum)}</span>`,
+    active:'forget', running:`W_f·concat = [${fmt(f_dot0.sum)}, ${fmt(f_dot1.sum)}]`});
 
-  const arrowGlow = el('marker', { id: 'arrowGlow', viewBox: '0 0 10 10', refX: '9', refY: '5',
-    markerWidth: '6', markerHeight: '6', orient: 'auto-start-reverse' }, defs);
-  el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#53d8fb' }, arrowGlow);
+  // ─── PHASE 4: 遗忘门 — 偏置与激活 (Steps 43-54) ───
+  add({phase:4, title:`加偏置：[${fmt(f_dot0.sum)}, ${fmt(f_dot1.sum)}] + [0, 0] = [${fmt(f_raw[0])}, ${fmt(f_raw[1])}]`,
+    calc:`[${fmt(f_dot0.sum)}, ${fmt(f_dot1.sum)}] + [<span class='val'>0</span>, <span class='val'>0</span>]\n= [<span class='res'>${fmt(f_raw[0])}</span>, <span class='res'>${fmt(f_raw[1])}</span>]`,
+    why:"偏置是加在点积结果上的常数。本例偏置全0，所以结果不变。但偏置的存在让模型有\"默认倾向\"。",
+    context:`f_t = σ(W_f·concat + <span class='current-part'>b_f</span>)\n    = σ([${fmt(f_raw[0])}, ${fmt(f_raw[1])}])`,
+    active:'forget'});
 
-  // Background
-  el('rect', { x: 0, y: 0, width: 460, height: 380, fill: 'transparent', rx: 12 }, svg);
+  add({phase:4, title:"偏置在这里没起作用（全0）",
+    calc:"b_f = [0, 0] → 偏置贡献 = <span class='val'>0</span>\n结果完全由 W_f·concat 决定",
+    why:"这是教学简化。实际训练后的 b_f 通常非零，尤其是遗忘门偏置常为正值（偏向保留）。",
+    context:`W_f·concat + b_f = [${fmt(f_raw[0])}, ${fmt(f_raw[1])}] + <span class='current-part'>[0, 0]</span>`,
+    active:'forget'});
 
-  // Main cell outline
-  el('rect', { x: 80, y: 50, width: 300, height: 280, fill: 'rgba(30,39,70,0.6)',
-    stroke: '#2a3a5c', 'stroke-width': 1.5, rx: 16 }, svg);
+  add({phase:4, title:"为什么需要激活函数？",
+    calc:"W_f·concat + b_f 是<span class='val'>线性变换</span>\n线性变换不够！需要<span class='val'>非线性决策</span>",
+    why:"没有激活函数的话，无论叠加多少层线性变换，结果仍然是线性的——模型无法学习复杂的非线性决策边界。激活函数引入非线性，让门能做出\"是/否\"的决策。",
+    context:`f_t = <span class='current-part'>σ</span>(W_f·concat + b_f)\n      ↑ 非线性变换`,
+    active:'forget'});
 
-  // ---- Cell state line (top) ----
-  const cellLine = el('g', { id: 'cellLine' }, svg);
-  // C_{t-1} input arrow
-  el('line', { x1: 30, y1: 85, x2: 80, y2: 85, stroke: '#00d98b', 'stroke-width': 2.5,
-    'marker-end': 'url(#arrow)' }, cellLine);
-  el('text', { x: 22, y: 82, fill: '#00d98b', 'font-size': 11, 'font-family': 'monospace',
-    'text-anchor': 'end' }, cellLine).textContent = 'C_{t-1}';
-  // Main horizontal
-  el('line', { x1: 80, y1: 85, x2: 380, y2: 85, stroke: '#00d98b', 'stroke-width': 3,
-    id: 'cellStateLine' }, cellLine);
-  // C_t output arrow
-  el('line', { x1: 380, y1: 85, x2: 440, y2: 85, stroke: '#00d98b', 'stroke-width': 2.5,
-    'marker-end': 'url(#arrow)' }, cellLine);
-  el('text', { x: 448, y: 82, fill: '#00d98b', 'font-size': 11, 'font-family': 'monospace' }, cellLine).textContent = 'C_t';
+  add({phase:4, title:"为什么选 Sigmoid？",
+    calc:"Sigmoid: σ(z) = 1/(1+e⁻ᶻ)\n输出范围：<span class='val'>[0, 1]</span>\n→ 天然适合\"保留比例\"",
+    why:"遗忘门需要输出\"保留多少\"的比例：0=完全不保留，1=完全保留。Sigmoid的输出范围恰好是[0,1]，完美匹配这个需求。",
+    context:`f_t = <span class='current-part'>σ</span>(z) ∈ [0, 1]  →  保留比例`,
+    active:'forget'});
 
-  // ---- Forget gate (x marker on cell line) ----
-  const forgetG = el('g', { id: 'forgetGateG', class: 'gate-group' }, svg);
-  el('rect', { x: 120, y: 58, width: 50, height: 54, fill: 'rgba(233,69,96,0.12)',
-    stroke: '#e94560', 'stroke-width': 1.5, rx: 8 }, forgetG);
-  el('text', { x: 145, y: 78, fill: '#e94560', 'font-size': 15, 'font-weight': 'bold',
-    'text-anchor': 'middle', 'font-family': 'monospace' }, forgetG).textContent = '×';
-  el('text', { x: 145, y: 103, fill: '#e94560', 'font-size': 9, 'text-anchor': 'middle' }, forgetG).textContent = 'f_t';
-  // Label
-  el('text', { x: 145, y: 50, fill: '#e94560', 'font-size': 10, 'text-anchor': 'middle',
-    'font-weight': 'bold' }, forgetG).textContent = '遗忘门';
+  add({phase:4, title:"为什么不用 ReLU？",
+    calc:"ReLU: max(0, z)\n输出范围：<span class='val'>[0, +∞)</span>\n→ 无法表示\"部分保留\"",
+    why:"ReLU 输出可以大于1，没有上界，不能表示\"保留50%\"这种比例概念。而门控机制需要精确的[0,1]范围输出。",
+    context:`f_t 需要 ∈ [0,1]\n<span class='current-part'>σ 输出 ∈ [0,1] ✓</span>\nReLU 输出 ∈ [0,∞) ✗`,
+    active:'forget'});
 
-  // ---- Input gate (+ on cell line) ----
-  const inputGateG = el('g', { id: 'inputGateG', class: 'gate-group' }, svg);
-  el('rect', { x: 195, y: 58, width: 50, height: 54, fill: 'rgba(83,216,251,0.12)',
-    stroke: '#53d8fb', 'stroke-width': 1.5, rx: 8 }, inputGateG);
-  el('text', { x: 220, y: 78, fill: '#53d8fb', 'font-size': 15, 'font-weight': 'bold',
-    'text-anchor': 'middle', 'font-family': 'monospace' }, inputGateG).textContent = '+';
-  el('text', { x: 220, y: 103, fill: '#53d8fb', 'font-size': 9, 'text-anchor': 'middle' }, inputGateG).textContent = 'i_t';
-  el('text', { x: 220, y: 50, fill: '#53d8fb', 'font-size': 10, 'text-anchor': 'middle',
-    'font-weight': 'bold' }, inputGateG).textContent = '输入门';
+  add({phase:4, title:"Sigmoid 公式展开",
+    calc:`σ(z) = <span class='val'>1 / (1 + e⁻ᶻ)</span>\n\n计算 f_t[0]: z = ${fmt(f_raw[0])}\n计算 f_t[1]: z = ${fmt(f_raw[1])}`,
+    why:"Sigmoid 的数学定义：将任意实数映射到(0,1)。z 越大→越接近1，z 越小→越接近0，z=0→恰好0.5。",
+    context:`f_t = <span class='current-part'>σ(z)</span> = 1/(1+e⁻ᶻ)`,
+    active:'forget'});
 
-  // ---- Candidate (tanh block below input gate) ----
-  const candidateG = el('g', { id: 'candidateG', class: 'gate-group' }, svg);
-  el('rect', { x: 195, y: 140, width: 50, height: 40, fill: 'rgba(192,132,252,0.12)',
-    stroke: '#c084fc', 'stroke-width': 1.5, rx: 8 }, candidateG);
-  el('text', { x: 220, y: 164, fill: '#c084fc', 'font-size': 13, 'font-weight': 'bold',
-    'text-anchor': 'middle', 'font-family': 'monospace' }, candidateG).textContent = 'tanh';
-  el('text', { x: 220, y: 192, fill: '#c084fc', 'font-size': 9, 'text-anchor': 'middle' }, candidateG).textContent = 'C̃_t';
-  // Arrow from candidate up to input gate
-  el('line', { x1: 220, y1: 140, x2: 220, y2: 112, stroke: '#c084fc', 'stroke-width': 1.5,
-    'marker-end': 'url(#arrow)' }, candidateG);
+  const e_pos0 = Math.exp(-f_raw[0]);
+  add({phase:4, title:`计算 f_t[0] = σ(${fmt(f_raw[0])})`,
+    calc:`z = ${fmt(f_raw[0])}\ne⁻ᶻ = e^{${fmt(-f_raw[0])}} = <span class='val'>${fmt(e_pos0)}</span>\n1 + e⁻ᶻ = 1 + ${fmt(e_pos0)} = <span class='val'>${fmt(1+e_pos0)}</span>\nσ(${fmt(f_raw[0])}) = 1 / ${fmt(1+e_pos0)} = <span class='res'>${fmt(f_t[0])}</span>`,
+    why:`${fmt(f_raw[0])} 是负数，所以 e⁻ᶻ > 1，分母 > 2，结果 < 0.5。这意味着第1维度的遗忘门倾向\"略微遗忘\"。`,
+    context:`f_t[0] = σ(${fmt(f_raw[0])}) = <span class='current-part'>${fmt(f_t[0])}</span>`,
+    active:'forget'});
 
-  // ---- i_t sigmoid (left of candidate) ----
-  const iTG = el('g', { id: 'iTGate', class: 'gate-group' }, svg);
-  el('rect', { x: 130, y: 140, width: 50, height: 40, fill: 'rgba(83,216,251,0.12)',
-    stroke: '#53d8fb', 'stroke-width': 1.5, rx: 8 }, iTG);
-  el('text', { x: 155, y: 164, fill: '#53d8fb', 'font-size': 13, 'font-weight': 'bold',
-    'text-anchor': 'middle', 'font-family': 'monospace' }, iTG).textContent = 'σ';
-  el('text', { x: 155, y: 192, fill: '#53d8fb', 'font-size': 9, 'text-anchor': 'middle' }, iTG).textContent = 'i_t';
-  // Multiply dot
-  el('circle', { cx: 190, cy: 125, r: 8, fill: 'rgba(83,216,251,0.15)', stroke: '#53d8fb',
-    'stroke-width': 1 }, iTG);
-  el('text', { x: 190, y: 129, fill: '#53d8fb', 'font-size': 11, 'text-anchor': 'middle' }, iTG).textContent = '⊙';
-  // Line from i_t sigmoid up to multiply
-  el('line', { x1: 155, y1: 140, x2: 185, y2: 125, stroke: '#53d8fb', 'stroke-width': 1 }, iTG);
-  // Line from multiply up to cell state
-  el('line', { x1: 190, y1: 117, x2: 210, y2: 112, stroke: '#53d8fb', 'stroke-width': 1.5,
-    'marker-end': 'url(#arrow)' }, iTG);
-  // Line from candidate to multiply
-  el('line', { x1: 195, y1: 155, x2: 183, y2: 130, stroke: '#c084fc', 'stroke-width': 1 }, iTG);
+  add({phase:4, title:`e^{${fmt(-f_raw[0])}} 的计算过程展开`,
+    calc:`e^{${fmt(-f_raw[0])}} ≈ 1 + ${fmt(-f_raw[0])} + (${fmt(-f_raw[0])})²/2! + ...\n= 1 + 0.08 + 0.0032 + 0.0001 + ...\n≈ <span class='val'>${fmt(e_pos0)}</span>`,
+    why:"自然指数 e^x 的泰勒展开：e^x = 1 + x + x²/2! + x³/3! + ... 对于 x=0.08，收敛很快。",
+    context:`e^{${fmt(-f_raw[0])}} = <span class='current-part'>${fmt(e_pos0)}</span>`,
+    active:'forget'});
 
-  // ---- Forget sigmoid (left side) ----
-  const fTG = el('g', { id: 'fTGate', class: 'gate-group' }, svg);
-  el('rect', { x: 95, y: 140, width: 50, height: 40, fill: 'rgba(233,69,96,0.12)',
-    stroke: '#e94560', 'stroke-width': 1.5, rx: 8 }, fTG);
-  el('text', { x: 120, y: 164, fill: '#e94560', 'font-size': 13, 'font-weight': 'bold',
-    'text-anchor': 'middle', 'font-family': 'monospace' }, fTG).textContent = 'σ';
-  el('text', { x: 120, y: 192, fill: '#e94560', 'font-size': 9, 'text-anchor': 'middle' }, fTG).textContent = 'f_t';
-  // Multiply dot for forget
-  el('circle', { cx: 145, cy: 85, r: 8, fill: 'rgba(233,69,96,0.15)', stroke: '#e94560',
-    'stroke-width': 1 }, fTG);
-  el('text', { x: 145, y: 89, fill: '#e94560', 'font-size': 11, 'text-anchor': 'middle' }, fTG).textContent = '⊙';
-  // Line from f_t sigmoid up to multiply
-  el('line', { x1: 120, y1: 140, x2: 142, y2: 93, stroke: '#e94560', 'stroke-width': 1 }, fTG);
+  const e_neg1 = Math.exp(-f_raw[1]);
+  add({phase:4, title:`计算 f_t[1] = σ(${fmt(f_raw[1])})`,
+    calc:`z = ${fmt(f_raw[1])}\ne⁻ᶻ = e^{${fmt(-f_raw[1])}} = <span class='val'>${fmt(e_neg1)}</span>\n1 + e⁻ᶻ = 1 + ${fmt(e_neg1)} = <span class='val'>${fmt(1+e_neg1)}</span>\nσ(${fmt(f_raw[1])}) = 1 / ${fmt(1+e_neg1)} = <span class='res'>${fmt(f_t[1])}</span>`,
+    why:`${fmt(f_raw[1])} 是正数，所以 e⁻ᶻ < 1，分母 < 2，结果 > 0.5。第2维度倾向\"略微保留\"。`,
+    context:`f_t[1] = σ(${fmt(f_raw[1])}) = <span class='current-part'>${fmt(f_t[1])}</span>`,
+    active:'forget'});
 
-  // ---- Output gate (right side) ----
-  const outputG = el('g', { id: 'outputGateG', class: 'gate-group' }, svg);
-  el('rect', { x: 290, y: 140, width: 50, height: 40, fill: 'rgba(245,166,35,0.12)',
-    stroke: '#f5a623', 'stroke-width': 1.5, rx: 8 }, outputG);
-  el('text', { x: 315, y: 164, fill: '#f5a623', 'font-size': 13, 'font-weight': 'bold',
-    'text-anchor': 'middle', 'font-family': 'monospace' }, outputG).textContent = 'σ';
-  el('text', { x: 315, y: 192, fill: '#f5a623', 'font-size': 9, 'text-anchor': 'middle' }, outputG).textContent = 'o_t';
-  el('text', { x: 315, y: 135, fill: '#f5a623', 'font-size': 10, 'text-anchor': 'middle',
-    'font-weight': 'bold' }, outputG).textContent = '输出门';
+  add({phase:4, title:`e^{${fmt(-f_raw[1])}} 的计算过程展开`,
+    calc:`e^{${fmt(-f_raw[1])}} ≈ 1 + ${fmt(-f_raw[1])} + (${fmt(-f_raw[1])})²/2! + ...\n= 1 + (-0.14) + 0.0098 + (-0.0005) + ...\n≈ <span class='val'>${fmt(e_neg1)}</span>`,
+    why:"e^{-0.14} 的泰勒展开，各项正负交替，快速收敛到约0.8694。",
+    context:`e^{${fmt(-f_raw[1])}} = <span class='current-part'>${fmt(e_neg1)}</span>`,
+    active:'forget'});
 
-  // tanh on cell line for output
-  const tanhOutG = el('g', { id: 'tanhOutG', }, svg);
-  el('rect', { x: 270, y: 58, width: 50, height: 54, fill: 'rgba(0,217,139,0.12)',
-    stroke: '#00d98b', 'stroke-width': 1.5, rx: 8 }, tanhOutG);
-  el('text', { x: 295, y: 78, fill: '#00d98b', 'font-size': 13, 'font-weight': 'bold',
-    'text-anchor': 'middle', 'font-family': 'monospace' }, tanhOutG).textContent = 'tanh';
+  add({phase:4, title:`遗忘门输出 f_t = [${fmt(f_t[0])}, ${fmt(f_t[1])}]`,
+    calc:`f_t = [<span class='res'>${fmt(f_t[0])}</span>, <span class='res'>${fmt(f_t[1])}</span>]`,
+    why:"两个维度都接近0.5，偏中性——既不是强烈保留也不是强烈遗忘。这是因为权重值较小，点积结果接近0。",
+    context:`<span class='current-part'>f_t = [${fmt(f_t[0])}, ${fmt(f_t[1])}]</span>`,
+    active:'forget'});
 
-  // Multiply dot for output
-  el('circle', { cx: 355, cy: 260, r: 8, fill: 'rgba(245,166,35,0.15)', stroke: '#f5a623',
-    'stroke-width': 1 }, outputG);
-  el('text', { x: 355, y: 264, fill: '#f5a623', 'font-size': 11, 'text-anchor': 'middle' }, outputG).textContent = '⊙';
+  add({phase:4, title:"解读 f_t 的物理意义",
+    calc:`f_t[0] = ${fmt(f_t[0])} → 保留<span class='val'>${fmt(f_t[0]*100,1)}%</span>的 C_{t-1}[0]\nf_t[1] = ${fmt(f_t[1])} → 保留<span class='val'>${fmt(f_t[1]*100,1)}%</span>的 C_{t-1}[1]\n→ 都接近50%，偏<span class='val'>中性决策</span>`,
+    why:"sigmoid输出0.5意味着\"一半保留一半遗忘\"——门还没有学会明确的遗忘/保留策略。训练充分的模型，f_t会更接近0或1。",
+    context:`C_t = <span class='current-part'>f_t ⊙ C_{t-1}</span> + i_t ⊙ C~_t\n      [${fmt(f_t[0])}, ${fmt(f_t[1])}] ⊙ [${fmt(C_prev[0])}, ${fmt(C_prev[1])}]`,
+    active:'forget', interpret:"f_t≈0.5 意味着门尚未做出强决策。训练后，遗忘门会对不相关的上下文输出接近0，对重要信息输出接近1。"});
 
-  // Line from output gate down to multiply
-  el('line', { x1: 315, y1: 180, x2: 348, y2: 253, stroke: '#f5a623', 'stroke-width': 1.5 }, outputG);
-  // Line from tanh(C_t) down to multiply
-  el('line', { x1: 295, y1: 112, x2: 295, y2: 230, stroke: '#00d98b', 'stroke-width': 1.5 }, outputG);
-  el('line', { x1: 295, y1: 230, x2: 348, y2: 253, stroke: '#00d98b', 'stroke-width': 1.5 }, outputG);
+  // ─── PHASE 5: 输入门 (Steps 55-68) ───
+  add({phase:5, title:"输入门的目的",
+    calc:"i_t = 决定<span class='val'>写入多少新信息</span>到细胞状态",
+    why:"遗忘门控制\"旧信息保留多少\"，输入门控制\"新信息写入多少\"。两者配合实现\"选择性更新\"——先擦除一部分，再写入一部分。",
+    context:`C_t = f_t⊙C_{t-1} + <span class='current-part'>i_t⊙C~_t</span>\n                   ↑ 控制新信息写入比例`,
+    active:'input'});
 
-  // ---- Hidden state line (bottom) ----
-  const hLine = el('g', { id: 'hLine' }, svg);
-  // h_{t-1} input
-  el('line', { x1: 30, y1: 260, x2: 80, y2: 260, stroke: '#5a6a8a', 'stroke-width': 2,
-    'marker-end': 'url(#arrow)' }, hLine);
-  el('text', { x: 22, y: 257, fill: '#8899bb', 'font-size': 11, 'font-family': 'monospace',
-    'text-anchor': 'end' }, hLine).textContent = 'h_{t-1}';
+  add({phase:5, title:"i_t 与 f_t 的区别",
+    calc:"f_t → 控制<span class='val'>旧信息保留</span>（擦除）\ni_t → 控制<span class='val'>新信息写入</span>（添加）\n两者独立决策，互不干扰",
+    why:"类比编辑文档：f_t=删除键（决定删多少），i_t=插入键（决定加多少）。两者可以同时操作，让LSTM灵活更新记忆。",
+    context:`C_t = <span class='val'>f_t⊙C_{t-1}</span> + <span class='val'>i_t⊙C~_t</span>\n      旧信息保留  新信息写入`,
+    active:'input'});
 
-  // Internal routing lines (h goes up to gates)
-  el('line', { x1: 80, y1: 260, x2: 80, y2: 200, stroke: '#5a6a8a', 'stroke-width': 1.5 }, hLine);
-  el('line', { x1: 80, y1: 200, x2: 100, y2: 160, stroke: '#5a6a8a', 'stroke-width': 1 }, hLine);
-  el('line', { x1: 80, y1: 200, x2: 135, y2: 160, stroke: '#5a6a8a', 'stroke-width': 1 }, hLine);
-  el('line', { x1: 80, y1: 200, x2: 205, y2: 160, stroke: '#5a6a8a', 'stroke-width': 1 }, hLine);
-  el('line', { x1: 80, y1: 200, x2: 300, y2: 160, stroke: '#5a6a8a', 'stroke-width': 1 }, hLine);
+  add({phase:5, title:"W_i 的维度和含义",
+    calc:`W_i ∈ ℝ^{<span class='val'>2×5</span>}\n与 W_f 同维度，但<span class='val'>不同的权重值</span>\n→ 学习不同的决策规则`,
+    why:"输入门和遗忘门结构完全相同（都是 σ(W·concat+b)），但参数不同，所以会学出不同的门控行为。",
+    context:`i_t = σ(<span class='current-part'>W_i</span>·concat + b_i)`,
+    active:'input'});
 
-  // x_t input
-  el('line', { x1: 30, y1: 300, x2: 80, y2: 300, stroke: '#5a6a8a', 'stroke-width': 2,
-    'marker-end': 'url(#arrow)' }, hLine);
-  el('text', { x: 22, y: 297, fill: '#8899bb', 'font-size': 11, 'font-family': 'monospace',
-    'text-anchor': 'end' }, hLine).textContent = 'x_t';
+  // Input gate row 0
+  const i0p = [];
+  for(let j=0;j<5;j++){
+    let p = W_i[0][j]*concat[j];
+    i0p.push(p);
+    let acc = i0p.reduce((a,b)=>a+b,0);
+    add({phase:5, title:`W_i[0][${j}] × concat[${j}] = ${fmt(W_i[0][j])} × ${fmtS(concat[j])} = ${fmt(p)}`,
+      calc:`<span class='val'>${fmt(W_i[0][j])}</span> × <span class='val'>${fmtS(concat[j])}</span> = <span class='res'>${fmt(p)}</span>`,
+      why:`W_i[0][${j}]=${fmt(W_i[0][j])} ${W_i[0][j]>0?'(正→促进写入)':'(负→抑制写入)'}，第${j}个输入（${j<2?'h_{t-1}':'x_t'}维度）。`,
+      context:`W_i[0]·concat: ... + <span class='current-part'>${fmt(W_i[0][j])}×${fmtS(concat[j])}=${fmt(p)}</span>`,
+      active:'input', running:`W_i[0]·concat 累计 = ${fmt(acc)}`});
+  }
+  add({phase:5, title:`输入门第1行求和 = ${fmt(i_dot0.sum)}`,
+    calc:`${i0p.map(v=>`<span class='val'>${fmt(v)}</span>`).join(' + ')}\n= <span class='res'>${fmt(i_dot0.sum)}</span>`,
+    why:`第1行点积结果为 ${fmt(i_dot0.sum)}，${i_dot0.sum>0?'正数，倾向写入':'负数，倾向不写入'}。`,
+    context:`W_i[0]·concat = <span class='current-part'>${fmt(i_dot0.sum)}</span>`,
+    active:'input', running:`W_i·concat = [${fmt(i_dot0.sum)}, _]`});
 
-  // x_t routing
-  el('line', { x1: 80, y1: 300, x2: 80, y2: 330, stroke: '#5a6a8a', 'stroke-width': 1.5 }, hLine);
-  el('line', { x1: 80, y1: 330, x2: 380, y2: 330, stroke: '#5a6a8a', 'stroke-width': 1 }, hLine);
-  // Branch up from x line to gates
-  el('line', { x1: 110, y1: 330, x2: 110, y2: 170, stroke: '#5a6a8a', 'stroke-width': 0.8, 'stroke-dasharray': '4,3' }, hLine);
-  el('line', { x1: 145, y1: 330, x2: 145, y2: 170, stroke: '#5a6a8a', 'stroke-width': 0.8, 'stroke-dasharray': '4,3' }, hLine);
-  el('line', { x1: 220, y1: 330, x2: 220, y2: 185, stroke: '#5a6a8a', 'stroke-width': 0.8, 'stroke-dasharray': '4,3' }, hLine);
-  el('line', { x1: 315, y1: 330, x2: 315, y2: 185, stroke: '#5a6a8a', 'stroke-width': 0.8, 'stroke-dasharray': '4,3' }, hLine);
+  // Input gate row 1
+  const i1p = [];
+  for(let j=0;j<5;j++){
+    let p = W_i[1][j]*concat[j];
+    i1p.push(p);
+    let acc = i1p.reduce((a,b)=>a+b,0);
+    add({phase:5, title:`W_i[1][${j}] × concat[${j}] = ${fmt(W_i[1][j])} × ${fmtS(concat[j])} = ${fmt(p)}`,
+      calc:`<span class='val'>${fmt(W_i[1][j])}</span> × <span class='val'>${fmtS(concat[j])}</span> = <span class='res'>${fmt(p)}</span>`,
+      why:`W_i[1][${j}]=${fmt(W_i[1][j])} ${W_i[1][j]>0?'(正→促进写入)':'(负→抑制写入)'}。`,
+      context:`W_i[1]·concat: ... + <span class='current-part'>${fmt(W_i[1][j])}×${fmtS(concat[j])}=${fmt(p)}</span>`,
+      active:'input', running:`W_i[1]·concat 累计 = ${fmt(acc)}`});
+  }
+  add({phase:5, title:`输入门第2行求和 = ${fmt(i_dot1.sum)}`,
+    calc:`${i1p.map(v=>`<span class='val'>${fmt(v)}</span>`).join(' + ')}\n= <span class='res'>${fmt(i_dot1.sum)}</span>`,
+    why:`第2行点积结果为 ${fmt(i_dot1.sum)}。`,
+    context:`W_i[1]·concat = <span class='current-part'>${fmt(i_dot1.sum)}</span>`,
+    active:'input', running:`W_i·concat = [${fmt(i_dot0.sum)}, ${fmt(i_dot1.sum)}]`});
 
-  // h_t output
-  el('line', { x1: 355, y1: 260, x2: 440, y2: 260, stroke: '#f5a623', 'stroke-width': 2.5,
-    'marker-end': 'url(#arrow)' }, hLine);
-  el('text', { x: 448, y: 257, fill: '#f5a623', 'font-size': 11, 'font-family': 'monospace' }, hLine).textContent = 'h_t';
+  add({phase:5, title:`加偏置 b_i = [${fmt(b_i[0])}, ${fmt(b_i[1])}]`,
+    calc:`[${fmt(i_dot0.sum)}, ${fmt(i_dot1.sum)}] + [<span class='val'>${fmt(b_i[0])}</span>, <span class='val'>${fmt(b_i[1])}</span>]\n= [<span class='res'>${fmt(i_raw[0])}</span>, <span class='res'>${fmt(i_raw[1])}</span>]`,
+    why:`b_i = [${fmt(b_i[0])}, ${fmt(b_i[1])}]。第1维偏置+0.1，增加了写入倾向；第2维偏置-0.1，降低了写入倾向。`,
+    context:`i_t = σ(W_i·concat + <span class='current-part'>b_i</span>)\n    = σ([${fmt(i_raw[0])}, ${fmt(i_raw[1])}])`,
+    active:'input'});
 
-  // Line from output multiply to h_t
-  el('line', { x1: 355, y1: 268, x2: 355, y2: 260, stroke: '#f5a623', 'stroke-width': 2 }, hLine);
+  add({phase:5, title:`σ(${fmt(i_raw[0])}) 的计算`,
+    calc:`e^{${fmt(-i_raw[0])}} = <span class='val'>${fmt(Math.exp(-i_raw[0]))}</span>\nσ(${fmt(i_raw[0])}) = 1/(1+${fmt(Math.exp(-i_raw[0]))}) = <span class='res'>${fmt(i_t[0])}</span>`,
+    why:`z=${fmt(i_raw[0])}>0，sigmoid结果>0.5，第1维倾向写入。偏置+0.1起了作用！`,
+    context:`i_t[0] = σ(${fmt(i_raw[0])}) = <span class='current-part'>${fmt(i_t[0])}</span>`,
+    active:'input'});
 
-  // ---- Concat label ----
-  el('text', { x: 55, y: 225, fill: '#5a6a8a', 'font-size': 10, 'text-anchor': 'middle',
-    'font-style': 'italic' }, svg).textContent = 'concat';
+  add({phase:5, title:`σ(${fmt(i_raw[1])}) 的计算`,
+    calc:`e^{${fmt(-i_raw[1])}} = <span class='val'>${fmt(Math.exp(-i_raw[1]))}</span>\nσ(${fmt(i_raw[1])}) = 1/(1+${fmt(Math.exp(-i_raw[1]))}) = <span class='res'>${fmt(i_t[1])}</span>`,
+    why:`z=${fmt(i_raw[1])}>0，sigmoid结果>0.5，第2维也倾向写入。`,
+    context:`i_t[1] = σ(${fmt(i_raw[1])}) = <span class='current-part'>${fmt(i_t[1])}</span>`,
+    active:'input'});
 
-  // Store SVG for later highlight manipulation
-  container.innerHTML = '';
-  container.appendChild(svg);
+  add({phase:5, title:`输入门输出 i_t = [${fmt(i_t[0])}, ${fmt(i_t[1])}]`,
+    calc:`i_t = [<span class='res'>${fmt(i_t[0])}</span>, <span class='res'>${fmt(i_t[1])}</span>]\n→ 两维都倾向写入新信息`,
+    why:"输入门两维都>0.5，表示当前输入信息值得写入细胞状态。相比遗忘门，输入门更积极。",
+    context:`<span class='current-part'>i_t = [${fmt(i_t[0])}, ${fmt(i_t[1])}]</span>`,
+    active:'input', interpret:`i_t≈0.6 表示约60%的新信息会被写入。与 f_t≈0.5 相比，输入门更活跃。`});
+
+  // ─── PHASE 6: 候选值 C~_t (Steps 69-80) ───
+  add({phase:6, title:"候选值的目的 — 生成\"要写入什么新内容\"",
+    calc:"C~_t = <span class='val'>候选新内容</span>\n由当前输入和历史共同决定",
+    why:"输入门决定\"写多少\"（i_t是比例），候选值决定\"写什么\"（C~_t是内容）。两者配合：i_t ⊙ C~_t = 实际写入量。",
+    context:`C_t = f_t⊙C_{t-1} + i_t⊙<span class='current-part'>C~_t</span>\n                      ↑ 候选新内容`,
+    active:'candidate'});
+
+  add({phase:6, title:"为什么用 tanh 而不是 sigmoid？",
+    calc:"tanh 输出范围：<span class='val'>[-1, 1]</span>\nsigmoid 输出范围：[0, 1]\n→ 候选值可以是<span class='val'>负数</span>（表示\"减少\"）",
+    why:"sigmoid 只能输出正值，意味着候选新内容只能\"增加\"细胞状态。但有时需要\"减少\"——tanh允许负值，让模型可以增加或减少每个维度的值。",
+    context:`C~_t = <span class='current-part'>tanh</span>(W_C·concat + b_C)  ∈ [-1, 1]`,
+    active:'candidate'});
+
+  add({phase:6, title:"W_C 的维度和含义",
+    calc:`W_C ∈ ℝ^{<span class='val'>2×5</span>}\n与 W_f, W_i 同维度\n但学习的是\"内容生成\"规则而非\"门控\"规则`,
+    why:"W_C 的结构和其他权重矩阵相同，但它的目的是生成内容而非门控信号。所以它用tanh激活而非sigmoid。",
+    context:`C~_t = tanh(<span class='current-part'>W_C</span>·concat + b_C)`,
+    active:'candidate'});
+
+  // Candidate row 0
+  const C0p = [];
+  for(let j=0;j<5;j++){
+    let p = W_C[0][j]*concat[j];
+    C0p.push(p);
+    let acc = C0p.reduce((a,b)=>a+b,0);
+    add({phase:6, title:`W_C[0][${j}] × concat[${j}] = ${fmt(W_C[0][j])} × ${fmtS(concat[j])} = ${fmt(p)}`,
+      calc:`<span class='val'>${fmt(W_C[0][j])}</span> × <span class='val'>${fmtS(concat[j])}</span> = <span class='res'>${fmt(p)}</span>`,
+      why:`权重${fmt(W_C[0][j])}，第${j}个输入。`,
+      context:`W_C[0]·concat: ... + <span class='current-part'>${fmt(W_C[0][j])}×${fmtS(concat[j])}=${fmt(p)}</span>`,
+      active:'candidate', running:`W_C[0]·concat 累计 = ${fmt(acc)}`});
+  }
+  add({phase:6, title:`候选值第1行求和 = ${fmt(Cc_dot0.sum)}`,
+    calc:`${C0p.map(v=>`<span class='val'>${fmt(v)}</span>`).join(' + ')}\n= <span class='res'>${fmt(Cc_dot0.sum)}</span>`,
+    why:`${fmt(Cc_dot0.sum)}，${Cc_dot0.sum>0?'正数→候选值为正(增加)':'负数→候选值为负(减少)'}。`,
+    context:`W_C[0]·concat = <span class='current-part'>${fmt(Cc_dot0.sum)}</span>`,
+    active:'candidate', running:`W_C·concat = [${fmt(Cc_dot0.sum)}, _]`});
+
+  // Candidate row 1
+  const C1p = [];
+  for(let j=0;j<5;j++){
+    let p = W_C[1][j]*concat[j];
+    C1p.push(p);
+    let acc = C1p.reduce((a,b)=>a+b,0);
+    add({phase:6, title:`W_C[1][${j}] × concat[${j}] = ${fmt(W_C[1][j])} × ${fmtS(concat[j])} = ${fmt(p)}`,
+      calc:`<span class='val'>${fmt(W_C[1][j])}</span> × <span class='val'>${fmtS(concat[j])}</span> = <span class='res'>${fmt(p)}</span>`,
+      why:`权重${fmt(W_C[1][j])}，第${j}个输入。`,
+      context:`W_C[1]·concat: ... + <span class='current-part'>${fmt(W_C[1][j])}×${fmtS(concat[j])}=${fmt(p)}</span>`,
+      active:'candidate', running:`W_C[1]·concat 累计 = ${fmt(acc)}`});
+  }
+  add({phase:6, title:`候选值第2行求和 = ${fmt(Cc_dot1.sum)}`,
+    calc:`${C1p.map(v=>`<span class='val'>${fmt(v)}</span>`).join(' + ')}\n= <span class='res'>${fmt(Cc_dot1.sum)}</span>`,
+    why:`${fmt(Cc_dot1.sum)}，${Cc_dot1.sum>0?'正数→候选值为正(增加)':'负数→候选值为负(减少)'}。`,
+    context:`W_C[1]·concat = <span class='current-part'>${fmt(Cc_dot1.sum)}</span>`,
+    active:'candidate', running:`W_C·concat = [${fmt(Cc_dot0.sum)}, ${fmt(Cc_dot1.sum)}]`});
+
+  add({phase:6, title:`加偏置 b_C = [${fmt(b_C[0])}, ${fmt(b_C[1])}]`,
+    calc:`[${fmt(Cc_dot0.sum)}, ${fmt(Cc_dot1.sum)}] + [<span class='val'>${fmt(b_C[0])}</span>, <span class='val'>${fmt(b_C[1])}</span>]\n= [<span class='res'>${fmt(Cc_raw[0])}</span>, <span class='res'>${fmt(Cc_raw[1])}</span>]`,
+    why:`b_C[1]=0.1 增加了第2维的候选值（略偏正），b_C[0]=0 不影响第1维。`,
+    context:`C~_t = tanh(W_C·concat + <span class='current-part'>b_C</span>)`,
+    active:'candidate'});
+
+  add({phase:6, title:`tanh(${fmt(Cc_raw[0])}) 的计算`,
+    calc:`tanh(z) = (eᶻ - e⁻ᶻ)/(eᶻ + e⁻ᶻ)\nz = ${fmt(Cc_raw[0])}（负数）\ntanh(${fmt(Cc_raw[0])}) = <span class='res'>${fmt(C_tilde[0])}</span>`,
+    why:`z<0 所以tanh结果为负，表示第1维的候选新内容是\"减少\"该维度的值。`,
+    context:`C~_t[0] = tanh(${fmt(Cc_raw[0])}) = <span class='current-part'>${fmt(C_tilde[0])}</span>`,
+    active:'candidate'});
+
+  add({phase:6, title:`tanh(${fmt(Cc_raw[1])}) 的计算`,
+    calc:`z = ${fmt(Cc_raw[1])}（正数）\ntanh(${fmt(Cc_raw[1])}) = <span class='res'>${fmt(C_tilde[1])}</span>`,
+    why:`z>0 所以tanh结果为正，表示第2维的候选新内容是\"增加\"该维度的值。`,
+    context:`C~_t[1] = tanh(${fmt(Cc_raw[1])}) = <span class='current-part'>${fmt(C_tilde[1])}</span>`,
+    active:'candidate'});
+
+  add({phase:6, title:`候选值 C~_t = [${fmt(C_tilde[0])}, ${fmt(C_tilde[1])}]`,
+    calc:`C~_t = [<span class='res'>${fmt(C_tilde[0])}</span>, <span class='res'>${fmt(C_tilde[1])}</span>]`,
+    why:"第1维候选值为负，意味着希望减少第1维的细胞状态；第2维候选值为正，希望增加第2维。",
+    context:`<span class='current-part'>C~_t = [${fmt(C_tilde[0])}, ${fmt(C_tilde[1])}]</span>`,
+    active:'candidate', interpret:"tanh 正值=增加该维度，负值=减少该维度。C~_t[0]为负→建议\"减少\"第1维长期记忆；C~_t[1]为正→建议\"增加\"第2维长期记忆。"});
+
+  // ─── PHASE 7: 细胞状态更新 C_t (Steps 81-94) ───
+  add({phase:7, title:"最核心的步骤！C_t 的更新公式",
+    calc:`C_t = <span class='val'>f_t ⊙ C_{t-1}</span> + <span class='val'>i_t ⊙ C~_t</span>\n⊙ = 逐元素乘法(Hadamard积)`,
+    why:"这是 LSTM 的核心创新！细胞状态通过<span class='val'>加法</span>更新，而非 RNN 的乘法更新。加法更新让梯度可以直接流过（梯度≈1），解决了 RNN 的梯度消失问题。",
+    context:`<span class='current-part'>C_t = f_t ⊙ C_{t-1} + i_t ⊙ C~_t</span>`,
+    active:'cellstate'});
+
+  add({phase:7, title:"第一部分：f_t ⊙ C_{t-1} — 遗忘旧信息",
+    calc:`f_t ⊙ C_{t-1}\n= [${fmt(f_t[0])}, ${fmt(f_t[1])}] ⊙ [${fmt(C_prev[0])}, ${fmt(C_prev[1])}]`,
+    why:"遗忘门逐元素乘以旧细胞状态。f_t=1则完全保留，f_t=0则完全遗忘，f_t=0.5则保留一半。",
+    context:`C_t = <span class='current-part'>f_t ⊙ C_{t-1}</span> + i_t ⊙ C~_t\n      ↑ 遗忘旧信息`,
+    active:'cellstate'});
+
+  add({phase:7, title:`f_t[0] × C_{t-1}[0] = ${fmt(f_t[0])} × ${fmt(C_prev[0])} = ${fmt(forget_part[0])}`,
+    calc:`f_t[0] = <span class='val'>${fmt(f_t[0])}</span>\nC_{t-1}[0] = <span class='val'>${fmt(C_prev[0])}</span>\n${fmt(f_t[0])} × ${fmt(C_prev[0])} = <span class='res'>${fmt(forget_part[0])}</span>\n→ 第1维保留 ${fmt(f_t[0]*100,1)}%，从 ${fmt(C_prev[0])} 降到 ${fmt(forget_part[0])}`,
+    why:"原始第1维细胞状态0.8（较强的正信号），保留48%后变为0.3840——正信号减弱但未消失。",
+    context:`f_t⊙C_{t-1} = [<span class='current-part'>${fmt(forget_part[0])}</span>, _]`,
+    active:'cellstate'});
+
+  add({phase:7, title:`f_t[1] × C_{t-1}[1] = ${fmt(f_t[1])} × ${fmt(C_prev[1])} = ${fmt(forget_part[1])}`,
+    calc:`f_t[1] = <span class='val'>${fmt(f_t[1])}</span>\nC_{t-1}[1] = <span class='val'>${fmt(C_prev[1])}</span>\n${fmt(f_t[1])} × ${fmt(C_prev[1])} = <span class='res'>${fmt(forget_part[1])}</span>\n→ 第2维保留 ${fmt(f_t[1]*100,1)}%，从 ${fmt(C_prev[1])} 变到 ${fmt(forget_part[1])}`,
+    why:"原始第2维-0.2（弱的负信号），保留53%后变为-0.1070——负信号减弱（绝对值变小），向0靠近。",
+    context:`f_t⊙C_{t-1} = [${fmt(forget_part[0])}, <span class='current-part'>${fmt(forget_part[1])}</span>]`,
+    active:'cellstate'});
+
+  add({phase:7, title:`遗忘部分结果 = [${fmt(forget_part[0])}, ${fmt(forget_part[1])}]`,
+    calc:`f_t ⊙ C_{t-1} = [<span class='res'>${fmt(forget_part[0])}</span>, <span class='res'>${fmt(forget_part[1])}</span>]`,
+    why:"经过遗忘门后，旧细胞状态的两维都被压缩了——但都没有完全消失（因为f_t≠0），也没有完全保留（因为f_t≠1）。",
+    context:`C_t = [<span class='current-part'>${fmt(forget_part[0])}, ${fmt(forget_part[1])}</span>] + i_t⊙C~_t`,
+    active:'cellstate'});
+
+  add({phase:7, title:"第二部分：i_t ⊙ C~_t — 写入新信息",
+    calc:`i_t ⊙ C~_t\n= [${fmt(i_t[0])}, ${fmt(i_t[1])}] ⊙ [${fmt(C_tilde[0])}, ${fmt(C_tilde[1])}]`,
+    why:"输入门逐元素乘以候选值。i_t控制写入比例，C~_t是写入内容。两者相乘得到实际写入量。",
+    context:`C_t = f_t⊙C_{t-1} + <span class='current-part'>i_t ⊙ C~_t</span>\n                      ↑ 写入新信息`,
+    active:'cellstate'});
+
+  add({phase:7, title:`i_t[0] × C~_t[0] = ${fmt(i_t[0])} × ${fmt(C_tilde[0])} = ${fmt(input_part[0])}`,
+    calc:`i_t[0] = <span class='val'>${fmt(i_t[0])}</span>\nC~_t[0] = <span class='val'>${fmt(C_tilde[0])}</span>（负值→减少）\n${fmt(i_t[0])} × ${fmt(C_tilde[0])} = <span class='res'>${fmt(input_part[0])}</span>`,
+    why:"第1维写入量为负！这意味着新信息要减少第1维的值。约60%的写入比例 x 负的候选值 = 负的实际写入量。",
+    context:`i_t⊙C~_t = [<span class='current-part'>${fmt(input_part[0])}</span>, _]`,
+    active:'cellstate'});
+
+  add({phase:7, title:`i_t[1] × C~_t[1] = ${fmt(i_t[1])} × ${fmt(C_tilde[1])} = ${fmt(input_part[1])}`,
+    calc:`i_t[1] = <span class='val'>${fmt(i_t[1])}</span>\nC~_t[1] = <span class='val'>${fmt(C_tilde[1])}</span>（正值→增加）\n${fmt(i_t[1])} × ${fmt(C_tilde[1])} = <span class='res'>${fmt(input_part[1])}</span>`,
+    why:"第2维写入量为正！新信息要增加第2维的值。约55%的写入比例 x 正的候选值 = 正的实际写入量。",
+    context:`i_t⊙C~_t = [${fmt(input_part[0])}, <span class='current-part'>${fmt(input_part[1])}</span>]`,
+    active:'cellstate'});
+
+  add({phase:7, title:`写入部分结果 = [${fmt(input_part[0])}, ${fmt(input_part[1])}]`,
+    calc:`i_t ⊙ C~_t = [<span class='res'>${fmt(input_part[0])}</span>, <span class='res'>${fmt(input_part[1])}</span>]`,
+    why:`第1维写入${fmt(input_part[0])}（减少），第2维写入${fmt(input_part[1])}（增加）。`,
+    context:`C_t = [${fmt(forget_part[0])}, ${fmt(forget_part[1])}] + <span class='current-part'>[${fmt(input_part[0])}, ${fmt(input_part[1])}]</span>`,
+    active:'cellstate'});
+
+  add({phase:7, title:"两部分相加：逐元素加法",
+    calc:`C_t = f_t⊙C_{t-1} + i_t⊙C~_t\n    = [${fmt(forget_part[0])}, ${fmt(forget_part[1])}]\n    + [${fmt(input_part[0])}, ${fmt(input_part[1])}]`,
+    why:"加法！不是乘法！这是 LSTM 解决梯度消失的关键——RNN 用乘法更新状态，梯度连乘导致指数衰减；LSTM 用加法更新，梯度可以\"加法流过\"。",
+    context:`<span class='current-part'>C_t = 遗忘部分 + 写入部分</span>`,
+    active:'cellstate'});
+
+  add({phase:7, title:`C_t[0] = ${fmt(forget_part[0])} + ${fmt(input_part[0])} = ${fmt(C_t[0])}`,
+    calc:`C_t[0] = <span class='val'>${fmt(forget_part[0])}</span> + <span class='val'>${fmt(input_part[0])}</span>\n       = <span class='res'>${fmt(C_t[0])}</span>\n旧值0.8 → 遗忘后0.384 → 写入(${fmt(input_part[0])}) → 最终${fmt(C_t[0])}`,
+    why:`第1维从0.8降到了${fmt(C_t[0])}。遗忘门减少了约52%，输入门又写入了一个负值，双重下降。`,
+    context:`C_t[0] = <span class='current-part'>${fmt(C_t[0])}</span>`,
+    active:'cellstate'});
+
+  add({phase:7, title:`C_t[1] = ${fmt(forget_part[1])} + ${fmt(input_part[1])} = ${fmt(C_t[1])}`,
+    calc:`C_t[1] = <span class='val'>${fmt(forget_part[1])}</span> + <span class='val'>${fmt(input_part[1])}</span>\n       = <span class='res'>${fmt(C_t[1])}</span>\n旧值-0.2 → 遗忘后(${fmt(forget_part[1])}) → 写入+${fmt(input_part[1])} → 最终${fmt(C_t[1])}`,
+    why:`第2维从-0.2升到了${fmt(C_t[1])}。遗忘门减弱了负信号，输入门写入了正值，两个因素共同将其推向正方向。`,
+    context:`C_t[1] = <span class='current-part'>${fmt(C_t[1])}</span>`,
+    active:'cellstate'});
+
+  add({phase:7, title:`C_t 最终结果 = [${fmt(C_t[0])}, ${fmt(C_t[1])}]`,
+    calc:`C_t = [<span class='res'>${fmt(C_t[0])}</span>, <span class='res'>${fmt(C_t[1])}</span>]`,
+    why:"新细胞状态已更新完成！C_t 将被传递到下一个时间步作为 C_{t+1} 的输入。这就是LSTM的\"记忆传送带\"。",
+    context:`<span class='current-part'>C_t = [${fmt(C_t[0])}, ${fmt(C_t[1])}]</span>`,
+    active:'cellstate'});
+
+  add({phase:7, title:"为什么这解决了梯度消失 — 核心洞察",
+    calc:`反向传播时：∂C_t/∂C_{t-1} = <span class='val'>f_t</span>\n如果 f_t ≈ 1 → 梯度 ≈ <span class='val'>1 × 旧梯度</span>，不衰减！\n对比 RNN：∂h_t/∂h_{t-1} = W（连乘导致指数衰减）`,
+    why:"LSTM 的梯度可以通过 f_t 门控制流过：只要遗忘门决定保留（f_t≈1），梯度就不衰减。这是 LSTM 相比 RNN 的根本优势——让梯度可以穿越很多时间步。",
+    context:`∂L/∂C_{t-1} = <span class='current-part'>f_t ⊙ ∂L/∂C_t</span> + ...`,
+    active:'cellstate', interpret:"如果遗忘门初始化为1（b_f=1），训练初期几乎所有梯度都能无损流过。即使经过100个时间步，梯度也只有微弱衰减，而RNN在10步后就接近0了。"});
+
+  // ─── PHASE 8: 输出门 (Steps 95-106) ───
+  add({phase:8, title:"输出门的目的",
+    calc:"o_t = 决定<span class='val'>暴露多少细胞状态</span>给外部\n细胞状态是\"内部记忆\"，输出门控制\"对外分享多少\"",
+    why:"细胞状态 C_t 可能包含很多信息，但并非所有信息都需要在当前时刻对外输出。输出门选择性地暴露相关部分，形成隐藏状态 h_t。",
+    context:`h_t = <span class='current-part'>o_t</span> ⊙ tanh(C_t)\n      ↑ 控制暴露比例`,
+    active:'output'});
+
+  add({phase:8, title:"W_o 的维度和含义",
+    calc:`W_o ∈ ℝ^{<span class='val'>2×5</span>}\n与其他门同维度，学习\"输出决策\"规则`,
+    why:"输出门的结构与遗忘门、输入门完全一致，只是学习不同的参数。参数不同→不同的门控行为。",
+    context:`o_t = σ(<span class='current-part'>W_o</span>·concat + b_o)`,
+    active:'output'});
+
+  // Output gate row 0
+  const o0p = [];
+  for(let j=0;j<5;j++){
+    let p = W_o[0][j]*concat[j];
+    o0p.push(p);
+    let acc = o0p.reduce((a,b)=>a+b,0);
+    add({phase:8, title:`W_o[0][${j}] × concat[${j}] = ${fmt(W_o[0][j])} × ${fmtS(concat[j])} = ${fmt(p)}`,
+      calc:`<span class='val'>${fmt(W_o[0][j])}</span> × <span class='val'>${fmtS(concat[j])}</span> = <span class='res'>${fmt(p)}</span>`,
+      why:`权重${fmt(W_o[0][j])}。`,
+      context:`W_o[0]·concat: ... + <span class='current-part'>${fmt(W_o[0][j])}×${fmtS(concat[j])}=${fmt(p)}</span>`,
+      active:'output', running:`W_o[0]·concat 累计 = ${fmt(acc)}`});
+  }
+  add({phase:8, title:`输出门第1行求和 = ${fmt(o_dot0.sum)}`,
+    calc:`${o0p.map(v=>`<span class='val'>${fmt(v)}</span>`).join(' + ')}\n= <span class='res'>${fmt(o_dot0.sum)}</span>`,
+    why:`第1行点积 = ${fmt(o_dot0.sum)}，${o_dot0.sum>0?'正数→倾向暴露':'负数→倾向隐藏'}第1维。`,
+    context:`W_o[0]·concat = <span class='current-part'>${fmt(o_dot0.sum)}</span>`,
+    active:'output', running:`W_o·concat = [${fmt(o_dot0.sum)}, _]`});
+
+  // Output gate row 1
+  const o1p = [];
+  for(let j=0;j<5;j++){
+    let p = W_o[1][j]*concat[j];
+    o1p.push(p);
+    let acc = o1p.reduce((a,b)=>a+b,0);
+    add({phase:8, title:`W_o[1][${j}] × concat[${j}] = ${fmt(W_o[1][j])} × ${fmtS(concat[j])} = ${fmt(p)}`,
+      calc:`<span class='val'>${fmt(W_o[1][j])}</span> × <span class='val'>${fmtS(concat[j])}</span> = <span class='res'>${fmt(p)}</span>`,
+      why:`权重${fmt(W_o[1][j])}。`,
+      context:`W_o[1]·concat: ... + <span class='current-part'>${fmt(W_o[1][j])}×${fmtS(concat[j])}=${fmt(p)}</span>`,
+      active:'output', running:`W_o[1]·concat 累计 = ${fmt(acc)}`});
+  }
+  add({phase:8, title:`输出门第2行求和 = ${fmt(o_dot1.sum)}`,
+    calc:`${o1p.map(v=>`<span class='val'>${fmt(v)}</span>`).join(' + ')}\n= <span class='res'>${fmt(o_dot1.sum)}</span>`,
+    why:`第2行点积 = ${fmt(o_dot1.sum)}。`,
+    context:`W_o[1]·concat = <span class='current-part'>${fmt(o_dot1.sum)}</span>`,
+    active:'output', running:`W_o·concat = [${fmt(o_dot0.sum)}, ${fmt(o_dot1.sum)}]`});
+
+  add({phase:8, title:`加偏置 b_o = [${fmt(b_o[0])}, ${fmt(b_o[1])}]`,
+    calc:`[${fmt(o_dot0.sum)}, ${fmt(o_dot1.sum)}] + [0, 0] = [${fmt(o_raw[0])}, ${fmt(o_raw[1])}]`,
+    why:"输出门偏置也为0（简化）。实际训练中偏置会被优化。",
+    context:`o_t = σ(W_o·concat + <span class='current-part'>b_o</span>) = σ([${fmt(o_raw[0])}, ${fmt(o_raw[1])}])`,
+    active:'output'});
+
+  add({phase:8, title:`σ(${fmt(o_raw[0])}) 和 σ(${fmt(o_raw[1])}) 的计算`,
+    calc:`σ(${fmt(o_raw[0])}) = 1/(1+e^{${fmt(-o_raw[0])}}) = 1/(1+${fmt(Math.exp(-o_raw[0]))}) = <span class='res'>${fmt(o_t[0])}</span>\nσ(${fmt(o_raw[1])}) = 1/(1+e^{${fmt(-o_raw[1])}}) = 1/(1+${fmt(Math.exp(-o_raw[1]))}) = <span class='res'>${fmt(o_t[1])}</span>`,
+    why:"两个维度的sigmoid值都>0.5，倾向暴露细胞状态。",
+    context:`o_t = [<span class='current-part'>${fmt(o_t[0])}</span>, <span class='current-part'>${fmt(o_t[1])}</span>]`,
+    active:'output'});
+
+  add({phase:8, title:`输出门 o_t = [${fmt(o_t[0])}, ${fmt(o_t[1])}]`,
+    calc:`o_t = [<span class='res'>${fmt(o_t[0])}</span>, <span class='res'>${fmt(o_t[1])}</span>]\n→ 约${fmt(o_t[0]*100,1)}%和${fmt(o_t[1]*100,1)}%的细胞状态将被暴露`,
+    why:"输出门决定了当前时间步对外输出的信息量。表示比较积极地输出细胞状态信息。",
+    context:`<span class='current-part'>o_t = [${fmt(o_t[0])}, ${fmt(o_t[1])}]</span>`,
+    active:'output', interpret:"o_t≈0.6 意味着约60%的内部记忆会对外可见。这类似\"我知道很多，但只分享一部分\"。"});
+
+  // ─── PHASE 9: 最终隐藏状态 h_t (Steps 107-118) ───
+  add({phase:9, title:"h_t = o_t ⊙ tanh(C_t) — 最终公式",
+    calc:`h_t = <span class='val'>o_t ⊙ tanh(C_t)</span>\ntanh(C_t) 将细胞状态压缩到 [-1, 1]\no_t 控制暴露多少`,
+    why:"为什么先 tanh 再乘 o_t？因为 C_t 的值可以是任意实数，而 h_t 需要有界输出（给下一时间步和softmax等使用）。tanh 压缩到 [-1,1]，然后 o_t 选择性地暴露。",
+    context:`<span class='current-part'>h_t = o_t ⊙ tanh(C_t)</span>`,
+    active:'final'});
+
+  add({phase:9, title:"为什么要 tanh(C_t)？",
+    calc:`C_t = [${fmt(C_t[0])}, ${fmt(C_t[1])}]\n这些值可以是<span class='val'>任意实数</span>\ntanh 将其压缩到 <span class='val'>[-1, 1]</span>`,
+    why:"C_t 是通过加法更新的，理论上可以无限增长。tanh 做两件事：1) 将值压缩到有界范围，防止数值爆炸；2) 提供非线性，增强表达能力。",
+    context:`h_t = o_t ⊙ <span class='current-part'>tanh(C_t)</span>`,
+    active:'final'});
+
+  add({phase:9, title:`tanh(C_t[0]) = tanh(${fmt(C_t[0])}) = ${fmt(tanh_C[0])}`,
+    calc:`tanh(${fmt(C_t[0])}) = (e^{${fmt(C_t[0])}} - e^{${fmt(-C_t[0])}})/(e^{${fmt(C_t[0])}} + e^{${fmt(-C_t[0])}})\n= <span class='res'>${fmt(tanh_C[0])}</span>`,
+    why:`${fmt(C_t[0])} 是较小的正数，tanh 接近线性区，结果约等于原值（因为 tanh(0.23)≈0.23）。`,
+    context:`tanh(C_t) = [<span class='current-part'>${fmt(tanh_C[0])}</span>, _]`,
+    active:'final'});
+
+  add({phase:9, title:`tanh(C_t[1]) = tanh(${fmt(C_t[1])}) = ${fmt(tanh_C[1])}`,
+    calc:`tanh(${fmt(C_t[1])}) = <span class='res'>${fmt(tanh_C[1])}</span>`,
+    why:`${fmt(C_t[1])} 非常接近0，tanh几乎线性，结果约等于原值。`,
+    context:`tanh(C_t) = [${fmt(tanh_C[0])}, <span class='current-part'>${fmt(tanh_C[1])}</span>]`,
+    active:'final'});
+
+  add({phase:9, title:`tanh(C_t) 结果 = [${fmt(tanh_C[0])}, ${fmt(tanh_C[1])}]`,
+    calc:`tanh(C_t) = [<span class='res'>${fmt(tanh_C[0])}</span>, <span class='res'>${fmt(tanh_C[1])}</span>]`,
+    why:"因为 C_t 的值较小，tanh 几乎是线性变换。但如果 C_t 很大（如 >3），tanh 会饱和到接近1或-1。",
+    context:`h_t = o_t ⊙ <span class='current-part'>[${fmt(tanh_C[0])}, ${fmt(tanh_C[1])}]</span>`,
+    active:'final'});
+
+  add({phase:9, title:`o_t[0] × tanh(C_t)[0] = ${fmt(o_t[0])} × ${fmt(tanh_C[0])} = ${fmt(h_t[0])}`,
+    calc:`o_t[0] = <span class='val'>${fmt(o_t[0])}</span>\ntanh(C_t)[0] = <span class='val'>${fmt(tanh_C[0])}</span>\n${fmt(o_t[0])} × ${fmt(tanh_C[0])} = <span class='res'>${fmt(h_t[0])}</span>`,
+    why:"第1维暴露了约60%的细胞状态（压缩后）。输出值较小但为正。",
+    context:`h_t[0] = <span class='current-part'>${fmt(h_t[0])}</span>`,
+    active:'final'});
+
+  add({phase:9, title:`o_t[1] × tanh(C_t)[1] = ${fmt(o_t[1])} × ${fmt(tanh_C[1])} = ${fmt(h_t[1])}`,
+    calc:`o_t[1] = <span class='val'>${fmt(o_t[1])}</span>\ntanh(C_t)[1] = <span class='val'>${fmt(tanh_C[1])}</span>\n${fmt(o_t[1])} × ${fmt(tanh_C[1])} = <span class='res'>${fmt(h_t[1])}</span>`,
+    why:"第2维暴露了约54%的细胞状态。输出值接近0——因为 C_t[1] 本身就接近0。",
+    context:`h_t[1] = <span class='current-part'>${fmt(h_t[1])}</span>`,
+    active:'final'});
+
+  add({phase:9, title:`h_t 最终结果 = [${fmt(h_t[0])}, ${fmt(h_t[1])}]`,
+    calc:`h_t = [<span class='res'>${fmt(h_t[0])}</span>, <span class='res'>${fmt(h_t[1])}</span>]`,
+    why:"h_t 是当前时间步的\"对外输出\"——它将被传递到下一时间步作为 h_{t+1} 的输入，同时也可以被用于预测（如接一个全连接层做分类）。",
+    context:`<span class='current-part'>h_t = [${fmt(h_t[0])}, ${fmt(h_t[1])}]</span>`,
+    active:'final'});
+
+  add({phase:9, title:"h_t 的意义 — 当前时间步的\"短期记忆\"",
+    calc:`h_t 是<span class='val'>对外可见</span>的隐藏状态\n→ 传递给下一时间步\n→ 用于下游任务（分类/预测等）`,
+    why:"h_t 是 LSTM 的\"面孔\"——外部世界只能通过 h_t 了解 LSTM 的内部状态。C_t 是\"内心\"，只有 LSTM 自己知道。",
+    context:`下一个时间步:\nLSTM(x_{t+1}, <span class='current-part'>h_t</span>, C_t) → h_{t+1}, C_{t+1}`,
+    active:'final'});
+
+  add({phase:9, title:"C_t vs h_t 的区别总结",
+    calc:`<span class='val'>C_t</span>（细胞状态）= 长期记忆\n  - 通过<span class='val'>加法</span>更新\n  - 梯度可直接流过\n  - 值域无限制\n\n<span class='val'>h_t</span>（隐藏状态）= 短期记忆\n  - 通过<span class='val'>乘法</span>从 C_t 导出\n  - 值域 [-1, 1]（经 tanh）\n  - 对外可见，参与预测`,
+    why:"C_t 和 h_t 的分离是 LSTM 的核心设计：C_t 负责长期存储（梯度无损流过），h_t 负责短期输出（选择性暴露）。这让模型既有\"深度记忆\"又有\"灵活输出\"。",
+    context:`C_t → 下一时间步的<span class='current-part'>长期记忆</span>\nh_t → 下一时间步的<span class='current-part'>短期记忆</span> + 当前预测`,
+    active:'final'});
+
+  add({phase:9, title:"完整 LSTM 一个时间步的所有计算结果汇总",
+    calc:`<span class='val'>输入:</span>\n  x_t = [0.5, -0.3, 0.8]\n  h_{t-1} = [0.1, 0.6],  C_{t-1} = [0.8, -0.2]\n  concat = [0.1, 0.6, 0.5, -0.3, 0.8]\n\n<span class='val'>遗忘门:</span>  f_t = [${fmt(f_t[0])}, ${fmt(f_t[1])}]\n<span class='val'>输入门:</span>  i_t = [${fmt(i_t[0])}, ${fmt(i_t[1])}]\n<span class='val'>候选值:</span>   C~_t = [${fmt(C_tilde[0])}, ${fmt(C_tilde[1])}]\n<span class='val'>细胞状态:</span> C_t = [${fmt(C_t[0])}, ${fmt(C_t[1])}]\n<span class='val'>输出门:</span>  o_t = [${fmt(o_t[0])}, ${fmt(o_t[1])}]\n<span class='val'>隐藏状态:</span> h_t = [${fmt(h_t[0])}, ${fmt(h_t[1])}]`,
+    why:"一个完整的 LSTM 时间步到此结束。C_t 和 h_t 将被传递到下一个时间步，循环往复，直到处理完整个序列。",
+    context:`<span class='current-part'>一个时间步完成！→ 进入 t+1</span>`,
+    active:'final', interpret:"你已完整跟踪了 LSTM 内部的每一步计算。从输入拼接、四个门控决策、到细胞状态更新和隐藏状态输出——每个乘法、每个激活、每个\"为什么\"都已展开。这就是 LSTM 的全部内部机制！"});
+
+  return S;
 }
 
-// ============ HIGHLIGHT LOGIC ============
-const highlightMap = {
-  'input': {
-    ids: ['fTGate', 'iTGate', 'candidateG', 'outputGateG'],
-    glowColor: '#8899bb'
-  },
-  'forget': {
-    ids: ['forgetGateG', 'fTGate'],
-    glowColor: '#e94560'
-  },
-  'inputGate': {
-    ids: ['inputGateG', 'iTGate', 'candidateG'],
-    glowColor: '#53d8fb'
-  },
-  'cell': {
-    ids: ['forgetGateG', 'inputGateG', 'cellLine'],
-    glowColor: '#00d98b'
-  },
-  'output': {
-    ids: ['outputGateG', 'tanhOutG'],
-    glowColor: '#f5a623'
-  }
-};
+const steps = buildSteps();
+const totalSteps = steps.length;
+const maxStepN = steps[steps.length-1].n;
+let currentIdx = 0;
+let autoplayTimer = null;
 
-function highlightStep(stepKey) {
-  // Remove all highlights first
-  document.querySelectorAll('.gate-group, #cellLine, #tanhOutG, #hLine, #forgetGateG, #inputGateG, #outputGateG, #candidateG, #fTGate, #iTGate').forEach(g => {
-    g.style.filter = '';
-    g.style.opacity = '0.45';
-  });
+// ============================================================
+// SVG DIAGRAM
+// ============================================================
+function buildSVG(activeRegion){
+  const colors = {
+    inputs:'#6e7681', concat:'#8b949e', forget:'#e94560',
+    input:'#53d8fb', candidate:'#c084fc', cellstate:'#00d98b',
+    output:'#f5a623', final:'#ffd700'
+  };
+  function op(region){ return region === activeRegion ? 1 : 0.2; }
+  function gl(region){ return region === activeRegion ? 'filter="url(#glow)"' : ''; }
 
-  // Highlight active
-  const map = highlightMap[stepKey];
-  if (!map) return;
-  map.ids.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.style.opacity = '1';
-      el.style.filter = `drop-shadow(0 0 8px ${map.glowColor})`;
-    }
-  });
+  const svg = document.getElementById('lstm-svg');
+  svg.innerHTML = `
+    <defs>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
 
-  // Always show cell line prominently for cell step
-  if (stepKey === 'cell') {
-    const cl = document.getElementById('cellLine');
-    if (cl) {
-      cl.style.opacity = '1';
-      cl.style.filter = 'drop-shadow(0 0 12px #00d98b)';
-    }
-  }
-  if (stepKey === 'output') {
-    const hl = document.getElementById('hLine');
-    if (hl) {
-      hl.style.opacity = '1';
-      hl.style.filter = 'drop-shadow(0 0 8px #f5a623)';
-    }
-  }
-}
+    <!-- Cell State Highway -->
+    <line x1="30" y1="42" x2="510" y2="42" stroke="#00d98b" stroke-width="3.5" opacity="${op('cellstate')}" ${gl('cellstate')}/>
+    <text x="270" y="26" text-anchor="middle" font-size="12" fill="#00d98b" opacity="${op('cellstate')}">C_{t-1} ─── 细胞状态传送带 ─── C_t</text>
+    <text x="18" y="46" font-size="10" fill="#00d98b" opacity="${op('cellstate')}">[0.8,-0.2]</text>
+    <text x="475" y="46" font-size="10" fill="#00d98b" opacity="${op('cellstate')}">[${fmt(C_t[0])},${fmt(C_t[1])}]</text>
 
-// ============ CURVE DRAWING ============
-function drawSigmoid(canvasId) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
+    <!-- Forget Gate Region -->
+    <rect x="75" y="78" width="105" height="180" rx="8" fill="rgba(233,69,96,0.06)" stroke="#e94560" stroke-width="1.5" opacity="${op('forget')}"/>
+    <text x="127" y="96" text-anchor="middle" class="gate-label" fill="#e94560" opacity="${op('forget')}">遗忘门 f_t</text>
+    <circle cx="127" cy="130" r="16" fill="rgba(233,69,96,0.12)" stroke="#e94560" stroke-width="1.5" opacity="${op('forget')}" ${gl('forget')}/>
+    <text x="127" y="135" text-anchor="middle" font-size="14" fill="#e94560" opacity="${op('forget')}">σ</text>
+    <text x="127" y="170" text-anchor="middle" font-size="9" fill="#e94560" opacity="${op('forget')}">W_f·concat+b_f</text>
+    <text x="127" y="190" text-anchor="middle" font-size="10" fill="#ff6b81" opacity="${op('forget')}">[${fmt(f_t[0])},${fmt(f_t[1])}]</text>
+    <circle cx="127" cy="225" r="11" fill="rgba(233,69,96,0.12)" stroke="#e94560" stroke-width="1.2" opacity="${op('forget')}" ${gl('forget')}/>
+    <text x="127" y="229" text-anchor="middle" font-size="13" fill="#e94560" opacity="${op('forget')}">×</text>
+    <line x1="127" y1="42" x2="127" y2="214" stroke="#e94560" stroke-width="1" stroke-dasharray="4,3" opacity="${op('forget')}"/>
 
-  // Background
-  ctx.fillStyle = '#1a1a2e';
-  ctx.fillRect(0, 0, w, h);
+    <!-- Input Gate Region -->
+    <rect x="200" y="78" width="105" height="180" rx="8" fill="rgba(83,216,251,0.06)" stroke="#53d8fb" stroke-width="1.5" opacity="${op('input')}"/>
+    <text x="252" y="96" text-anchor="middle" class="gate-label" fill="#53d8fb" opacity="${op('input')}">输入门 i_t</text>
+    <circle cx="252" cy="130" r="16" fill="rgba(83,216,251,0.12)" stroke="#53d8fb" stroke-width="1.5" opacity="${op('input')}" ${gl('input')}/>
+    <text x="252" y="135" text-anchor="middle" font-size="14" fill="#53d8fb" opacity="${op('input')}">σ</text>
+    <text x="252" y="170" text-anchor="middle" font-size="9" fill="#53d8fb" opacity="${op('input')}">W_i·concat+b_i</text>
+    <text x="252" y="190" text-anchor="middle" font-size="10" fill="#53d8fb" opacity="${op('input')}">[${fmt(i_t[0])},${fmt(i_t[1])}]</text>
+    <circle cx="252" cy="225" r="11" fill="rgba(83,216,251,0.12)" stroke="#53d8fb" stroke-width="1.2" opacity="${op('input')}" ${gl('input')}/>
+    <text x="252" y="229" text-anchor="middle" font-size="13" fill="#53d8fb" opacity="${op('input')}">×</text>
 
-  // Axes
-  ctx.strokeStyle = '#3a4a6c';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(20, h/2); ctx.lineTo(w-10, h/2);
-  ctx.moveTo(w/2, 10); ctx.lineTo(w/2, h-10);
-  ctx.stroke();
+    <!-- Candidate Region -->
+    <rect x="200" y="270" width="105" height="60" rx="6" fill="rgba(192,132,252,0.06)" stroke="#c084fc" stroke-width="1.2" opacity="${op('candidate')}"/>
+    <text x="252" y="290" text-anchor="middle" class="gate-label" fill="#c084fc" opacity="${op('candidate')}">候选 C~_t</text>
+    <circle cx="252" cy="315" r="12" fill="rgba(192,132,252,0.12)" stroke="#c084fc" stroke-width="1.2" opacity="${op('candidate')}" ${gl('candidate')}/>
+    <text x="252" y="320" text-anchor="middle" font-size="11" fill="#c084fc" opacity="${op('candidate')}">tanh</text>
+    <text x="252" y="340" text-anchor="middle" font-size="9" fill="#c084fc" opacity="${op('candidate')}">[${fmt(C_tilde[0])},${fmt(C_tilde[1])}]</text>
+    <line x1="252" y1="270" x2="252" y2="236" stroke="#c084fc" stroke-width="1" stroke-dasharray="4,3" opacity="${op('candidate')}"/>
 
-  // Labels
-  ctx.fillStyle = '#8888aa';
-  ctx.font = '10px monospace';
-  ctx.fillText('z', w-15, h/2 - 5);
-  ctx.fillText('σ(z)', w/2 + 5, 15);
-  ctx.fillText('0', w/2 - 12, h/2 + 12);
-  ctx.fillText('1', w/2 + 5, 18);
+    <!-- Add node -->
+    <circle cx="340" cy="225" r="12" fill="rgba(0,217,139,0.12)" stroke="#00d98b" stroke-width="1.5" opacity="${op('cellstate')}" ${gl('cellstate')}/>
+    <text x="340" y="230" text-anchor="middle" font-size="16" fill="#00d98b" opacity="${op('cellstate')}">+</text>
+    <text x="340" y="250" text-anchor="middle" font-size="9" fill="#00d98b" opacity="${op('cellstate')}">C_t更新</text>
+    <line x1="138" y1="225" x2="328" y2="225" stroke="#e94560" stroke-width="1" stroke-dasharray="4,3" opacity="${op('forget')}"/>
+    <line x1="263" y1="225" x2="328" y2="225" stroke="#53d8fb" stroke-width="1" stroke-dasharray="4,3" opacity="${op('input')}"/>
+    <line x1="340" y1="213" x2="340" y2="42" stroke="#00d98b" stroke-width="2" opacity="${op('cellstate')}"/>
 
-  // Sigmoid curve
-  ctx.strokeStyle = '#e94560';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let px = 20; px < w - 10; px++) {
-    const z = (px - w/2) / 25;
-    const val = 1 / (1 + Math.exp(-z));
-    const py = h/2 - val * (h/2 - 15) + 15;
-    if (px === 20) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.stroke();
+    <!-- Output Gate Region -->
+    <rect x="380" y="78" width="105" height="130" rx="8" fill="rgba(245,166,35,0.06)" stroke="#f5a623" stroke-width="1.5" opacity="${op('output')}"/>
+    <text x="432" y="96" text-anchor="middle" class="gate-label" fill="#f5a623" opacity="${op('output')}">输出门 o_t</text>
+    <circle cx="432" cy="130" r="16" fill="rgba(245,166,35,0.12)" stroke="#f5a623" stroke-width="1.5" opacity="${op('output')}" ${gl('output')}/>
+    <text x="432" y="135" text-anchor="middle" font-size="14" fill="#f5a623" opacity="${op('output')}">σ</text>
+    <text x="432" y="170" text-anchor="middle" font-size="9" fill="#f5a623" opacity="${op('output')}">W_o·concat+b_o</text>
+    <text x="432" y="190" text-anchor="middle" font-size="10" fill="#f5a623" opacity="${op('output')}">[${fmt(o_t[0])},${fmt(o_t[1])}]</text>
 
-  // Dash lines for 0 and 1
-  ctx.strokeStyle = '#444466';
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(20, 15); ctx.lineTo(w-10, 15);
-  ctx.moveTo(20, h - 15); ctx.lineTo(w-10, h - 15);
-  ctx.stroke();
-  ctx.setLineDash([]);
+    <!-- tanh and multiply for h_t -->
+    <circle cx="432" cy="235" r="12" fill="rgba(255,215,0,0.12)" stroke="#ffd700" stroke-width="1.2" opacity="${op('final')}" ${gl('final')}/>
+    <text x="432" y="240" text-anchor="middle" font-size="11" fill="#ffd700" opacity="${op('final')}">tanh</text>
+    <circle cx="432" cy="280" r="11" fill="rgba(255,215,0,0.12)" stroke="#ffd700" stroke-width="1.2" opacity="${op('final')}" ${gl('final')}/>
+    <text x="432" y="284" text-anchor="middle" font-size="13" fill="#ffd700" opacity="${op('final')}">×</text>
+    <line x1="432" y1="195" x2="432" y2="223" stroke="#f5a623" stroke-width="1" stroke-dasharray="4,3" opacity="${op('output')}"/>
+    <line x1="340" y1="42" x2="432" y2="223" stroke="#00d98b" stroke-width="1" stroke-dasharray="4,3" opacity="${op('cellstate')}"/>
+    <line x1="432" y1="247" x2="432" y2="269" stroke="#ffd700" stroke-width="1" stroke-dasharray="4,3" opacity="${op('final')}"/>
 
-  ctx.fillStyle = '#e94560';
-  ctx.font = '9px monospace';
-  ctx.fillText('1', 8, 18);
-  ctx.fillText('0', 8, h - 12);
-}
+    <!-- h_t output -->
+    <text x="432" y="320" text-anchor="middle" font-size="11" fill="#ffd700" opacity="${op('final')}">h_t=[${fmt(h_t[0])},${fmt(h_t[1])}]</text>
+    <line x1="432" y1="291" x2="432" y2="310" stroke="#ffd700" stroke-width="2" opacity="${op('final')}"/>
 
-function drawTanh(canvasId) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
+    <!-- Input labels -->
+    <rect x="30" y="365" width="180" height="42" rx="6" fill="rgba(139,148,158,0.08)" stroke="#8b949e" stroke-width="1" opacity="${op('inputs')}"/>
+    <text x="120" y="383" text-anchor="middle" font-size="11" fill="#8b949e" opacity="${op('inputs')}">h_{t-1}=[0.1, 0.6]</text>
+    <text x="120" y="400" text-anchor="middle" font-size="11" fill="#8b949e" opacity="${op('inputs')}">x_t=[0.5, -0.3, 0.8]</text>
 
-  ctx.fillStyle = '#1a1a2e';
-  ctx.fillRect(0, 0, w, h);
+    <!-- concat arrow -->
+    <line x1="120" y1="365" x2="120" y2="130" stroke="#8b949e" stroke-width="1.5" stroke-dasharray="3,3" opacity="${op('concat')}"/>
+    <text x="52" y="260" font-size="9" fill="#8b949e" opacity="${op('concat')}" transform="rotate(-90,52,260)">concat→各门</text>
 
-  // Axes
-  ctx.strokeStyle = '#3a4a6c';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(20, h/2); ctx.lineTo(w-10, h/2);
-  ctx.moveTo(w/2, 10); ctx.lineTo(w/2, h-10);
-  ctx.stroke();
-
-  // Labels
-  ctx.fillStyle = '#8888aa';
-  ctx.font = '10px monospace';
-  ctx.fillText('z', w-15, h/2 - 5);
-  ctx.fillText('tanh(z)', w/2 + 5, 15);
-
-  // Tanh curve
-  ctx.strokeStyle = '#c084fc';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let px = 20; px < w - 10; px++) {
-    const z = (px - w/2) / 25;
-    const val = Math.tanh(z);
-    const py = h/2 - val * (h/2 - 15);
-    if (px === 20) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.stroke();
-
-  // Dashes
-  ctx.strokeStyle = '#444466';
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(20, 15); ctx.lineTo(w-10, 15);
-  ctx.moveTo(20, h - 15); ctx.lineTo(w-10, h - 15);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.fillStyle = '#c084fc';
-  ctx.font = '9px monospace';
-  ctx.fillText('+1', 4, 18);
-  ctx.fillText('-1', 4, h - 10);
-}
-
-// ============ STEP INDICATOR ============
-function buildStepIndicator() {
-  const container = document.getElementById('stepIndicator');
-  container.innerHTML = '';
-  steps.forEach((s, i) => {
-    const dot = document.createElement('div');
-    dot.className = 'step-dot' + (i === currentStep ? ' active' : '');
-    dot.onclick = () => goToStep(i);
-    dot.title = s.title;
-    container.appendChild(dot);
-  });
-}
-
-// ============ RENDER STEP ============
-let currentStep = 0;
-
-function renderStep(idx) {
-  currentStep = idx;
-  const step = steps[idx];
-  const panel = document.getElementById('detailPanel');
-
-  panel.innerHTML = `
-    <div class="fade-in">
-      <div class="step-title">
-        <span class="step-badge" style="background:${step.badgeColor}22;color:${step.badgeColor};border:1px solid ${step.badgeColor}">${step.badge}</span>
-        ${step.title}
-      </div>
-      <div class="step-desc">${step.desc}</div>
-      ${step.formulaSection()}
-      ${step.numericalSection()}
-      ${step.intuitionSection()}
-    </div>
+    <!-- Branch lines -->
+    <line x1="120" y1="130" x2="111" y2="130" stroke="#e94560" stroke-width="1.2" opacity="${op('forget')}"/>
+    <line x1="120" y1="130" x2="236" y2="130" stroke="#53d8fb" stroke-width="1.2" opacity="${op('input')}"/>
+    <line x1="120" y1="130" x2="416" y2="130" stroke="#f5a623" stroke-width="1.2" opacity="${op('output')}"/>
+    <line x1="120" y1="315" x2="240" y2="315" stroke="#c084fc" stroke-width="1" opacity="${op('candidate')}"/>
   `;
-
-  // Draw curves after DOM update
-  if (idx === 1) setTimeout(() => drawSigmoid('sigmoidCurve'), 50);
-  if (idx === 2) setTimeout(() => drawTanh('tanhCurve'), 50);
-
-  // Highlight SVG
-  highlightStep(step.svgHighlight);
-
-  // Update step indicator
-  buildStepIndicator();
-
-  // Update nav
-  document.getElementById('btnPrev').disabled = idx === 0;
-  document.getElementById('btnNext').disabled = idx === steps.length - 1;
-  document.getElementById('stepCounter').textContent = `${idx} / ${steps.length - 1}`;
 }
 
-// ============ NAVIGATION ============
-function nextStep() {
-  if (currentStep < steps.length - 1) renderStep(currentStep + 1);
-}
-function prevStep() {
-  if (currentStep > 0) renderStep(currentStep - 1);
-}
-function goToStep(i) {
-  if (i >= 0 && i < steps.length) renderStep(i);
-}
-function resetSteps() {
-  renderStep(0);
+// ============================================================
+// RENDER
+// ============================================================
+function render(idx){
+  if(idx<0) idx=0;
+  if(idx>=totalSteps) idx=totalSteps-1;
+  currentIdx = idx;
+  const step = steps[idx];
+  const phase = getPhaseForStep(step.n);
+
+  document.getElementById('phase-text').textContent = `Phase ${phase.ci}/9`;
+  document.getElementById('step-text').textContent = `Step ${step.n}/${maxStepN}`;
+  document.getElementById('phase-name').textContent = phase.name;
+  const pct = ((idx+1)/totalSteps*100).toFixed(1);
+  const bar = document.getElementById('progress-bar');
+  bar.style.width = pct+'%';
+  bar.style.background = phase.color;
+  document.getElementById('phase-select').value = phase.ci;
+
+  buildSVG(step.active);
+
+  let html = `<div class="fade-in">`;
+  html += `<div class="step-number">STEP ${step.n} / ${maxStepN}</div>`;
+  html += `<div class="step-title"><span class="phase-badge bg${phase.ci}" style="color:#fff;font-size:11px">P${phase.ci}</span> ${step.title}</div>`;
+
+  html += `<div class="detail-section"><div class="detail-section-title">当前计算</div>`;
+  html += `<div class="step-calc">${step.calc}</div></div>`;
+
+  if(step.why){
+    html += `<div class="detail-section"><div class="step-why"><span class="label">为什么？</span>${step.why}</div></div>`;
+  }
+  if(step.context){
+    html += `<div class="detail-section"><div class="detail-section-title">在整体公式中的位置</div>`;
+    html += `<div class="step-context">${step.context}</div></div>`;
+  }
+  if(step.running){
+    html += `<div class="detail-section"><div class="step-running"><span class="label">累计结果</span><span class="acc mono">${step.running}</span></div></div>`;
+  }
+  if(step.interpret){
+    html += `<div class="detail-section"><div class="step-interpret"><span class="label">解读</span>${step.interpret}</div></div>`;
+  }
+
+  html += `</div>`;
+  document.getElementById('detail-panel').innerHTML = html;
+  document.getElementById('detail-panel').scrollTop = 0;
 }
 
-// Keyboard navigation
+// ============================================================
+// NAVIGATION
+// ============================================================
+function next(){ render(currentIdx+1); }
+function prev(){ render(currentIdx-1); }
+function jump(d){ render(currentIdx+d); }
+function jumpToPhase(ph){
+  ph = parseInt(ph);
+  const phase = phases[ph];
+  const idx = steps.findIndex(s => s.n >= phase.startStep);
+  render(idx >= 0 ? idx : 0);
+}
+function toggleAutoplay(){
+  const btn = document.getElementById('autoplay-btn');
+  if(autoplayTimer){
+    clearInterval(autoplayTimer);
+    autoplayTimer = null;
+    btn.textContent = '▶ 自动';
+    btn.classList.remove('primary');
+  } else {
+    autoplayTimer = setInterval(()=>{
+      if(currentIdx < totalSteps-1) next();
+      else toggleAutoplay();
+    }, 2000);
+    btn.textContent = '⏸ 暂停';
+    btn.classList.add('primary');
+  }
+}
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextStep(); }
-  if (e.key === 'ArrowLeft') { e.preventDefault(); prevStep(); }
+  if(e.key === 'ArrowRight') next();
+  else if(e.key === 'ArrowLeft') prev();
+  else if(e.key === 'ArrowUp'){ e.preventDefault(); jump(-5); }
+  else if(e.key === 'ArrowDown'){ e.preventDefault(); jump(5); }
+  else if(e.key === ' '){ e.preventDefault(); toggleAutoplay(); }
 });
 
-// ============ INIT ============
-buildSVG();
-renderStep(0);
+render(0);
 </script>
 </body>
 </html>
