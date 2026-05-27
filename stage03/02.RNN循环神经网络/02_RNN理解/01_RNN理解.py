@@ -241,7 +241,7 @@ def tt_with_rnn03():
     text_emb = torch.mean(rnn_output, dim=1)
     print(text_emb.shape)
 
-
+# 需要理解一下
 def tt_with_rnn04():
     """
     RNN API使用 和 RNN过程拆解进行比较
@@ -346,7 +346,7 @@ if __name__ == '__main__':
     # tt_with_fc()
     # tt_with_conv1d()
     # tt_with_rnn01()
-    tt_with_rnn02()
+    # tt_with_rnn02()
     # tt_with_rnn03()
     # tt_with_rnn04()
-    # tt_with_rnn05()
+    tt_with_rnn05()

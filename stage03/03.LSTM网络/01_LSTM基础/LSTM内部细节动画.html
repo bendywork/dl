@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSTM 内部机制详解</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #1a1a2e;
+    --bg2: #16213e;
+    --bg3: #0f3460;
+    --accent: #e94560;
+    --accent2: #53d8fb;
+    --accent3: #00d98b;
+    --text: #e0e0e0;
+    --text-dim: #8888aa;
+    --card: #1e2746;
+    --border: #2a3a5c;
+    --glow-forget: #e94560;
+    --glow-input: #53d8fb;
+    --glow-output: #f5a623;
+    --glow-cell: #00d98b;
+    --glow-candidate: #c084fc;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Title */
+  .title-bar {
+    text-align: center;
+    padding: 18px 20px 10px;
+    background: linear-gradient(135deg, var(--bg2), var(--bg3));
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .title-bar h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, var(--accent2), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .title-bar .subtitle {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  /* Main layout */
+  .main-container {
+    display: flex;
+    height: calc(100vh - 80px);
+    overflow: hidden;
+  }
+
+  /* Left: LSTM Diagram */
+  .diagram-panel {
+    width: 42%;
+    min-width: 420px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: radial-gradient(ellipse at center, rgba(15,52,96,0.4) 0%, transparent 70%);
+  }
+
+  /* Right: Step details */
+  .detail-panel {
+    width: 58%;
+    padding: 20px 28px;
+    overflow-y: auto;
+    border-left: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  .detail-panel::-webkit-scrollbar { width: 6px; }
+  .detail-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .detail-panel::-webkit-scrollbar-track { background: transparent; }
+
+  /* SVG Diagram */
+  .lstm-svg-container {
+    width: 100%;
+    max-width: 480px;
+  }
+  .lstm-svg-container svg { width: 100%; height: auto; }
+
+  /* Step indicator */
+  .step-indicator {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .step-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.4s ease;
+    cursor: pointer;
+  }
+  .step-dot.active {
+    background: var(--accent2);
+    box-shadow: 0 0 10px var(--accent2);
+    transform: scale(1.3);
+  }
+  .step-dot:hover { transform: scale(1.2); }
+
+  /* Step content */
+  .step-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .step-badge {
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+  }
+  .step-desc {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+
+  /* Formula box */
+  .formula-box {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .formula-box .label {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .formula {
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 17px;
+    line-height: 1.7;
+    color: #fff;
+    white-space: pre-wrap;
+  }
+  .formula .op { color: var(--accent2); }
+  .formula .fn { color: var(--accent3); font-weight: 700; }
+  .formula .dim { color: var(--accent); font-size: 12px; vertical-align: sub; }
+  .formula .highlight {
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(83, 216, 251, 0.15);
+  }
+
+  /* Numerical example */
+  .numerical-box {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+  }
+  .numerical-box .label {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  .num-row {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.8;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .num-row .varname {
+    color: var(--accent2);
+    min-width: 70px;
+    text-align: right;
+  }
+  .num-row .eq { color: var(--text-dim); }
+  .num-row .val { color: #fff; }
+  .num-row .note { color: var(--text-dim); font-size: 12px; margin-left: 8px; }
+
+  /* Intuition box */
+  .intuition-box {
+    background: linear-gradient(135deg, rgba(0,217,139,0.08), rgba(83,216,251,0.08));
+    border: 1px solid rgba(0,217,139,0.3);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+  }
+  .intuition-box .label {
+    font-size: 12px;
+    color: var(--accent3);
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .intuition-box p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  /* Matrix display */
+  .matrix-display {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #ccc;
+    margin: 6px 0;
+    white-space: pre;
+  }
+  .matrix-display .bracket { color: var(--text-dim); }
+  .matrix-display .num { color: #fff; }
+  .matrix-display .pos { color: var(--accent3); }
+  .matrix-display .neg { color: var(--accent); }
+
+  /* Small curve plot */
+  .curve-container {
+    display: inline-block;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    margin: 8px 0;
+  }
+  .curve-container canvas { display: block; }
+
+  /* Navigation */
+  .nav-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    background: linear-gradient(180deg, transparent, var(--bg) 30%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    z-index: 100;
+    padding-bottom: 4px;
+  }
+  .nav-btn {
+    padding: 8px 28px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    user-select: none;
+  }
+  .nav-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .nav-btn.primary {
+    background: linear-gradient(135deg, var(--bg3), #1a5276);
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+  .nav-btn.primary:hover { background: var(--bg3); }
+  .step-counter {
+    color: var(--text-dim);
+    font-size: 13px;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  /* Animated elements */
+  .fade-in { animation: fadeIn 0.5s ease forwards; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+  .pulse-glow {
+    animation: pulseGlow 1.5s ease-in-out infinite;
+  }
+  @keyframes pulseGlow {
+    0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
+    50% { filter: drop-shadow(0 0 12px currentColor); }
+  }
+
+  /* Data flow animation on SVG */
+  .flow-particle {
+    fill: var(--accent2);
+    opacity: 0;
+  }
+  .flow-particle.animate {
+    animation: flowMove 1.5s ease-in-out infinite;
+  }
+
+  /* Color coding for forget/keep */
+  .tag-forget {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .tag-keep {
+    color: var(--accent3);
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .main-container { flex-direction: column; height: auto; }
+    .diagram-panel, .detail-panel { width: 100%; min-width: unset; }
+    .diagram-panel { min-height: 360px; }
+    .detail-panel { border-left: none; border-top: 1px solid var(--border); min-height: 400px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="title-bar">
+  <h1>LSTM 内部机制详解</h1>
+  <div class="subtitle">长短期记忆网络 — 逐步动画演示与矩阵计算</div>
+</div>
+
+<div class="main-container">
+  <!-- Left: LSTM Diagram -->
+  <div class="diagram-panel">
+    <div class="lstm-svg-container" id="svgContainer"></div>
+    <div class="step-indicator" id="stepIndicator"></div>
+  </div>
+
+  <!-- Right: Step Details -->
+  <div class="detail-panel" id="detailPanel">
+    <!-- Dynamic content injected by JS -->
+  </div>
+</div>
+
+<!-- Navigation -->
+<div class="nav-bar">
+  <button class="nav-btn" id="btnPrev" onclick="prevStep()">上一步</button>
+  <span class="step-counter" id="stepCounter">0 / 4</span>
+  <button class="nav-btn primary" id="btnNext" onclick="nextStep()">下一步</button>
+  <button class="nav-btn" onclick="resetSteps()">重置</button>
+</div>
+
+<script>
+// ============ CONSTANTS & NUMERICAL DATA ============
+const d = 3, h = 2;
+
+// Inputs
+const x_t = [0.5, -0.3, 0.8];
+const h_prev = [0.1, 0.6];
+const C_prev = [0.8, -0.2];
+
+// Concatenated input [h_{t-1}, x_t]
+const concat = [...h_prev, ...x_t]; // [0.1, 0.6, 0.5, -0.3, 0.8]
+
+// Weight matrices (2x5)
+const W_f = [[0.2, -0.1, 0.3, 0.1, -0.2],
+             [0.1,  0.4,-0.2, 0.3,  0.1]];
+const b_f = [0.0, 0.0];
+
+const W_i = [[ 0.3, 0.1,-0.1, 0.2, 0.4],
+             [-0.2, 0.3, 0.5, 0.1,-0.1]];
+const b_i = [0.1, -0.1];
+
+const W_C = [[ 0.1,-0.3, 0.2, 0.4,-0.1],
+             [ 0.5, 0.2,-0.4, 0.1, 0.3]];
+const b_C = [0.0, 0.1];
+
+const W_o = [[-0.1, 0.2, 0.3,-0.2, 0.1],
+             [ 0.4,-0.1, 0.2, 0.3, 0.2]];
+const b_o = [0.0, 0.0];
+
+// ============ MATH HELPERS ============
+function matVecMul(M, v) {
+  return M.map(row => row.reduce((s, w, j) => s + w * v[j], 0));
+}
+function vecAdd(a, b) { return a.map((v, i) => v + b[i]); }
+function sigmoid(z) { return 1 / (1 + Math.exp(-z)); }
+function tanh_fn(z) { return Math.tanh(z); }
+function hadamard(a, b) { return a.map((v, i) => v * b[i]); }
+
+function fmt(v, decimals=4) {
+  return v.toFixed(decimals);
+}
+function fmtArr(arr, decimals=4) {
+  return '[ ' + arr.map(v => fmt(v, decimals)).join(', ') + ' ]';
+}
+
+// ============ COMPUTE ALL VALUES ============
+const f_t = vecAdd(matVecMul(W_f, concat), b_f).map(sigmoid);
+const i_t = vecAdd(matVecMul(W_i, concat), b_i).map(sigmoid);
+const C_tilde = vecAdd(matVecMul(W_C, concat), b_C).map(tanh_fn);
+const C_t = vecAdd(hadamard(f_t, C_prev), hadamard(i_t, C_tilde));
+const o_t = vecAdd(matVecMul(W_o, concat), b_o).map(sigmoid);
+const tanh_Ct = C_t.map(tanh_fn);
+const h_t = hadamard(o_t, tanh_Ct);
+
+// Intermediate raw values (before activation)
+const f_raw = vecAdd(matVecMul(W_f, concat), b_f);
+const i_raw = vecAdd(matVecMul(W_i, concat), b_i);
+const C_raw = vecAdd(matVecMul(W_C, concat), b_C);
+const o_raw = vecAdd(matVecMul(W_o, concat), b_o);
+
+// ============ STEP DEFINITIONS ============
+const steps = [
+  // Step 0
+  {
+    title: '输入准备',
+    badge: 'Step 0',
+    badgeColor: '#8888aa',
+    desc: 'LSTM 在时间步 t 接收两个输入：当前输入向量 x_t 和上一时刻的隐藏状态 h_{t-1}。LSTM 的核心操作是将二者拼接后统一处理。',
+    formulaSection: function() {
+      return `
+        <div class="formula-box">
+          <div class="label">维度说明</div>
+          <div class="formula">
+<span class="highlight">x_t</span> ∈ R<sup><span class="dim">d</span></sup>    d = ${d} (输入维度)
+<span class="highlight">h_{t-1}</span> ∈ R<sup><span class="dim">h</span></sup>    h = ${h} (隐藏维度)
+<span class="highlight">[h_{t-1}, x_t]</span> ∈ R<sup><span class="dim">d+h</span></sup> = R<sup><span class="dim">${d+h}</span></sup>  (拼接后)
+
+拼接操作：
+  <span class="op">concat</span> = [ h<sub>t-1</sub> , x<sub>t</sub> ]
+       = [ ${fmtArr(h_prev)} , ${fmtArr(x_t)} ]
+       = ${fmtArr(concat)}
+          </div>
+        </div>`;
+    },
+    numericalSection: function() {
+      return `
+        <div class="numerical-box">
+          <div class="label">数值示例</div>
+          <div class="num-row"><span class="varname">x_t</span><span class="eq">=</span><span class="val">${fmtArr(x_t)}</span><span class="note">← 当前输入 (d=${d})</span></div>
+          <div class="num-row"><span class="varname">h_{t-1}</span><span class="eq">=</span><span class="val">${fmtArr(h_prev)}</span><span class="note">← 上一步隐藏状态 (h=${h})</span></div>
+          <div class="num-row"><span class="varname">C_{t-1}</span><span class="eq">=</span><span class="val">${fmtArr(C_prev)}</span><span class="note">← 上一步细胞状态</span></div>
+          <div class="num-row"><span class="varname">concat</span><span class="eq">=</span><span class="val">${fmtArr(concat)}</span><span class="note">← 拼接后维度 = ${d+h}</span></div>
+        </div>`;
+    },
+    intuitionSection: function() {
+      return `
+        <div class="intuition-box">
+          <div class="label">直觉理解</div>
+          <p>LSTM 把「上一步的输出 h」和「这一步的输入 x」拼在一起，作为一个整体送给所有门。<br>
+          这样每个门都能同时参考"历史记忆"和"当前信息"，做出更智能的决策。<br>
+          所有权重矩阵 W 的列数都是 ${d+h}，行数都是 ${h}，这样才能与拼接向量相乘。</p>
+        </div>`;
+    },
+    svgHighlight: 'input'
+  },
+  // Step 1
+  {
+    title: '遗忘门 (Forget Gate)',
+    badge: 'Step 1',
+    badgeColor: '#e94560',
+    desc: '遗忘门决定从旧细胞状态 C_{t-1} 中丢弃哪些信息。输出 f_t 中每个元素接近 0 表示"遗忘"，接近 1 表示"保留"。',
+    formulaSection: function() {
+      return `
+        <div class="formula-box">
+          <div class="label">遗忘门公式</div>
+          <div class="formula">
+<span class="fn">f_t</span> = <span class="fn">σ</span>( W<sub>f</sub> · [h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>f</sub> )
+
+  W<sub>f</sub> ∈ R<sup><span class="dim">${h}×${d+h}</span></sup> , b<sub>f</sub> ∈ R<sup><span class="dim">${h}</span></sup>
+
+  <span class="fn">σ</span>(z) = 1 / (1 + e<sup>-z</sup>)    ← Sigmoid 函数
+
+  <span class="tag-forget">f_t ≈ 0 → 遗忘</span>     <span class="tag-keep">f_t ≈ 1 → 保留</span>
+          </div>
+        </div>
+        <div class="curve-container">
+          <canvas id="sigmoidCurve" width="240" height="120"></canvas>
+        </div>`;
+    },
+    numericalSection: function() {
+      return `
+        <div class="numerical-box">
+          <div class="label">逐步计算</div>
+          <div class="num-row"><span class="varname">W_f · concat</span><span class="eq">=</span><span class="val">${fmtArr(matVecMul(W_f, concat))}</span></div>
+          <div class="num-row"><span class="varname">+ b_f</span><span class="eq">=</span><span class="val">${fmtArr(f_raw)}</span><span class="note">← sigmoid 输入</span></div>
+          <div class="num-row"><span class="varname">σ(...)</span><span class="eq">=</span><span class="val" style="color:var(--accent)">${fmtArr(f_t)}</span><span class="note">← 遗忘门输出</span></div>
+        </div>
+        <div class="numerical-box">
+          <div class="label">权重矩阵 W_f (${h}×${d+h})</div>
+          <div class="matrix-display">${matrixToString(W_f)}</div>
+        </div>`;
+    },
+    intuitionSection: function() {
+      return `
+        <div class="intuition-box">
+          <div class="label">直觉理解</div>
+          <p>遗忘门就像一个"选择性擦除器"：它对细胞状态中的每个值逐一判断——这个信息还有用吗？<br>
+          Sigmoid 把输出压缩到 [0,1]：<br>
+          &bull; <span class="tag-forget">接近 0 = 大力遗忘</span>（乘以旧状态后值接近0，相当于删掉）<br>
+          &bull; <span class="tag-keep">接近 1 = 完全保留</span>（旧状态原样保留）<br><br>
+          在我们的例子中，f_t = ${fmtArr(f_t)}，<br>
+          第1维 ${fmt(f_t[0])} → 较强保留，第2维 ${fmt(f_t[1])} → 较强保留。</p>
+        </div>`;
+    },
+    svgHighlight: 'forget'
+  },
+  // Step 2
+  {
+    title: '输入门 (Input Gate)',
+    badge: 'Step 2',
+    badgeColor: '#53d8fb',
+    desc: '输入门决定哪些新信息将被写入细胞状态。它包含两部分：i_t 控制写入多少，C_tilde 提供写入的候选内容。',
+    formulaSection: function() {
+      return `
+        <div class="formula-box">
+          <div class="label">输入门公式</div>
+          <div class="formula">
+<span class="fn">i_t</span> = <span class="fn">σ</span>( W<sub>i</sub> · [h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>i</sub> )
+          <span class="note" style="color:var(--text-dim);font-size:13px">← 控制写入量</span>
+
+<span class="fn">C̃_t</span> = <span class="fn">tanh</span>( W<sub>C</sub> · [h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>C</sub> )
+          <span class="note" style="color:var(--text-dim);font-size:13px">← 候选新内容</span>
+
+  W<sub>i</sub>, W<sub>C</sub> ∈ R<sup><span class="dim">${h}×${d+h}</span></sup>
+
+  <span class="fn">tanh</span>(z) = (e<sup>z</sup> - e<sup>-z</sup>) / (e<sup>z</sup> + e<sup>-z</sup>)    ∈ [-1, +1]
+          </div>
+        </div>
+        <div class="curve-container">
+          <canvas id="tanhCurve" width="240" height="120"></canvas>
+        </div>`;
+    },
+    numericalSection: function() {
+      return `
+        <div class="numerical-box">
+          <div class="label">输入门 i_t 计算</div>
+          <div class="num-row"><span class="varname">W_i · concat</span><span class="eq">=</span><span class="val">${fmtArr(matVecMul(W_i, concat))}</span></div>
+          <div class="num-row"><span class="varname">+ b_i</span><span class="eq">=</span><span class="val">${fmtArr(i_raw)}</span></div>
+          <div class="num-row"><span class="varname">σ(...)</span><span class="eq">=</span><span class="val" style="color:var(--accent2)">${fmtArr(i_t)}</span><span class="note">← 输入门输出</span></div>
+        </div>
+        <div class="numerical-box">
+          <div class="label">候选值 C̃_t 计算</div>
+          <div class="num-row"><span class="varname">W_C · concat</span><span class="eq">=</span><span class="val">${fmtArr(matVecMul(W_C, concat))}</span></div>
+          <div class="num-row"><span class="varname">+ b_C</span><span class="eq">=</span><span class="val">${fmtArr(C_raw)}</span></div>
+          <div class="num-row"><span class="varname">tanh(...)</span><span class="eq">=</span><span class="val" style="color:var(--glow-candidate)">${fmtArr(C_tilde)}</span><span class="note">← 候选新值</span></div>
+        </div>
+        <div class="numerical-box">
+          <div class="label">权重矩阵</div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <div><div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">W_i (${h}×${d+h})</div><div class="matrix-display">${matrixToString(W_i)}</div></div>
+            <div><div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">W_C (${h}×${d+h})</div><div class="matrix-display">${matrixToString(W_C)}</div></div>
+          </div>
+        </div>`;
+    },
+    intuitionSection: function() {
+      return `
+        <div class="intuition-box">
+          <div class="label">直觉理解</div>
+          <p>输入门像"写入审核员"，分两步工作：<br>
+          &bull; <b>i_t</b>（Sigmoid）：决定每个维度"允不允许写入"——0=不许写，1=全部写<br>
+          &bull; <b>C̃_t</b>（tanh）：生成"要写什么新内容"——值域[-1,1]表示增减方向<br><br>
+          两者逐元素相乘 i_t ⊙ C̃_t 后，就是实际写入细胞状态的新信息。<br><br>
+          本例中：i_t = ${fmtArr(i_t)}，C̃_t = ${fmtArr(C_tilde)}<br>
+          写入量 = i ⊙ C̃ = ${fmtArr(hadamard(i_t, C_tilde))}</p>
+        </div>`;
+    },
+    svgHighlight: 'inputGate'
+  },
+  // Step 3
+  {
+    title: '细胞状态更新 (Cell State Update)',
+    badge: 'Step 3',
+    badgeColor: '#00d98b',
+    desc: '这是 LSTM 最核心的一步！旧细胞状态经过遗忘门筛选后，加上输入门筛选的新内容，得到新的细胞状态 C_t。',
+    formulaSection: function() {
+      return `
+        <div class="formula-box">
+          <div class="label">细胞状态更新公式</div>
+          <div class="formula">
+<span class="fn">C_t</span> = <span style="color:var(--accent)">f_t</span> ⊙ C<sub>t-1</sub>  +  <span style="color:var(--accent2)">i_t</span> ⊙ <span style="color:#c084fc">C̃_t</span>
+
+   ↑↑↑↑↑↑↑↑↑↑       ↑↑↑↑↑↑↑↑↑↑
+   <span style="color:var(--accent)">旧记忆×遗忘门</span>   <span style="color:var(--accent2)">新内容×输入门</span>
+
+  ⊙ = Hadamard积（逐元素相乘）
+
+  C_t ∈ R<sup><span class="dim">${h}</span></sup>  是 LSTM 的"长期记忆"
+          </div>
+        </div>`;
+    },
+    numericalSection: function() {
+      const forgetPart = hadamard(f_t, C_prev);
+      const inputPart = hadamard(i_t, C_tilde);
+      return `
+        <div class="numerical-box">
+          <div class="label">逐步计算 — 遗忘部分</div>
+          <div class="num-row"><span class="varname" style="color:var(--accent)">f_t</span><span class="eq">=</span><span class="val" style="color:var(--accent)">${fmtArr(f_t)}</span><span class="note">← 遗忘门</span></div>
+          <div class="num-row"><span class="varname">C_{t-1}</span><span class="eq">=</span><span class="val">${fmtArr(C_prev)}</span><span class="note">← 旧细胞状态</span></div>
+          <div class="num-row"><span class="varname" style="color:var(--accent)">f ⊙ C</span><span class="eq">=</span><span class="val" style="color:var(--accent)">${fmtArr(forgetPart)}</span><span class="note">← 旧记忆保留量</span></div>
+        </div>
+        <div class="numerical-box">
+          <div class="label">逐步计算 — 输入部分</div>
+          <div class="num-row"><span class="varname" style="color:var(--accent2)">i_t</span><span class="eq">=</span><span class="val" style="color:var(--accent2)">${fmtArr(i_t)}</span><span class="note">← 输入门</span></div>
+          <div class="num-row"><span class="varname" style="color:#c084fc">C̃_t</span><span class="eq">=</span><span class="val" style="color:#c084fc">${fmtArr(C_tilde)}</span><span class="note">← 候选新值</span></div>
+          <div class="num-row"><span class="varname" style="color:var(--accent2)">i ⊙ C̃</span><span class="eq">=</span><span class="val" style="color:var(--accent2)">${fmtArr(inputPart)}</span><span class="note">← 新写入内容</span></div>
+        </div>
+        <div class="numerical-box" style="border-color:var(--accent3);background:rgba(0,217,139,0.06)">
+          <div class="label" style="color:var(--accent3)">最终结果</div>
+          <div class="num-row"><span class="varname" style="color:var(--accent3)">C_t</span><span class="eq">=</span><span class="val" style="color:var(--accent3);font-size:16px;font-weight:700">${fmtArr(C_t)}</span></div>
+          <div class="num-row" style="margin-top:4px"><span class="varname"></span><span class="eq"></span><span class="val" style="color:var(--text-dim);font-size:12px">= ${fmtArr(forgetPart)} + ${fmtArr(inputPart)}</span></div>
+        </div>`;
+    },
+    intuitionSection: function() {
+      return `
+        <div class="intuition-box">
+          <div class="label">直觉理解 — 核心机制</div>
+          <p>想象 C_t 是一本"记事本"：<br>
+          &bull; <span style="color:var(--accent)">红色部分 f⊙C：用橡皮擦掉旧内容</span>（f 接近0的部分被擦掉更多）<br>
+          &bull; <span style="color:var(--accent2)">蓝色部分 i⊙C̃：用笔写上新内容</span>（i 接近1的部分写入更多）<br><br>
+          <b>这就是 LSTM 解决梯度消失的关键</b>：<br>
+          如果遗忘门 f_t ≈ 1，则 C_t ≈ C_{t-1}，<br>
+          旧记忆几乎原样传递——梯度可以跨越很多时间步而不衰减！<br>
+          这条"细胞状态高速公路"是 LSTM 的精髓。</p>
+        </div>`;
+    },
+    svgHighlight: 'cell'
+  },
+  // Step 4
+  {
+    title: '输出门 (Output Gate)',
+    badge: 'Step 4',
+    badgeColor: '#f5a623',
+    desc: '输出门决定细胞状态中的哪些信息应该作为当前隐藏状态 h_t 输出。细胞状态先经过 tanh 压缩到 [-1,1]，再由输出门筛选。',
+    formulaSection: function() {
+      return `
+        <div class="formula-box">
+          <div class="label">输出门公式</div>
+          <div class="formula">
+<span class="fn">o_t</span> = <span class="fn">σ</span>( W<sub>o</sub> · [h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>o</sub> )
+       <span class="note" style="color:var(--text-dim);font-size:13px">← 输出门：决定暴露多少</span>
+
+<span class="fn">h_t</span> = o_t ⊙ <span class="fn">tanh</span>(C_t)
+       <span class="note" style="color:var(--text-dim);font-size:13px">← 最终隐藏状态输出</span>
+
+  W<sub>o</sub> ∈ R<sup><span class="dim">${h}×${d+h}</span></sup> , b<sub>o</sub> ∈ R<sup><span class="dim">${h}</span></sup>
+  h_t ∈ R<sup><span class="dim">${h}</span></sup>  是 LSTM 的"短期输出"
+          </div>
+        </div>`;
+    },
+    numericalSection: function() {
+      return `
+        <div class="numerical-box">
+          <div class="label">输出门 o_t 计算</div>
+          <div class="num-row"><span class="varname">W_o · concat</span><span class="eq">=</span><span class="val">${fmtArr(matVecMul(W_o, concat))}</span></div>
+          <div class="num-row"><span class="varname">+ b_o</span><span class="eq">=</span><span class="val">${fmtArr(o_raw)}</span></div>
+          <div class="num-row"><span class="varname">σ(...)</span><span class="eq">=</span><span class="val" style="color:var(--glow-output)">${fmtArr(o_t)}</span><span class="note">← 输出门</span></div>
+        </div>
+        <div class="numerical-box">
+          <div class="label">隐藏状态 h_t 计算</div>
+          <div class="num-row"><span class="varname" style="color:var(--accent3)">C_t</span><span class="eq">=</span><span class="val" style="color:var(--accent3)">${fmtArr(C_t)}</span><span class="note">← 新细胞状态</span></div>
+          <div class="num-row"><span class="varname">tanh(C_t)</span><span class="eq">=</span><span class="val">${fmtArr(tanh_Ct)}</span><span class="note">← 压缩到[-1,1]</span></div>
+          <div class="num-row"><span class="varname">o_t</span><span class="eq">=</span><span class="val" style="color:var(--glow-output)">${fmtArr(o_t)}</span><span class="note">← 输出门筛选</span></div>
+        </div>
+        <div class="numerical-box" style="border-color:var(--glow-output);background:rgba(245,166,35,0.06)">
+          <div class="label" style="color:var(--glow-output)">最终输出</div>
+          <div class="num-row"><span class="varname" style="color:var(--glow-output)">h_t</span><span class="eq">=</span><span class="val" style="color:var(--glow-output);font-size:16px;font-weight:700">${fmtArr(h_t)}</span></div>
+          <div class="num-row" style="margin-top:4px"><span class="varname"></span><span class="eq"></span><span class="val" style="color:var(--text-dim);font-size:12px">= ${fmtArr(o_t)} ⊙ ${fmtArr(tanh_Ct)}</span></div>
+        </div>
+        <div class="numerical-box">
+          <div class="label">权重矩阵 W_o (${h}×${d+h})</div>
+          <div class="matrix-display">${matrixToString(W_o)}</div>
+        </div>`;
+    },
+    intuitionSection: function() {
+      return `
+        <div class="intuition-box">
+          <div class="label">直觉理解</div>
+          <p>输出门像一个"发言人"：<br>
+          &bull; 细胞状态 C_t 包含了丰富的长期记忆，但不是所有信息都需要现在说出来<br>
+          &bull; tanh(C_t) 将记忆"标准化"到 [-1,1] 范围<br>
+          &bull; 输出门 o_t 决定每个维度"说多少"——0=闭嘴，1=全说<br><br>
+          <b>关键区分</b>：<br>
+          &bull; C_t = <span style="color:var(--accent3)">长期记忆</span>（跨越多个时间步传递）<br>
+          &bull; h_t = <span style="color:var(--glow-output)">短期输出</span>（当前时间步对外暴露的信息）<br><br>
+          本例最终输出：h_t = ${fmtArr(h_t)}</p>
+        </div>`;
+    },
+    svgHighlight: 'output'
+  }
+];
+
+// ============ MATRIX DISPLAY HELPER ============
+function matrixToString(M) {
+  return M.map(row => {
+    return '[ ' + row.map(v => {
+      const s = v >= 0 ? ' ' + fmt(v,1) : fmt(v,1);
+      return `<span class="${v >= 0 ? 'pos' : 'neg'}">${s}</span>`;
+    }).join(', ') + ' ]';
+  }).join('\n');
+}
+
+// ============ SVG LSTM DIAGRAM ============
+function buildSVG() {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const container = document.getElementById('svgContainer');
+
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 460 380');
+  svg.setAttribute('xmlns', svgNS);
+
+  // Helper
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(svgNS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  // Defs: gradients, filters
+  const defs = el('defs', {}, svg);
+
+  // Glow filter
+  const glowFilter = el('filter', { id: 'glow', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
+  el('feGaussianBlur', { stdDeviation: '4', result: 'blur' }, glowFilter);
+  const merge = el('feMerge', {}, glowFilter);
+  el('feMergeNode', { in: 'blur' }, merge);
+  el('feMergeNode', { in: 'SourceGraphic' }, merge);
+
+  // Arrow marker
+  const marker = el('marker', { id: 'arrow', viewBox: '0 0 10 10', refX: '9', refY: '5',
+    markerWidth: '6', markerHeight: '6', orient: 'auto-start-reverse' }, defs);
+  el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#5a6a8a' }, marker);
+
+  const arrowGlow = el('marker', { id: 'arrowGlow', viewBox: '0 0 10 10', refX: '9', refY: '5',
+    markerWidth: '6', markerHeight: '6', orient: 'auto-start-reverse' }, defs);
+  el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#53d8fb' }, arrowGlow);
+
+  // Background
+  el('rect', { x: 0, y: 0, width: 460, height: 380, fill: 'transparent', rx: 12 }, svg);
+
+  // Main cell outline
+  el('rect', { x: 80, y: 50, width: 300, height: 280, fill: 'rgba(30,39,70,0.6)',
+    stroke: '#2a3a5c', 'stroke-width': 1.5, rx: 16 }, svg);
+
+  // ---- Cell state line (top) ----
+  const cellLine = el('g', { id: 'cellLine' }, svg);
+  // C_{t-1} input arrow
+  el('line', { x1: 30, y1: 85, x2: 80, y2: 85, stroke: '#00d98b', 'stroke-width': 2.5,
+    'marker-end': 'url(#arrow)' }, cellLine);
+  el('text', { x: 22, y: 82, fill: '#00d98b', 'font-size': 11, 'font-family': 'monospace',
+    'text-anchor': 'end' }, cellLine).textContent = 'C_{t-1}';
+  // Main horizontal
+  el('line', { x1: 80, y1: 85, x2: 380, y2: 85, stroke: '#00d98b', 'stroke-width': 3,
+    id: 'cellStateLine' }, cellLine);
+  // C_t output arrow
+  el('line', { x1: 380, y1: 85, x2: 440, y2: 85, stroke: '#00d98b', 'stroke-width': 2.5,
+    'marker-end': 'url(#arrow)' }, cellLine);
+  el('text', { x: 448, y: 82, fill: '#00d98b', 'font-size': 11, 'font-family': 'monospace' }, cellLine).textContent = 'C_t';
+
+  // ---- Forget gate (x marker on cell line) ----
+  const forgetG = el('g', { id: 'forgetGateG', class: 'gate-group' }, svg);
+  el('rect', { x: 120, y: 58, width: 50, height: 54, fill: 'rgba(233,69,96,0.12)',
+    stroke: '#e94560', 'stroke-width': 1.5, rx: 8 }, forgetG);
+  el('text', { x: 145, y: 78, fill: '#e94560', 'font-size': 15, 'font-weight': 'bold',
+    'text-anchor': 'middle', 'font-family': 'monospace' }, forgetG).textContent = '×';
+  el('text', { x: 145, y: 103, fill: '#e94560', 'font-size': 9, 'text-anchor': 'middle' }, forgetG).textContent = 'f_t';
+  // Label
+  el('text', { x: 145, y: 50, fill: '#e94560', 'font-size': 10, 'text-anchor': 'middle',
+    'font-weight': 'bold' }, forgetG).textContent = '遗忘门';
+
+  // ---- Input gate (+ on cell line) ----
+  const inputGateG = el('g', { id: 'inputGateG', class: 'gate-group' }, svg);
+  el('rect', { x: 195, y: 58, width: 50, height: 54, fill: 'rgba(83,216,251,0.12)',
+    stroke: '#53d8fb', 'stroke-width': 1.5, rx: 8 }, inputGateG);
+  el('text', { x: 220, y: 78, fill: '#53d8fb', 'font-size': 15, 'font-weight': 'bold',
+    'text-anchor': 'middle', 'font-family': 'monospace' }, inputGateG).textContent = '+';
+  el('text', { x: 220, y: 103, fill: '#53d8fb', 'font-size': 9, 'text-anchor': 'middle' }, inputGateG).textContent = 'i_t';
+  el('text', { x: 220, y: 50, fill: '#53d8fb', 'font-size': 10, 'text-anchor': 'middle',
+    'font-weight': 'bold' }, inputGateG).textContent = '输入门';
+
+  // ---- Candidate (tanh block below input gate) ----
+  const candidateG = el('g', { id: 'candidateG', class: 'gate-group' }, svg);
+  el('rect', { x: 195, y: 140, width: 50, height: 40, fill: 'rgba(192,132,252,0.12)',
+    stroke: '#c084fc', 'stroke-width': 1.5, rx: 8 }, candidateG);
+  el('text', { x: 220, y: 164, fill: '#c084fc', 'font-size': 13, 'font-weight': 'bold',
+    'text-anchor': 'middle', 'font-family': 'monospace' }, candidateG).textContent = 'tanh';
+  el('text', { x: 220, y: 192, fill: '#c084fc', 'font-size': 9, 'text-anchor': 'middle' }, candidateG).textContent = 'C̃_t';
+  // Arrow from candidate up to input gate
+  el('line', { x1: 220, y1: 140, x2: 220, y2: 112, stroke: '#c084fc', 'stroke-width': 1.5,
+    'marker-end': 'url(#arrow)' }, candidateG);
+
+  // ---- i_t sigmoid (left of candidate) ----
+  const iTG = el('g', { id: 'iTGate', class: 'gate-group' }, svg);
+  el('rect', { x: 130, y: 140, width: 50, height: 40, fill: 'rgba(83,216,251,0.12)',
+    stroke: '#53d8fb', 'stroke-width': 1.5, rx: 8 }, iTG);
+  el('text', { x: 155, y: 164, fill: '#53d8fb', 'font-size': 13, 'font-weight': 'bold',
+    'text-anchor': 'middle', 'font-family': 'monospace' }, iTG).textContent = 'σ';
+  el('text', { x: 155, y: 192, fill: '#53d8fb', 'font-size': 9, 'text-anchor': 'middle' }, iTG).textContent = 'i_t';
+  // Multiply dot
+  el('circle', { cx: 190, cy: 125, r: 8, fill: 'rgba(83,216,251,0.15)', stroke: '#53d8fb',
+    'stroke-width': 1 }, iTG);
+  el('text', { x: 190, y: 129, fill: '#53d8fb', 'font-size': 11, 'text-anchor': 'middle' }, iTG).textContent = '⊙';
+  // Line from i_t sigmoid up to multiply
+  el('line', { x1: 155, y1: 140, x2: 185, y2: 125, stroke: '#53d8fb', 'stroke-width': 1 }, iTG);
+  // Line from multiply up to cell state
+  el('line', { x1: 190, y1: 117, x2: 210, y2: 112, stroke: '#53d8fb', 'stroke-width': 1.5,
+    'marker-end': 'url(#arrow)' }, iTG);
+  // Line from candidate to multiply
+  el('line', { x1: 195, y1: 155, x2: 183, y2: 130, stroke: '#c084fc', 'stroke-width': 1 }, iTG);
+
+  // ---- Forget sigmoid (left side) ----
+  const fTG = el('g', { id: 'fTGate', class: 'gate-group' }, svg);
+  el('rect', { x: 95, y: 140, width: 50, height: 40, fill: 'rgba(233,69,96,0.12)',
+    stroke: '#e94560', 'stroke-width': 1.5, rx: 8 }, fTG);
+  el('text', { x: 120, y: 164, fill: '#e94560', 'font-size': 13, 'font-weight': 'bold',
+    'text-anchor': 'middle', 'font-family': 'monospace' }, fTG).textContent = 'σ';
+  el('text', { x: 120, y: 192, fill: '#e94560', 'font-size': 9, 'text-anchor': 'middle' }, fTG).textContent = 'f_t';
+  // Multiply dot for forget
+  el('circle', { cx: 145, cy: 85, r: 8, fill: 'rgba(233,69,96,0.15)', stroke: '#e94560',
+    'stroke-width': 1 }, fTG);
+  el('text', { x: 145, y: 89, fill: '#e94560', 'font-size': 11, 'text-anchor': 'middle' }, fTG).textContent = '⊙';
+  // Line from f_t sigmoid up to multiply
+  el('line', { x1: 120, y1: 140, x2: 142, y2: 93, stroke: '#e94560', 'stroke-width': 1 }, fTG);
+
+  // ---- Output gate (right side) ----
+  const outputG = el('g', { id: 'outputGateG', class: 'gate-group' }, svg);
+  el('rect', { x: 290, y: 140, width: 50, height: 40, fill: 'rgba(245,166,35,0.12)',
+    stroke: '#f5a623', 'stroke-width': 1.5, rx: 8 }, outputG);
+  el('text', { x: 315, y: 164, fill: '#f5a623', 'font-size': 13, 'font-weight': 'bold',
+    'text-anchor': 'middle', 'font-family': 'monospace' }, outputG).textContent = 'σ';
+  el('text', { x: 315, y: 192, fill: '#f5a623', 'font-size': 9, 'text-anchor': 'middle' }, outputG).textContent = 'o_t';
+  el('text', { x: 315, y: 135, fill: '#f5a623', 'font-size': 10, 'text-anchor': 'middle',
+    'font-weight': 'bold' }, outputG).textContent = '输出门';
+
+  // tanh on cell line for output
+  const tanhOutG = el('g', { id: 'tanhOutG', }, svg);
+  el('rect', { x: 270, y: 58, width: 50, height: 54, fill: 'rgba(0,217,139,0.12)',
+    stroke: '#00d98b', 'stroke-width': 1.5, rx: 8 }, tanhOutG);
+  el('text', { x: 295, y: 78, fill: '#00d98b', 'font-size': 13, 'font-weight': 'bold',
+    'text-anchor': 'middle', 'font-family': 'monospace' }, tanhOutG).textContent = 'tanh';
+
+  // Multiply dot for output
+  el('circle', { cx: 355, cy: 260, r: 8, fill: 'rgba(245,166,35,0.15)', stroke: '#f5a623',
+    'stroke-width': 1 }, outputG);
+  el('text', { x: 355, y: 264, fill: '#f5a623', 'font-size': 11, 'text-anchor': 'middle' }, outputG).textContent = '⊙';
+
+  // Line from output gate down to multiply
+  el('line', { x1: 315, y1: 180, x2: 348, y2: 253, stroke: '#f5a623', 'stroke-width': 1.5 }, outputG);
+  // Line from tanh(C_t) down to multiply
+  el('line', { x1: 295, y1: 112, x2: 295, y2: 230, stroke: '#00d98b', 'stroke-width': 1.5 }, outputG);
+  el('line', { x1: 295, y1: 230, x2: 348, y2: 253, stroke: '#00d98b', 'stroke-width': 1.5 }, outputG);
+
+  // ---- Hidden state line (bottom) ----
+  const hLine = el('g', { id: 'hLine' }, svg);
+  // h_{t-1} input
+  el('line', { x1: 30, y1: 260, x2: 80, y2: 260, stroke: '#5a6a8a', 'stroke-width': 2,
+    'marker-end': 'url(#arrow)' }, hLine);
+  el('text', { x: 22, y: 257, fill: '#8899bb', 'font-size': 11, 'font-family': 'monospace',
+    'text-anchor': 'end' }, hLine).textContent = 'h_{t-1}';
+
+  // Internal routing lines (h goes up to gates)
+  el('line', { x1: 80, y1: 260, x2: 80, y2: 200, stroke: '#5a6a8a', 'stroke-width': 1.5 }, hLine);
+  el('line', { x1: 80, y1: 200, x2: 100, y2: 160, stroke: '#5a6a8a', 'stroke-width': 1 }, hLine);
+  el('line', { x1: 80, y1: 200, x2: 135, y2: 160, stroke: '#5a6a8a', 'stroke-width': 1 }, hLine);
+  el('line', { x1: 80, y1: 200, x2: 205, y2: 160, stroke: '#5a6a8a', 'stroke-width': 1 }, hLine);
+  el('line', { x1: 80, y1: 200, x2: 300, y2: 160, stroke: '#5a6a8a', 'stroke-width': 1 }, hLine);
+
+  // x_t input
+  el('line', { x1: 30, y1: 300, x2: 80, y2: 300, stroke: '#5a6a8a', 'stroke-width': 2,
+    'marker-end': 'url(#arrow)' }, hLine);
+  el('text', { x: 22, y: 297, fill: '#8899bb', 'font-size': 11, 'font-family': 'monospace',
+    'text-anchor': 'end' }, hLine).textContent = 'x_t';
+
+  // x_t routing
+  el('line', { x1: 80, y1: 300, x2: 80, y2: 330, stroke: '#5a6a8a', 'stroke-width': 1.5 }, hLine);
+  el('line', { x1: 80, y1: 330, x2: 380, y2: 330, stroke: '#5a6a8a', 'stroke-width': 1 }, hLine);
+  // Branch up from x line to gates
+  el('line', { x1: 110, y1: 330, x2: 110, y2: 170, stroke: '#5a6a8a', 'stroke-width': 0.8, 'stroke-dasharray': '4,3' }, hLine);
+  el('line', { x1: 145, y1: 330, x2: 145, y2: 170, stroke: '#5a6a8a', 'stroke-width': 0.8, 'stroke-dasharray': '4,3' }, hLine);
+  el('line', { x1: 220, y1: 330, x2: 220, y2: 185, stroke: '#5a6a8a', 'stroke-width': 0.8, 'stroke-dasharray': '4,3' }, hLine);
+  el('line', { x1: 315, y1: 330, x2: 315, y2: 185, stroke: '#5a6a8a', 'stroke-width': 0.8, 'stroke-dasharray': '4,3' }, hLine);
+
+  // h_t output
+  el('line', { x1: 355, y1: 260, x2: 440, y2: 260, stroke: '#f5a623', 'stroke-width': 2.5,
+    'marker-end': 'url(#arrow)' }, hLine);
+  el('text', { x: 448, y: 257, fill: '#f5a623', 'font-size': 11, 'font-family': 'monospace' }, hLine).textContent = 'h_t';
+
+  // Line from output multiply to h_t
+  el('line', { x1: 355, y1: 268, x2: 355, y2: 260, stroke: '#f5a623', 'stroke-width': 2 }, hLine);
+
+  // ---- Concat label ----
+  el('text', { x: 55, y: 225, fill: '#5a6a8a', 'font-size': 10, 'text-anchor': 'middle',
+    'font-style': 'italic' }, svg).textContent = 'concat';
+
+  // Store SVG for later highlight manipulation
+  container.innerHTML = '';
+  container.appendChild(svg);
+}
+
+// ============ HIGHLIGHT LOGIC ============
+const highlightMap = {
+  'input': {
+    ids: ['fTGate', 'iTGate', 'candidateG', 'outputGateG'],
+    glowColor: '#8899bb'
+  },
+  'forget': {
+    ids: ['forgetGateG', 'fTGate'],
+    glowColor: '#e94560'
+  },
+  'inputGate': {
+    ids: ['inputGateG', 'iTGate', 'candidateG'],
+    glowColor: '#53d8fb'
+  },
+  'cell': {
+    ids: ['forgetGateG', 'inputGateG', 'cellLine'],
+    glowColor: '#00d98b'
+  },
+  'output': {
+    ids: ['outputGateG', 'tanhOutG'],
+    glowColor: '#f5a623'
+  }
+};
+
+function highlightStep(stepKey) {
+  // Remove all highlights first
+  document.querySelectorAll('.gate-group, #cellLine, #tanhOutG, #hLine, #forgetGateG, #inputGateG, #outputGateG, #candidateG, #fTGate, #iTGate').forEach(g => {
+    g.style.filter = '';
+    g.style.opacity = '0.45';
+  });
+
+  // Highlight active
+  const map = highlightMap[stepKey];
+  if (!map) return;
+  map.ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.style.opacity = '1';
+      el.style.filter = `drop-shadow(0 0 8px ${map.glowColor})`;
+    }
+  });
+
+  // Always show cell line prominently for cell step
+  if (stepKey === 'cell') {
+    const cl = document.getElementById('cellLine');
+    if (cl) {
+      cl.style.opacity = '1';
+      cl.style.filter = 'drop-shadow(0 0 12px #00d98b)';
+    }
+  }
+  if (stepKey === 'output') {
+    const hl = document.getElementById('hLine');
+    if (hl) {
+      hl.style.opacity = '1';
+      hl.style.filter = 'drop-shadow(0 0 8px #f5a623)';
+    }
+  }
+}
+
+// ============ CURVE DRAWING ============
+function drawSigmoid(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // Background
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, w, h);
+
+  // Axes
+  ctx.strokeStyle = '#3a4a6c';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(20, h/2); ctx.lineTo(w-10, h/2);
+  ctx.moveTo(w/2, 10); ctx.lineTo(w/2, h-10);
+  ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = '#8888aa';
+  ctx.font = '10px monospace';
+  ctx.fillText('z', w-15, h/2 - 5);
+  ctx.fillText('σ(z)', w/2 + 5, 15);
+  ctx.fillText('0', w/2 - 12, h/2 + 12);
+  ctx.fillText('1', w/2 + 5, 18);
+
+  // Sigmoid curve
+  ctx.strokeStyle = '#e94560';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let px = 20; px < w - 10; px++) {
+    const z = (px - w/2) / 25;
+    const val = 1 / (1 + Math.exp(-z));
+    const py = h/2 - val * (h/2 - 15) + 15;
+    if (px === 20) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // Dash lines for 0 and 1
+  ctx.strokeStyle = '#444466';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(20, 15); ctx.lineTo(w-10, 15);
+  ctx.moveTo(20, h - 15); ctx.lineTo(w-10, h - 15);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#e94560';
+  ctx.font = '9px monospace';
+  ctx.fillText('1', 8, 18);
+  ctx.fillText('0', 8, h - 12);
+}
+
+function drawTanh(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, w, h);
+
+  // Axes
+  ctx.strokeStyle = '#3a4a6c';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(20, h/2); ctx.lineTo(w-10, h/2);
+  ctx.moveTo(w/2, 10); ctx.lineTo(w/2, h-10);
+  ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = '#8888aa';
+  ctx.font = '10px monospace';
+  ctx.fillText('z', w-15, h/2 - 5);
+  ctx.fillText('tanh(z)', w/2 + 5, 15);
+
+  // Tanh curve
+  ctx.strokeStyle = '#c084fc';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let px = 20; px < w - 10; px++) {
+    const z = (px - w/2) / 25;
+    const val = Math.tanh(z);
+    const py = h/2 - val * (h/2 - 15);
+    if (px === 20) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // Dashes
+  ctx.strokeStyle = '#444466';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(20, 15); ctx.lineTo(w-10, 15);
+  ctx.moveTo(20, h - 15); ctx.lineTo(w-10, h - 15);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#c084fc';
+  ctx.font = '9px monospace';
+  ctx.fillText('+1', 4, 18);
+  ctx.fillText('-1', 4, h - 10);
+}
+
+// ============ STEP INDICATOR ============
+function buildStepIndicator() {
+  const container = document.getElementById('stepIndicator');
+  container.innerHTML = '';
+  steps.forEach((s, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'step-dot' + (i === currentStep ? ' active' : '');
+    dot.onclick = () => goToStep(i);
+    dot.title = s.title;
+    container.appendChild(dot);
+  });
+}
+
+// ============ RENDER STEP ============
+let currentStep = 0;
+
+function renderStep(idx) {
+  currentStep = idx;
+  const step = steps[idx];
+  const panel = document.getElementById('detailPanel');
+
+  panel.innerHTML = `
+    <div class="fade-in">
+      <div class="step-title">
+        <span class="step-badge" style="background:${step.badgeColor}22;color:${step.badgeColor};border:1px solid ${step.badgeColor}">${step.badge}</span>
+        ${step.title}
+      </div>
+      <div class="step-desc">${step.desc}</div>
+      ${step.formulaSection()}
+      ${step.numericalSection()}
+      ${step.intuitionSection()}
+    </div>
+  `;
+
+  // Draw curves after DOM update
+  if (idx === 1) setTimeout(() => drawSigmoid('sigmoidCurve'), 50);
+  if (idx === 2) setTimeout(() => drawTanh('tanhCurve'), 50);
+
+  // Highlight SVG
+  highlightStep(step.svgHighlight);
+
+  // Update step indicator
+  buildStepIndicator();
+
+  // Update nav
+  document.getElementById('btnPrev').disabled = idx === 0;
+  document.getElementById('btnNext').disabled = idx === steps.length - 1;
+  document.getElementById('stepCounter').textContent = `${idx} / ${steps.length - 1}`;
+}
+
+// ============ NAVIGATION ============
+function nextStep() {
+  if (currentStep < steps.length - 1) renderStep(currentStep + 1);
+}
+function prevStep() {
+  if (currentStep > 0) renderStep(currentStep - 1);
+}
+function goToStep(i) {
+  if (i >= 0 && i < steps.length) renderStep(i);
+}
+function resetSteps() {
+  renderStep(0);
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextStep(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prevStep(); }
+});
+
+// ============ INIT ============
+buildSVG();
+renderStep(0);
+</script>
+</body>
+</html>
