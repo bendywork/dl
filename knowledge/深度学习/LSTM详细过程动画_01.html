@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSTM 详细过程动画 — 108步骤精讲</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; height: 100vh; overflow: hidden; }
+
+/* ===== 顶部标题 ===== */
+.header {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  padding: 20px 40px;
+  border-bottom: 2px solid #4a9eff33;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.header h1 { font-size: 1.6rem; color: #4a9eff; }
+.header .step-counter { font-size: 1.1rem; color: #aaa; }
+.progress-bar-wrap { height: 4px; background: #222; }
+.progress-bar { height: 4px; background: linear-gradient(90deg, #4a9eff, #a78bfa); transition: width 0.3s; }
+
+/* ===== 主体布局 ===== */
+.main { display: flex; height: calc(100vh - 84px); overflow: hidden; }
+
+/* ===== 左侧：LSTM 图示 ===== */
+.diagram-panel {
+  width: 55%;
+  padding: 30px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-right: 1px solid #2a2a3e;
+  position: relative;
+}
+
+/* ===== 右侧：步骤讲解 ===== */
+.explain-panel {
+  width: 45%;
+  padding: 30px;
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+.step-tag { font-size: 0.75rem; color: #4a9eff; font-weight: bold; letter-spacing: 2px; margin-bottom: 8px; }
+.step-title { font-size: 1.4rem; font-weight: bold; color: #fff; margin-bottom: 16px; line-height: 1.4; }
+.step-body { font-size: 0.95rem; color: #c0c8d8; line-height: 1.9; flex: 1; }
+.step-body .formula {
+  background: #1a2040; border-left: 3px solid #4a9eff;
+  padding: 12px 16px; border-radius: 4px; margin: 12px 0;
+  font-family: 'Courier New', monospace; font-size: 1rem; color: #7dd3fc;
+}
+.step-body .highlight { color: #fcd34d; font-weight: bold; }
+.step-body .green { color: #6ee7b7; font-weight: bold; }
+.step-body .pink { color: #f9a8d4; font-weight: bold; }
+.step-body .orange { color: #fdba74; font-weight: bold; }
+
+/* 底部导航 */
+.nav-bar {
+  padding: 16px 40px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: #0f1117; border-top: 1px solid #2a2a3e;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  z-index: 1000;
+}
+.nav-btn {
+  padding: 10px 28px; border-radius: 8px; font-size: 0.95rem; font-weight: bold;
+  cursor: pointer; border: none; transition: all 0.2s;
+}
+.nav-btn.prev { background: #2a2a3e; color: #aaa; }
+.nav-btn.prev:hover { background: #3a3a5e; color: #fff; }
+.nav-btn.next { background: #4a9eff; color: #fff; }
+.nav-btn.next:hover { background: #2a7fdf; }
+.nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.section-dots { display: flex; gap: 6px; flex-wrap: wrap; max-width: 400px; justify-content: center; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #333; cursor: pointer; transition: all 0.2s; }
+.dot.active { background: #4a9eff; transform: scale(1.4); }
+.dot.done { background: #4a9eff44; }
+
+/* ===== SVG 图示样式 ===== */
+svg { font-family: 'Segoe UI', sans-serif; }
+.cell-box { fill: #1e2d1e; stroke: #4a7c4a; stroke-width: 2; rx: 12; }
+.gate-σ { fill: #fef3c7; stroke: #d97706; stroke-width: 2; }
+.gate-tanh { fill: #ede9fe; stroke: #7c3aed; stroke-width: 2; }
+.gate-mult { fill: #fce7f3; stroke: #db2777; stroke-width: 2; }
+.gate-add { fill: #ecfdf5; stroke: #059669; stroke-width: 2; }
+.node-x { fill: #bfdbfe; stroke: #3b82f6; stroke-width: 2; }
+.node-h { fill: #e9d5ff; stroke: #7c3aed; stroke-width: 2; }
+.node-c { fill: #d1fae5; stroke: #10b981; stroke-width: 2; }
+
+.highlight-glow { filter: drop-shadow(0 0 8px #4a9eff); }
+.highlight-glow-yellow { filter: drop-shadow(0 0 8px #fcd34d); }
+.highlight-glow-green { filter: drop-shadow(0 0 8px #6ee7b7); }
+.highlight-glow-pink { filter: drop-shadow(0 0 8px #f9a8d4); }
+.highlight-glow-orange { filter: drop-shadow(0 0 8px #fdba74); }
+
+.arrow { stroke: #556; stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }
+.arrow-active { stroke: #4a9eff; stroke-width: 2.5; fill: none; marker-end: url(#arrowhead-blue); }
+.arrow-yellow { stroke: #fcd34d; stroke-width: 2.5; fill: none; marker-end: url(#arrowhead-yellow); }
+.arrow-green { stroke: #6ee7b7; stroke-width: 2.5; fill: none; marker-end: url(#arrowhead-green); }
+.arrow-pink { stroke: #f9a8d4; stroke-width: 2.5; fill: none; marker-end: url(#arrowhead-pink); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🧠 LSTM 详细过程动画</h1>
+  <div class="step-counter" id="stepCounter">步骤 1 / 108</div>
+</div>
+<div class="progress-bar-wrap">
+  <div class="progress-bar" id="progressBar" style="width:1%"></div>
+</div>
+
+<div class="main">
+  <!-- 左侧图示 -->
+  <div class="diagram-panel">
+    <svg id="lstmSvg" viewBox="0 0 560 420" width="100%" height="100%">
+      <defs>
+        <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#556"/>
+        </marker>
+        <marker id="arrowhead-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#4a9eff"/>
+        </marker>
+        <marker id="arrowhead-yellow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#fcd34d"/>
+        </marker>
+        <marker id="arrowhead-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#6ee7b7"/>
+        </marker>
+        <marker id="arrowhead-pink" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#f9a8d4"/>
+        </marker>
+      </defs>
+
+      <!-- === 主细胞框 === -->
+      <rect id="cellBox" x="60" y="60" width="440" height="300" rx="16" fill="#162416" stroke="#3a6a3a" stroke-width="2"/>
+      <text x="280" y="42" text-anchor="middle" fill="#6ee7b7" font-size="13" font-weight="bold">LSTM 单元（时间步 t）</text>
+
+      <!-- 细胞状态传送带 C_t（顶部水平线）-->
+      <line id="cLine" x1="60" y1="110" x2="500" y2="110" stroke="#6ee7b7" stroke-width="2.5" stroke-dasharray="6,3"/>
+      <text x="30" y="115" fill="#6ee7b7" font-size="11">C_{t-1}</text>
+      <text x="508" y="115" fill="#6ee7b7" font-size="11">C_t</text>
+
+      <!-- 遗忘门 σ_f -->
+      <g id="gateF">
+        <rect x="100" y="175" width="50" height="36" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="125" y="198" text-anchor="middle" fill="#92400e" font-size="13" font-weight="bold">σ_f</text>
+      </g>
+      <!-- 遗忘门 × C_{t-1} -->
+      <g id="multF">
+        <circle cx="125" cy="130" r="14" fill="#fce7f3" stroke="#db2777" stroke-width="2"/>
+        <text x="125" y="135" text-anchor="middle" fill="#db2777" font-size="16" font-weight="bold">×</text>
+      </g>
+
+      <!-- 输入门 σ_i -->
+      <g id="gateI">
+        <rect x="190" y="175" width="50" height="36" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="215" y="198" text-anchor="middle" fill="#92400e" font-size="13" font-weight="bold">σ_i</text>
+      </g>
+      <!-- 候选值 tanh -->
+      <g id="gateTanhC">
+        <rect x="260" y="175" width="50" height="36" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+        <text x="285" y="198" text-anchor="middle" fill="#5b21b6" font-size="12" font-weight="bold">tanh</text>
+      </g>
+      <!-- 输入门 × 候选 -->
+      <g id="multI">
+        <circle cx="250" cy="130" r="14" fill="#fce7f3" stroke="#db2777" stroke-width="2"/>
+        <text x="250" y="135" text-anchor="middle" fill="#db2777" font-size="16" font-weight="bold">×</text>
+      </g>
+
+      <!-- 加法节点 + -->
+      <g id="addNode">
+        <circle cx="370" cy="110" r="16" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+        <text x="370" y="116" text-anchor="middle" fill="#065f46" font-size="18" font-weight="bold">+</text>
+      </g>
+
+      <!-- 输出门 σ_o -->
+      <g id="gateO">
+        <rect x="390" y="175" width="50" height="36" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="415" y="198" text-anchor="middle" fill="#92400e" font-size="13" font-weight="bold">σ_o</text>
+      </g>
+      <!-- tanh(C_t) -->
+      <g id="tanhOut">
+        <rect x="390" y="255" width="50" height="36" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+        <text x="415" y="278" text-anchor="middle" fill="#5b21b6" font-size="11" font-weight="bold">tanh</text>
+      </g>
+      <!-- 输出门 × tanh(C_t) -->
+      <g id="multO">
+        <circle cx="460" cy="273" r="14" fill="#fce7f3" stroke="#db2777" stroke-width="2"/>
+        <text x="460" y="278" text-anchor="middle" fill="#db2777" font-size="16" font-weight="bold">×</text>
+      </g>
+
+      <!-- 输入 x_t -->
+      <g id="nodeX">
+        <circle cx="280" cy="380" r="18" fill="#bfdbfe" stroke="#3b82f6" stroke-width="2"/>
+        <text x="280" y="386" text-anchor="middle" fill="#1e40af" font-size="13" font-weight="bold">x_t</text>
+      </g>
+
+      <!-- h_{t-1} 输入 -->
+      <g id="nodeHPrev">
+        <circle cx="60" cy="250" r="18" fill="#e9d5ff" stroke="#7c3aed" stroke-width="2"/>
+        <text x="60" y="256" text-anchor="middle" fill="#4c1d95" font-size="10" font-weight="bold">h_{t-1}</text>
+      </g>
+
+      <!-- h_t 输出 -->
+      <g id="nodeHOut">
+        <circle cx="500" cy="250" r="18" fill="#e9d5ff" stroke="#7c3aed" stroke-width="2"/>
+        <text x="500" y="256" text-anchor="middle" fill="#4c1d95" font-size="11" font-weight="bold">h_t</text>
+      </g>
+
+      <!-- 拼接标注 [h_{t-1}, x_t] -->
+      <rect id="concatBox" x="140" y="240" width="230" height="28" rx="6" fill="#1a2040" stroke="#4a9eff33" stroke-width="1"/>
+      <text x="255" y="259" text-anchor="middle" fill="#7dd3fc" font-size="11">[h_{t-1}, x_t] 拼接向量</text>
+
+      <!-- 连接线（静态骨架） -->
+      <!-- h_{t-1} → 各门 -->
+      <line x1="78" y1="250" x2="140" y2="250" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <!-- x_t → 各门 -->
+      <line x1="280" y1="362" x2="280" y2="268" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <!-- 各门 → × -->
+      <line x1="125" y1="175" x2="125" y2="144" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <line x1="215" y1="175" x2="215" y2="144" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <line x1="285" y1="175" x2="285" y2="144" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <!-- ×F → C线 -->
+      <line x1="125" y1="116" x2="125" y2="110" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <!-- ×I与候选 -->
+      <line x1="215" y1="144" x2="250" y2="144" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <line x1="285" y1="144" x2="264" y2="144" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <line x1="250" y1="116" x2="250" y2="110" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <!-- + → ... -->
+      <line x1="370" y1="126" x2="370" y2="255" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <line x1="370" y1="255" x2="390" y2="255" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <!-- σ_o → ×O -->
+      <line x1="415" y1="211" x2="415" y2="255" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <line x1="415" y1="255" x2="446" y2="273" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <!-- ×O → h_t -->
+      <line x1="474" y1="273" x2="500" y2="268" class="arrow" stroke="#445" stroke-width="1.2"/>
+      <line x1="500" y1="250" x2="500" y2="232" class="arrow" stroke="#445" stroke-width="1.2"/>
+
+      <!-- 动态高亮层（初始隐藏） -->
+      <g id="dynamicLayer"></g>
+
+      <!-- 标注文字层 -->
+      <g id="labelLayer">
+        <text x="88" y="128" fill="#f9a8d4" font-size="10">f_t</text>
+        <text x="238" y="128" fill="#f9a8d4" font-size="10">i_t·g_t</text>
+        <text x="358" y="100" fill="#6ee7b7" font-size="10">C_t</text>
+        <text x="468" y="270" fill="#e9d5ff" font-size="10">h_t</text>
+      </g>
+    </svg>
+
+    <!-- 当前数值显示 -->
+    <div id="valDisplay" style="background:#1a2040;border-radius:8px;padding:12px 20px;margin-top:12px;width:100%;font-size:0.85rem;color:#7dd3fc;font-family:'Courier New',monospace;min-height:60px;">
+      <span id="valText">▶ 点击"下一步"开始 LSTM 详细讲解</span>
+    </div>
+  </div>
+
+  <!-- 右侧讲解 -->
+  <div class="explain-panel" style="padding-bottom:80px;">
+    <div class="step-tag" id="stepTag">SECTION 1 · 背景</div>
+    <div class="step-title" id="stepTitle">LSTM 是什么？为什么需要它？</div>
+    <div class="step-body" id="stepBody">
+      在开始之前，先建立直觉：<br><br>
+      <span class="highlight">普通 RNN 的核心缺陷</span>：梯度在时间反传时会指数级消失，
+      导致网络只能"记住"最近几步的信息。<br><br>
+      <span class="green">LSTM 的解决思路</span>：引入一条"细胞状态高速公路"（Cell State），
+      让信息可以<b>无损地</b>在时间轴上传递，同时用三个"门"来精确控制
+      哪些信息被遗忘、哪些被写入、哪些被输出。<br><br>
+      接下来，我们用 <b>108 步</b>，把每一个计算细节都讲清楚。
+    </div>
+  </div>
+</div>
+
+<!-- 底部导航 -->
+<div class="nav-bar">
+  <button class="nav-btn prev" id="prevBtn" onclick="navigate(-1)" disabled>← 上一步</button>
+  <div class="section-dots" id="sectionDots"></div>
+  <button class="nav-btn next" id="nextBtn" onclick="navigate(1)">下一步 →</button>
+</div>
+
+<script>
+// ===================================================
+// 108步骤数据
+// ===================================================
+const steps = [
+  // ──────────────── SECTION 1: 背景与动机 (1-8) ────────────────
+  {
+    section: "SECTION 1 · 背景", title: "LSTM 是什么？为什么需要它？",
+    highlight: [],
+    val: "▶ 点击"下一步"开始 LSTM 详细讲解",
+    body: `在开始之前，先建立直觉：<br><br>
+<span class="highlight">普通 RNN 的核心缺陷</span>：梯度在时间反传时会指数级消失，
+导致网络只能"记住"最近几步的信息。<br><br>
+<span class="green">LSTM 的解决思路</span>：引入一条"细胞状态高速公路"（Cell State），
+让信息可以<b>无损地</b>在时间轴上传递，同时用三个"门"来精确控制
+哪些信息被遗忘、哪些被写入、哪些被输出。<br><br>
+接下来，我们用 <b>108 步</b>，把每一个计算细节都讲清楚。`
+  },
+  {
+    section: "SECTION 1 · 背景", title: "RNN 梯度消失的根本原因",
+    highlight: [],
+    val: "∂L/∂h₁ = ∂L/∂h₅ × (Wh)⁴ → 若|λ(Wh)|<1，则趋向0",
+    body: `<b>数学上</b>，RNN 的梯度公式是：<br><br>
+<div class="formula">∂L/∂h₁ = ∂L/∂h₅ × ∂h₅/∂h₄ × ∂h₄/∂h₃ × ∂h₃/∂h₂ × ∂h₂/∂h₁</div>
+每一项 ∂h_t/∂h_{t-1} ≈ Wh^T，如果连乘 T 次：<br><br>
+• Wh 特征值 < 1 → 连乘后 → <span class="highlight">梯度消失</span><br>
+• Wh 特征值 > 1 → 连乘后 → <span class="orange">梯度爆炸</span><br><br>
+这意味着，<span class="green">时间距离越远，梯度越接近0，权重几乎不更新</span>。`
+  },
+  {
+    section: "SECTION 1 · 背景", title: "LSTM 的核心设计哲学",
+    highlight: [],
+    val: "LSTM = 细胞状态 C_t（高速公路）+ 3个门控",
+    body: `LSTM（Long Short-Term Memory，长短期记忆网络）由 Hochreiter & Schmidhuber 于 <b>1997年</b> 提出。<br><br>
+核心思想：<br><br>
+<span class="green">① 细胞状态 C_t</span>：一条几乎无损的"传送带"，让梯度可以直接流过去<br>
+<span class="highlight">② 遗忘门 f_t</span>：决定"忘掉多少旧信息"<br>
+<span class="pink">③ 输入门 i_t</span>：决定"写入多少新信息"<br>
+<span class="orange">④ 输出门 o_t</span>：决定"输出多少给下一步"`
+  },
+  {
+    section: "SECTION 1 · 背景", title: "LSTM 的输入输出总览",
+    highlight: ["nodeX", "nodeHPrev", "nodeHOut", "cLine"],
+    val: "输入: x_t, h_{t-1}, C_{t-1} → 输出: h_t, C_t",
+    body: `每个 LSTM 时间步接收 <b>3个输入</b>：<br><br>
+<span class="highlight">x_t</span>：当前时间步的输入向量（蓝色圆圈）<br>
+<span class="pink">h_{t-1}</span>：上一步的隐状态（紫色圆圈，左侧）<br>
+<span class="green">C_{t-1}</span>：上一步的细胞状态（绿色虚线，顶部）<br><br>
+并输出 <b>2个结果</b>：<br>
+<span class="pink">h_t</span>：本步的隐状态（传给下一层或输出层）<br>
+<span class="green">C_t</span>：本步的细胞状态（传给下一个时间步）`
+  },
+  {
+    section: "SECTION 1 · 背景", title: "sigmoid 激活函数详解",
+    highlight: ["gateF"],
+    val: "σ(x) = 1 / (1 + e^(-x))，输出范围 (0, 1)",
+    body: `门控机制的核心是 <span class="highlight">sigmoid 函数</span>，记作 σ：<br><br>
+<div class="formula">σ(x) = 1 / (1 + e^(-x))</div>
+输出范围：<b>(0, 1)</b><br><br>
+• 输出接近 <b>0</b> → "关门"：阻止信息通过<br>
+• 输出接近 <b>1</b> → "开门"：允许信息通过<br><br>
+所以 sigmoid 就像一个<span class="green">可微分的开关</span>，
+可以被梯度下降训练，学会在什么时候开、什么时候关。`
+  },
+  {
+    section: "SECTION 1 · 背景", title: "tanh 激活函数详解",
+    highlight: ["gateTanhC"],
+    val: "tanh(x) = (e^x - e^(-x)) / (e^x + e^(-x))，输出范围(-1,1)",
+    body: `tanh 用于生成"候选值"（写入信息）和最终输出转换：<br><br>
+<div class="formula">tanh(x) = (eˣ - e⁻ˣ) / (eˣ + e⁻ˣ)</div>
+输出范围：<b>(-1, 1)</b><br><br>
+• 可以表示<span class="highlight">正向信息</span>（+1附近）和<span class="pink">负向信息</span>（-1附近）<br>
+• 零中心，梯度流动比 sigmoid 更稳定<br><br>
+<span class="green">记忆口诀</span>：sigmoid 控制"多少"，tanh 控制"方向和强度"`
+  },
+  {
+    section: "SECTION 1 · 背景", title: "逐元素乘法（Hadamard 积）",
+    highlight: ["multF", "multI", "multO"],
+    val: "⊙ 操作：[0.8, 0.2, 0.9] ⊙ [1.0, -0.5, 0.3] = [0.8, -0.1, 0.27]",
+    body: `图中的 <span class="pink">× 圆圈</span> 表示<b>逐元素乘法（⊙）</b>，不是矩阵乘法！<br><br>
+<div class="formula">a ⊙ b = [a₁b₁, a₂b₂, ..., aₙbₙ]</div>
+这很关键：<br>
+• 门的输出是一个 <b>0~1 的向量</b>（每个维度独立控制）<br>
+• ⊙ 相当于对每个特征维度单独"开关"<br><br>
+例：门值 0.8 → 保留 80% 的信号；门值 0.05 → 几乎完全遮蔽。`
+  },
+  {
+    section: "SECTION 1 · 背景", title: "拼接操作 [h_{t-1}, x_t]",
+    highlight: ["concatBox", "nodeX", "nodeHPrev"],
+    val: "若 h_{t-1}∈ℝ⁴, x_t∈ℝ³ → [h_{t-1},x_t]∈ℝ⁷",
+    body: `所有门的计算都以<span class="highlight">[h_{t-1}; x_t]</span>（拼接向量）为输入：<br><br>
+<div class="formula">[h_{t-1}; x_t] = concat(h_{t-1}, x_t)</div>
+• h_{t-1}：维度 = 隐藏层大小 H<br>
+• x_t：维度 = 输入特征维 D<br>
+• 拼接后：维度 = H + D<br><br>
+<span class="green">为什么拼接？</span>这样每个门都能同时看到"历史状态"和"当前输入"，
+再决定如何处理。门的权重矩阵维度就是 H × (H+D)。`
+  },
+
+  // ──────────────── SECTION 2: 遗忘门 (9-22) ────────────────
+  {
+    section: "SECTION 2 · 遗忘门", title: "遗忘门：整体职责",
+    highlight: ["gateF"],
+    val: "遗忘门 f_t 决定：对 C_{t-1} 的每个维度，保留多少",
+    body: `<span class="highlight">遗忘门（Forget Gate）</span>是第一个被计算的门。<br><br>
+<b>它的职责</b>：决定从细胞状态 C_{t-1} 中<b>遗忘多少</b>。<br><br>
+想象一个人在阅读文章，遇到新段落时，需要忘掉上一段主语的性别信息。
+遗忘门就负责做这件事：<br><br>
+• f_t ≈ 1 → <span class="green">保留这个维度的信息</span><br>
+• f_t ≈ 0 → <span class="highlight">清除这个维度的信息</span>`
+  },
+  {
+    section: "SECTION 2 · 遗忘门", title: "遗忘门：输入是什么",
+    highlight: ["gateF", "concatBox"],
+    val: "输入: [h_{t-1}; x_t]，维度 H+D",
+    body: `遗忘门的输入是拼接向量：<br><br>
+<div class="formula">输入向量 = [h_{t-1}; x_t]</div>
+• <span class="pink">h_{t-1}</span>：上一步输出（维度 H）<br>
+• <span class="highlight">x_t</span>：当前输入（维度 D）<br><br>
+这个拼接向量<span class="green">进入一个线性变换层</span>，再经过 sigmoid 激活，
+输出一个 0~1 的遗忘向量 f_t（维度 H）。`
+  },
+  {
+    section: "SECTION 2 · 遗忘门", title: "遗忘门：权重矩阵 W_f",
+    highlight: ["gateF"],
+    val: "W_f 形状: H × (H+D)，b_f 形状: H",
+    body: `遗忘门有自己的权重矩阵和偏置：<br><br>
+<div class="formula">W_f ∈ ℝ^{H×(H+D)}，b_f ∈ ℝ^H</div>
+• W_f 的每一行对应细胞状态的一个维度<br>
+• 每一列对应拼接输入的一个维度<br><br>
+<span class="green">这些参数通过反向传播学习</span>：网络会自动学会
+"在什么情况下，该忘掉哪些信息"。`
+  },
+  {
+    section: "SECTION 2 · 遗忘门", title: "遗忘门：线性变换",
+    highlight: ["gateF"],
+    val: "z_f = W_f · [h_{t-1}; x_t] + b_f",
+    body: `第一步：做线性变换，得到未激活值 z_f：<br><br>
+<div class="formula">z_f = W_f · [h_{t-1}; x_t] + b_f</div>
+计算过程：<br>
+• 矩阵 W_f（形状 H×(H+D)）乘以列向量（形状 H+D）<br>
+• 加上偏置 b_f<br>
+• 得到形状为 H 的中间向量 z_f<br><br>
+<span class="highlight">z_f 的每个元素可以是任意实数</span>，接下来要用 sigmoid 压缩到 (0,1)。`
+  },
+  {
+    section: "SECTION 2 · 遗忘门", title: "遗忘门：sigmoid 激活",
+    highlight: ["gateF"],
+    val: "f_t = σ(z_f) = σ(W_f·[h_{t-1};x_t] + b_f)",
+    body: `第二步：将 z_f 通过 sigmoid 压缩：<br><br>
+<div class="formula">f_t = σ(W_f · [h_{t-1}; x_t] + b_f)</div>
+• f_t ∈ (0, 1)^H，维度与细胞状态相同<br>
+• f_t 的每个分量独立控制细胞状态的对应维度<br><br>
+<span class="green">数值示例</span>：<br>
+若 f_t = [0.95, 0.02, 0.88, 0.70]<br>
+→ 第1维保留95%，<span class="highlight">第2维几乎清空</span>，第3维保留88%...`
+  },
+  {
+    section: "SECTION 2 · 遗忘门", title: "遗忘门：与 C_{t-1} 相乘",
+    highlight: ["gateF", "multF", "cLine"],
+    val: "f_t ⊙ C_{t-1}：逐元素相乘，选择性遗忘",
+    body: `第三步：f_t 与旧细胞状态 C_{t-1} 做 Hadamard 积：<br><br>
+<div class="formula">f_t ⊙ C_{t-1}</div>
+图中的 <span class="pink">× 圆圈</span>就是这个操作。<br><br>
+数值示例：<br>
+C_{t-1} = [1.2, -0.8, 0.5, 2.1]<br>
+f_t = [0.95, 0.02, 0.88, 0.70]<br>
+<div class="formula">f_t ⊙ C_{t-1} = [1.14, -0.016, 0.44, 1.47]</div>
+注意第2维：从 -0.8 变成了 -0.016，<span class="highlight">几乎被清零</span>！`
+  },
+  {
+    section: "SECTION 2 · 遗忘门", title: "遗忘门：梯度流动的秘密",
+    highlight: ["multF", "cLine"],
+    val: "C_t 的梯度路径经过加法节点，不经过矩阵乘法！",
+    body: `这里有个<span class="green">极其重要</span>的点——LSTM 能解决梯度消失的关键：<br><br>
+细胞状态 C_t 的反向传播路径：<br>
+<div class="formula">∂C_t/∂C_{t-1} = f_t（仅乘以遗忘门值，接近1时几乎无损）</div>
+相比 RNN 每步要乘 Wh^T（可能 <1 或 >1），
+LSTM 的梯度通过加法节点（+）回流时<span class="highlight">几乎不衰减</span>。<br><br>
+这就是"<span class="green">细胞状态高速公路</span>"的本质！`
+  },
+  {
+    section: "SECTION 2 · 遗忘门", title: "遗忘门：直觉理解（翻译例子）",
+    highlight: ["gateF"],
+    val: "场景：机器翻译中，遇到新主语时忘掉旧主语的性别",
+    body: `<b>真实场景</b>（以语言模型为例）：<br><br>
+输入序列：<i>"小明买了苹果。<b>小红</b>..."</i><br><br>
+遇到"小红"时：<br>
+• 旧细胞状态中存储了"小明=男性主语"<br>
+• <span class="highlight">遗忘门学会了</span>：新主语出现 → 清零"当前主语性别"维度<br>
+• f_t[性别维度] ≈ 0 → "小明是男性"被遗忘<br><br>
+<span class="green">网络自动学会这些</span>，无需人工规则！这就是 LSTM 强大的地方。`
+  },
+  {
+    section: "SECTION 2 · 遗忘门", title: "遗忘门：偏置 b_f 的作用",
+    highlight: ["gateF"],
+    val: "b_f 初始化为正值（如1）→ f_t 偏向1 → 默认保留记忆",
+    body: `<span class="green">实践技巧</span>：遗忘门的偏置 b_f 通常初始化为 <b>1（或更大）</b>。<br><br>
+为什么？<br>
+• b_f = 1 → σ(1) ≈ 0.73 → 默认保留73%的记忆<br>
+• 这让网络在训练初期更容易学习长依赖<br>
+• 避免训练初期"遗忘过多"导致梯度信号丢失<br><br>
+这是 Jozefowicz et al. 2015 论文中推荐的初始化策略。`
+  },
+  {
+    section: "SECTION 2 · 遗忘门", title: "遗忘门完整公式总结",
+    highlight: ["gateF", "multF"],
+    val: "f_t = σ(W_f·[h_{t-1};x_t] + b_f)  →  f_t ⊙ C_{t-1}",
+    body: `<b>遗忘门计算链（完整）</b>：<br><br>
+<div class="formula">步骤1: z_f = W_f · [h_{t-1}; x_t] + b_f</div>
+<div class="formula">步骤2: f_t = σ(z_f)  ∈ (0,1)^H</div>
+<div class="formula">步骤3: 遗忘后细胞状态 = f_t ⊙ C_{t-1}</div>
+<span class="highlight">参数</span>：W_f（H×(H+D)），b_f（H），共 H×(H+D)+H 个参数<br><br>
+<span class="green">直觉</span>：f_t 是一把"橡皮擦"，决定擦掉细胞状态的哪些内容。`
+  },
+
+  // ──────────────── SECTION 3: 输入门 (23-38) ────────────────
+  {
+    section: "SECTION 3 · 输入门", title: "输入门：整体职责",
+    highlight: ["gateI", "gateTanhC"],
+    val: "输入门决定：往细胞状态里写入多少新信息",
+    body: `<span class="pink">输入门（Input Gate）</span>控制<b>新信息的写入量</b>。<br><br>
+它由<b>两部分</b>协同工作：<br><br>
+<span class="pink">① 输入门 i_t（σ）</span>：决定"写多少"（0~1 的开关）<br>
+<span class="orange">② 候选细胞状态 g_t（tanh）</span>：决定"写什么"（方向和强度）<br><br>
+最终写入量 = i_t ⊙ g_t，两者相乘才得到真正加入细胞状态的内容。`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "候选细胞状态：概念",
+    highlight: ["gateTanhC"],
+    val: "g_t = tanh(W_g·[h_{t-1};x_t] + b_g)，候选写入值",
+    body: `<span class="orange">候选细胞状态 g_t</span>（也常写作 C̃_t）：<br><br>
+"如果完全相信当前输入，我们想写入什么？"<br><br>
+<div class="formula">g_t = tanh(W_g · [h_{t-1}; x_t] + b_g)</div>
+• 用 tanh 激活 → 输出范围 (-1, 1)<br>
+• 表示"候选写入值"：正数表示增加，负数表示减少<br>
+• 维度 = H（与细胞状态一致）<br><br>
+<span class="green">类比</span>：g_t 是"草稿内容"，i_t 决定"采纳多少草稿"。`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "候选细胞状态：线性变换",
+    highlight: ["gateTanhC"],
+    val: "z_g = W_g · [h_{t-1}; x_t] + b_g",
+    body: `第一步：线性变换生成 z_g：<br><br>
+<div class="formula">z_g = W_g · [h_{t-1}; x_t] + b_g</div>
+• W_g ∈ ℝ^{H×(H+D)}，b_g ∈ ℝ^H<br>
+• 注意：W_g 与遗忘门 W_f 是<span class="highlight">完全独立的权重</span><br>
+• z_g 的值范围是任意实数<br><br>
+<span class="green">注意</span>：尽管输入相同，但每个门用自己独立的权重矩阵，
+因此每个门会"看出"不同的信息。`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "候选细胞状态：tanh 激活",
+    highlight: ["gateTanhC"],
+    val: "g_t = tanh(z_g)，范围(-1,1)，表示写入方向和强度",
+    body: `第二步：tanh 激活：<br><br>
+<div class="formula">g_t = tanh(W_g · [h_{t-1}; x_t] + b_g)</div>
+数值示例：<br>
+若 z_g = [2.1, -0.5, 0.8, -1.3]<br>
+g_t = tanh(z_g) = [0.97, -0.46, 0.66, -0.86]<br><br>
+• <span class="green">正值</span>：想把该维度的细胞状态往正方向调<br>
+• <span class="highlight">负值</span>：想把该维度的细胞状态往负方向调<br>
+• 绝对值大 → 修改幅度大`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "输入门 i_t：职责",
+    highlight: ["gateI"],
+    val: "i_t = σ(W_i·[h_{t-1};x_t] + b_i)，控制写入比例",
+    body: `<span class="pink">输入门 i_t</span>：决定候选值 g_t 中，<b>哪些维度实际被写入</b>：<br><br>
+<div class="formula">i_t = σ(W_i · [h_{t-1}; x_t] + b_i)</div>
+• W_i, b_i 是独立的权重/偏置<br>
+• i_t ∈ (0, 1)^H<br><br>
+数值示例：<br>
+i_t = [0.9, 0.05, 0.8, 0.3]<br>
+→ 第1维写入90%的候选值，<span class="highlight">第2维几乎不写入</span>，第3维写入80%...`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "输入门线性变换",
+    highlight: ["gateI"],
+    val: "z_i = W_i · [h_{t-1}; x_t] + b_i（未激活值）",
+    body: `线性变换步骤：<br><br>
+<div class="formula">z_i = W_i · [h_{t-1}; x_t] + b_i</div>
+• W_i ∈ ℝ^{H×(H+D)}，与 W_f、W_g 均独立<br>
+• b_i ∈ ℝ^H<br><br>
+<span class="green">4个门的权重矩阵</span>（W_f, W_i, W_g, W_o）<br>
+在实际实现中，通常<b>拼接为一个大矩阵</b>一起做矩阵乘法，
+提升计算效率（一次 GEMM 代替 4 次）。`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "输入门 sigmoid 激活",
+    highlight: ["gateI"],
+    val: "i_t = σ(z_i)，输出(0,1)，控制写入开关",
+    body: `激活步骤：<br><br>
+<div class="formula">i_t = σ(z_i) = 1 / (1 + e^{-z_i})</div>
+• i_t 的每个分量独立，范围 (0, 1)<br>
+• <b>0</b>：完全不写入该维度<br>
+• <b>1</b>：完全写入该维度的候选值<br><br>
+<span class="highlight">为什么需要两个门（i_t 和 g_t）？</span><br>
+因为 g_t（tanh）提供方向信息，i_t（sigmoid）提供选择信号，
+<span class="green">分离"写什么"和"写多少"</span>，表达更灵活。`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "输入写入量：i_t ⊙ g_t",
+    highlight: ["gateI", "gateTanhC", "multI"],
+    val: "写入量 = i_t ⊙ g_t（逐元素相乘）",
+    body: `<b>实际写入细胞状态的内容</b>：<br><br>
+<div class="formula">写入量 = i_t ⊙ g_t</div>
+数值示例：<br>
+i_t = [0.9, 0.05, 0.8, 0.3]<br>
+g_t = [0.97, -0.46, 0.66, -0.86]<br>
+<div class="formula">i_t ⊙ g_t = [0.87, -0.023, 0.53, -0.26]</div>
+图中第二个 <span class="pink">× 圆圈</span> 就是这个操作。<br><br>
+<span class="green">效果</span>：第2维几乎不写入（-0.023），第1维写入0.87的增量。`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "输入门：梯度流动分析",
+    highlight: ["multI", "gateI"],
+    val: "∂(i_t⊙g_t)/∂[h,x] 涉及 sigmoid 导数（最大0.25）",
+    body: `<span class="highlight">输入门的梯度</span>比细胞状态的梯度更复杂：<br><br>
+经过 sigmoid 的梯度：σ'(x) = σ(x)(1-σ(x))，最大值 0.25<br>
+经过 tanh 的梯度：tanh'(x) = 1 - tanh²(x)，最大值 1.0<br><br>
+但关键是：<span class="green">细胞状态 C_t 的更新路径是加法</span>（见加法节点），
+加法的梯度等于1，所以梯度可以<b>直接穿过加法节点</b>回流，
+不经过 sigmoid/tanh！这是 LSTM 解决梯度消失的核心机制。`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "输入门：直觉理解（语言例子）",
+    highlight: ["gateI", "gateTanhC"],
+    val: "场景：遇到关键词'Paris' → 写入位置信息",
+    body: `<b>真实场景</b>（语言模型）：<br><br>
+输入序列：<i>"The <b>Eiffel Tower</b> is in Paris..."</i><br><br>
+当处理 "Paris" 这个词时：<br>
+• g_t（候选值）编码了"这是一个城市，位于法国"的信息<br>
+• <span class="pink">i_t 中"城市"维度 ≈ 0.95</span>（几乎全写入）<br>
+• 细胞状态中"城市"维度被更新为巴黎相关的表示<br><br>
+<span class="green">这样后续生成"France"、"French"时，细胞状态能提供正确上下文。</span>`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "输入门参数量",
+    highlight: ["gateI", "gateTanhC"],
+    val: "输入门参数: W_i(H×(H+D)) + b_i(H) + W_g(H×(H+D)) + b_g(H)",
+    body: `输入门（含候选值）的参数量：<br><br>
+• W_i：H × (H+D) 个参数<br>
+• b_i：H 个参数<br>
+• W_g：H × (H+D) 个参数<br>
+• b_g：H 个参数<br><br>
+合计：<span class="highlight">2H(H+D) + 2H</span> 个参数<br><br>
+<span class="green">整个 LSTM 单元参数总量</span>（4个门合计）：<br>
+4H(H+D) + 4H = <b>4H(H+D+1)</b><br>
+若 H=256, D=128：约 4×256×385 = <b>394,240 个参数</b>！`
+  },
+  {
+    section: "SECTION 3 · 输入门", title: "输入门：与遗忘门的关系",
+    highlight: ["gateF", "gateI"],
+    val: "一般来说 f_t + i_t ≠ 1（两者独立，可同时开或关）",
+    body: `一个常见误解：<span class="highlight">遗忘门和输入门不是互补关系！</span><br><br>
+f_t 和 i_t 是<b>完全独立</b>的，可以同时为大或同时为小：<br><br>
+• f_t ≈ 1, i_t ≈ 1 → 保留旧信息，同时大量写入新信息<br>
+• f_t ≈ 0, i_t ≈ 1 → 清空旧信息，写入新信息（完全替换）<br>
+• f_t ≈ 1, i_t ≈ 0 → 保留旧信息，不写入（记忆保持）<br>
+• f_t ≈ 0, i_t ≈ 0 → 清空旧信息，也不写入（重置）<br><br>
+<span class="green">GRU 的简化版把这两个门合并了（reset gate）</span>，参数更少但灵活性降低。`
+  },
+
+  // ──────────────── SECTION 4: 细胞状态更新 (39-52) ────────────────
+  {
+    section: "SECTION 4 · 细胞状态更新", title: "细胞状态更新：加法节点",
+    highlight: ["addNode", "cLine"],
+    val: "C_t = f_t ⊙ C_{t-1} + i_t ⊙ g_t",
+    body: `<span class="green">核心公式！</span> 细胞状态的更新：<br><br>
+<div class="formula">C_t = f_t ⊙ C_{t-1} + i_t ⊙ g_t</div>
+图中的 <span class="green">⊕ 圆圈</span> 就是这个加法节点。<br><br>
+两项含义：<br>
+• <span class="highlight">f_t ⊙ C_{t-1}</span>：选择性保留的旧记忆<br>
+• <span class="pink">i_t ⊙ g_t</span>：新写入的信息<br><br>
+两者相加，得到新的细胞状态 C_t！`
+  },
+  {
+    section: "SECTION 4 · 细胞状态更新", title: "细胞状态更新：完整数值示例",
+    highlight: ["addNode", "multF", "multI"],
+    val: "C_t = [1.14,-0.016,0.44,1.47] + [0.87,-0.023,0.53,-0.26]",
+    body: `继续之前的数值示例：<br><br>
+<div class="formula">f_t ⊙ C_{t-1} = [1.14, -0.016, 0.44, 1.47]</div>
+<div class="formula">i_t ⊙ g_t = [0.87, -0.023, 0.53, -0.26]</div>
+<div class="formula">C_t = [2.01, -0.039, 0.97, 1.21]</div>
+第1维：1.14 + 0.87 = 2.01（旧记忆+新写入）<br>
+第2维：-0.016 + (-0.023) = -0.039（几乎被完全遗忘且几乎没新写入）<br><br>
+<span class="green">C_t 的范围不限于(-1,1)，可以累积！</span>`
+  },
+  {
+    section: "SECTION 4 · 细胞状态更新", title: "细胞状态：梯度高速公路",
+    highlight: ["addNode", "cLine"],
+    val: "∂C_t/∂C_{t-1} = f_t（不经过tanh/sigmoid！）",
+    body: `<span class="green">LSTM 解决梯度消失的数学关键</span>：<br><br>
+对 C_t = f_t ⊙ C_{t-1} + i_t ⊙ g_t 求偏导：<br><br>
+<div class="formula">∂C_t/∂C_{t-1} = f_t</div>
+• 梯度直接乘以 f_t（≈ 0.5~1.0）<br>
+• <span class="highlight">不经过任何 sigmoid/tanh 的导数</span>（sigmoid 导数最大才 0.25！）<br><br>
+对比 RNN：∂h_t/∂h_{t-1} = Wh^T × tanh'，反复连乘 → 消失<br>
+LSTM：梯度可以在 C 通道上<b>几乎无损地流过多个时间步</b>！`
+  },
+  {
+    section: "SECTION 4 · 细胞状态更新", title: "细胞状态：为什么用加法",
+    highlight: ["addNode"],
+    val: "加法节点的梯度=1，是LSTM的核心设计选择",
+    body: `<span class="highlight">为什么不用乘法或其他操作？</span><br><br>
+反向传播中，加法节点的梯度：<br>
+<div class="formula">∂(a+b)/∂a = 1，∂(a+b)/∂b = 1</div>
+梯度直接"穿过"加法节点，数值不变！<br><br>
+这与 <span class="green">ResNet 的残差连接</span>（跳跃连接）是同样的思想：
+都用加法来让梯度"短路"，绕开那些梯度衰减严重的层。<br><br>
+LSTM 的 Cell State ≈ ResNet 的残差连接，是同一时期出现的两大突破。`
+  },
+  {
+    section: "SECTION 4 · 细胞状态更新", title: "细胞状态：信息累积特性",
+    highlight: ["cLine"],
+    val: "C_t 可以跨越数百个时间步保持信息（长依赖！）",
+    body: `由于梯度路径上没有显著衰减，细胞状态 C_t 可以：<br><br>
+• <b>正向</b>：保存几百步前的关键信息（如文章开头的主题）<br>
+• <b>反向</b>：梯度可以传回几百步前，更新那时的权重<br><br>
+<span class="green">实验证明</span>（Graves 2013）：LSTM 可以记住 1000+ 步前的信息，
+而普通 RNN 通常只能记住 10~20 步。<br><br>
+<span class="highlight">这就是 LSTM 名字中"Long"的含义！</span>`
+  },
+  {
+    section: "SECTION 4 · 细胞状态更新", title: "细胞状态：边界情况分析",
+    highlight: ["addNode", "gateF", "gateI"],
+    val: "f=1,i=0: 完全记忆；f=0,i=0: 完全重置",
+    body: `四种极端情况：<br><br>
+<b>1. f_t=1, i_t=0</b>（纯记忆）：<br>
+<div class="formula">C_t = 1⊙C_{t-1} + 0⊙g_t = C_{t-1}</div>
+<b>2. f_t=0, i_t=1</b>（纯替换）：<br>
+<div class="formula">C_t = 0 + 1⊙g_t = g_t</div>
+<b>3. f_t=1, i_t=1</b>（叠加）：<br>
+<div class="formula">C_t = C_{t-1} + g_t（累积）</div>
+<b>4. f_t=0, i_t=0</b>（清零）：<br>
+<div class="formula">C_t = 0（完全重置）</div>`
+  },
+  {
+    section: "SECTION 4 · 细胞状态更新", title: "细胞状态：维度说明",
+    highlight: ["cLine"],
+    val: "C_t ∈ ℝ^H，每个维度可以独立存储不同类型的信息",
+    body: `细胞状态是一个<b>向量</b>，不是标量！<br><br>
+假设 H=512：<br>
+• C_t 有 512 个维度<br>
+• 每个维度独立受自己的门控值控制<br>
+• 不同维度可以存储<b>完全不同类型的信息</b><br><br>
+<span class="green">可视化研究</span>（Karpathy 2015）发现，LSTM 的某些细胞维度：<br>
+• 专门追踪"引号是否开启"<br>
+• 专门追踪"代码缩进深度"<br>
+• 专门追踪"句子位置"<br>
+这些都是<span class="highlight">网络自动学到的</span>！`
+  },
+
+  // ──────────────── SECTION 5: 输出门 (53-68) ────────────────
+  {
+    section: "SECTION 5 · 输出门", title: "输出门：整体职责",
+    highlight: ["gateO"],
+    val: "输出门决定：将细胞状态中多少内容输出为 h_t",
+    body: `<span class="orange">输出门（Output Gate）</span>是最后一个门，决定：<br>
+"我们已经更新了细胞状态 C_t，现在<b>输出多少给外部</b>？"<br><br>
+为什么不直接输出 C_t？<br>
+• C_t 可能累积了很大的值（无界），不适合直接输出<br>
+• 不同任务需要"选择性地暴露"不同的记忆内容<br>
+• 输出门实现了"<span class="green">外部可见信息</span>"和"<span class="highlight">内部记忆</span>"的分离`
+  },
+  {
+    section: "SECTION 5 · 输出门", title: "输出门线性变换",
+    highlight: ["gateO"],
+    val: "z_o = W_o · [h_{t-1}; x_t] + b_o",
+    body: `输出门的计算同样基于拼接输入：<br><br>
+<div class="formula">z_o = W_o · [h_{t-1}; x_t] + b_o</div>
+• W_o ∈ ℝ^{H×(H+D)}，b_o ∈ ℝ^H<br>
+• 与其他门<b>完全独立的权重</b><br><br>
+<span class="green">注意</span>：输出门的输入仍然是 [h_{t-1}; x_t]，
+<b>不是 C_t</b>！C_t 在后续 tanh 压缩后才参与计算。`
+  },
+  {
+    section: "SECTION 5 · 输出门", title: "输出门 sigmoid 激活",
+    highlight: ["gateO"],
+    val: "o_t = σ(W_o·[h_{t-1};x_t] + b_o)，控制输出比例",
+    body: `激活步骤：<br><br>
+<div class="formula">o_t = σ(W_o · [h_{t-1}; x_t] + b_o)</div>
+• o_t ∈ (0, 1)^H<br>
+• o_t 的每个分量决定：C_t 对应维度是否被暴露到 h_t<br><br>
+数值示例：<br>
+o_t = [0.85, 0.90, 0.20, 0.75]<br>
+→ 第3维的细胞状态几乎不输出（0.20），其他维度正常输出`
+  },
+  {
+    section: "SECTION 5 · 输出门", title: "tanh 压缩细胞状态",
+    highlight: ["tanhOut", "addNode"],
+    val: "tanh(C_t) 将细胞状态压缩到(-1,1)",
+    body: `输出前需要对 C_t 做 tanh 压缩：<br><br>
+<div class="formula">tanh(C_t)</div>
+为什么要压缩？<br>
+• C_t 的值可能很大（如 2.01, 1.21 等）<br>
+• tanh 将其映射到 (-1, 1)，<span class="green">归一化幅度</span><br>
+• 防止 h_t 值域过大，影响后续计算<br><br>
+图中右下角的 <span class="pink">tanh 方框</span> 就是这个操作。<br>
+输入：C_t（无界）→ 输出：tanh(C_t)∈(-1,1)^H`
+  },
+  {
+    section: "SECTION 5 · 输出门", title: "输出门：最终 h_t 计算",
+    highlight: ["gateO", "tanhOut", "multO", "nodeHOut"],
+    val: "h_t = o_t ⊙ tanh(C_t)",
+    body: `<b>最终输出的隐状态：</b><br><br>
+<div class="formula">h_t = o_t ⊙ tanh(C_t)</div>
+图中最右侧的 <span class="pink">× 圆圈</span> 就是这个操作。<br><br>
+数值示例（继续之前）：<br>
+C_t = [2.01, -0.039, 0.97, 1.21]<br>
+tanh(C_t) = [0.97, -0.039, 0.75, 0.84]<br>
+o_t = [0.85, 0.90, 0.20, 0.75]<br>
+<div class="formula">h_t = [0.82, -0.035, 0.15, 0.63]</div>
+h_t ∈ (-1, 1)^H，维度 H！`
+  },
+  {
+    section: "SECTION 5 · 输出门", title: "h_t 的两个去向",
+    highlight: ["nodeHOut"],
+    val: "h_t → ①传给下一个时间步 ②传给输出层",
+    body: `h_t 有两个用途：<br><br>
+<b>① 传给下一个时间步</b>：<br>
+h_t 成为 t+1 时刻的 h_{t-1}，参与下一步所有门的计算<br><br>
+<b>② 传给输出层</b>（如果当前步有输出）：<br>
+<div class="formula">y_t = softmax(W_y · h_t + b_y)</div>
+用于生成预测（分类、词预测等）<br><br>
+<span class="green">注意</span>：h_t 的范围是 (-1,1)，远小于 C_t（可能很大）。
+这是因为 h_t 面向外部，需要是归一化、稳定的信号。`
+  },
+  {
+    section: "SECTION 5 · 输出门", title: "输出门直觉：过滤内部记忆",
+    highlight: ["gateO", "tanhOut"],
+    val: "C_t存储长期记忆，h_t只暴露当前任务需要的部分",
+    body: `<span class="green">精妙的设计</span>：细胞状态 C_t 存储<b>全部内部记忆</b>，
+但 h_t 只是其<b>过滤后的子集</b>。<br><br>
+<b>例子</b>（机器翻译）：<br>
+• C_t 中同时存储了：语法信息、主题信息、时态信息、指代信息<br>
+• 当前步生成动词时：o_t 激活"时态"维度，抑制其他维度<br>
+• 当前步生成代词时：o_t 激活"指代"维度<br><br>
+输出门让 LSTM 能在<span class="highlight">不同任务/时间步输出不同的信息子集</span>。`
+  },
+  {
+    section: "SECTION 5 · 输出门", title: "输出门：完整公式",
+    highlight: ["gateO", "tanhOut", "multO"],
+    val: "o_t=σ(W_o·[h_{t-1};x_t]+b_o)  h_t=o_t⊙tanh(C_t)",
+    body: `输出门完整计算链：<br><br>
+<div class="formula">步骤1: z_o = W_o · [h_{t-1}; x_t] + b_o</div>
+<div class="formula">步骤2: o_t = σ(z_o)</div>
+<div class="formula">步骤3: tanh(C_t)（压缩细胞状态）</div>
+<div class="formula">步骤4: h_t = o_t ⊙ tanh(C_t)</div>
+<span class="highlight">参数</span>：W_o（H×(H+D)），b_o（H）<br><br>
+<span class="green">注意</span>：步骤3的 tanh(C_t) 没有额外的权重参数，只是激活函数！`
+  },
+
+  // ──────────────── SECTION 6: 完整前向传播 (69-80) ────────────────
+  {
+    section: "SECTION 6 · 完整前向传播", title: "前向传播：4个门的并行计算",
+    highlight: ["gateF", "gateI", "gateTanhC", "gateO"],
+    val: "实践中：[f,i,g,o] = split(W·[h,x]+b, 4)",
+    body: `在实际实现中，4个门<b>同时计算</b>（不是串行的）：<br><br>
+<div class="formula">W = [W_f; W_i; W_g; W_o] ∈ ℝ^{4H×(H+D)}</div>
+<div class="formula">b = [b_f; b_i; b_g; b_o] ∈ ℝ^{4H}</div>
+<div class="formula">gates = W · [h_{t-1}; x_t] + b  ∈ ℝ^{4H}</div>
+<div class="formula">[z_f, z_i, z_g, z_o] = split(gates, 4)</div>
+<span class="green">一次大矩阵乘法替代4次小矩阵乘法</span>，GPU 并行效率更高！`
+  },
+  {
+    section: "SECTION 6 · 完整前向传播", title: "前向传播：激活函数分配",
+    highlight: ["gateF", "gateI", "gateTanhC", "gateO"],
+    val: "f,i,o → sigmoid；g(候选) → tanh",
+    body: `激活函数分配：<br><br>
+<div class="formula">f_t = σ(z_f)  ← 遗忘门（0~1）</div>
+<div class="formula">i_t = σ(z_i)  ← 输入门（0~1）</div>
+<div class="formula">g_t = tanh(z_g) ← 候选值（-1~1）</div>
+<div class="formula">o_t = σ(z_o)  ← 输出门（0~1）</div>
+规律：<span class="highlight">凡是"控制比例"的门用 sigmoid</span>（输出0~1才有控制意义），
+<span class="green">凡是"存储信息"的用 tanh</span>（有方向性）。`
+  },
+  {
+    section: "SECTION 6 · 完整前向传播", title: "前向传播：细胞状态更新",
+    highlight: ["multF", "multI", "addNode", "cLine"],
+    val: "C_t = f_t ⊙ C_{t-1} + i_t ⊙ g_t",
+    body: `<b>完整前向传播步骤汇总（细胞状态部分）</b>：<br><br>
+<div class="formula">① 遗忘：partial = f_t ⊙ C_{t-1}</div>
+<div class="formula">② 候选：new_info = i_t ⊙ g_t</div>
+<div class="formula">③ 更新：C_t = partial + new_info</div>
+这三步对应图中的：<br>
+• 左侧 × → 中间 × → + 圆圈<br><br>
+<span class="green">C_t 的更新只用了加法和逐元素乘法</span>，没有矩阵乘法，梯度路径极短！`
+  },
+  {
+    section: "SECTION 6 · 完整前向传播", title: "前向传播：输出计算",
+    highlight: ["tanhOut", "multO", "nodeHOut"],
+    val: "h_t = o_t ⊙ tanh(C_t)，维度H",
+    body: `<b>完整前向传播步骤汇总（输出部分）</b>：<br><br>
+<div class="formula">④ 压缩: tanh_C = tanh(C_t)</div>
+<div class="formula">⑤ 输出: h_t = o_t ⊙ tanh_C</div>
+h_t ∈ (-1, 1)^H，这就是本时间步的"对外输出"。<br><br>
+<span class="highlight">向下一步传递的是</span>：(h_t, C_t) 这两个向量——
+这是 LSTM 与普通 RNN 最大的区别：<b>有两条传递通道</b>！`
+  },
+  {
+    section: "SECTION 6 · 完整前向传播", title: "完整前向传播公式汇总",
+    highlight: ["gateF","gateI","gateTanhC","gateO","addNode","tanhOut","multO"],
+    val: "6个公式，3个门+1个候选+细胞状态更新+隐状态输出",
+    body: `<b>LSTM 完整前向传播（6条公式）</b>：<br><br>
+<div class="formula">f_t = σ(W_f·[h_{t-1};x_t] + b_f)</div>
+<div class="formula">i_t = σ(W_i·[h_{t-1};x_t] + b_i)</div>
+<div class="formula">g_t = tanh(W_g·[h_{t-1};x_t] + b_g)</div>
+<div class="formula">o_t = σ(W_o·[h_{t-1};x_t] + b_o)</div>
+<div class="formula">C_t = f_t ⊙ C_{t-1} + i_t ⊙ g_t</div>
+<div class="formula">h_t = o_t ⊙ tanh(C_t)</div>
+<span class="green">背下这6条公式，LSTM 的本质就掌握了！</span>`
+  },
+
+  // ──────────────── SECTION 7: 反向传播BPTT (81-92) ────────────────
+  {
+    section: "SECTION 7 · 反向传播", title: "BPTT：从损失开始",
+    highlight: ["nodeHOut"],
+    val: "Loss L → ∂L/∂h_t → 反向流过输出门",
+    body: `<span class="highlight">BPTT（通过时间反向传播）</span>从损失函数开始：<br><br>
+假设损失为 L（交叉熵等），梯度从 h_t 开始反传：<br>
+<div class="formula">dh_t = ∂L/∂h_t（来自损失或下一步的梯度）</div>
+梯度反传路径：<br>
+L → h_t → 输出门 × → tanh(C_t) → C_t → 加法节点 → 遗忘/输入门<br><br>
+<span class="green">关键</span>：C_t 到 C_{t-1} 的梯度几乎无损，这是核心！`
+  },
+  {
+    section: "SECTION 7 · 反向传播", title: "BPTT：输出门梯度",
+    highlight: ["gateO", "multO"],
+    val: "do_t = dh_t ⊙ tanh(C_t)  dtanh_C = dh_t ⊙ o_t",
+    body: `从 h_t = o_t ⊙ tanh(C_t) 反传：<br><br>
+<div class="formula">∂h_t/∂o_t = tanh(C_t)</div>
+<div class="formula">∂h_t/∂tanh(C_t) = o_t</div>
+所以：<br>
+<div class="formula">do_t = dh_t ⊙ tanh(C_t)</div>
+<div class="formula">dtanh_C = dh_t ⊙ o_t</div>
+然后 dtanh_C 经过 tanh 的导数继续反传到 C_t：<br>
+<div class="formula">dC_t += dtanh_C ⊙ (1 - tanh²(C_t))</div>`
+  },
+  {
+    section: "SECTION 7 · 反向传播", title: "BPTT：细胞状态梯度",
+    highlight: ["addNode", "cLine"],
+    val: "dC_t → dC_{t-1} = dC_t ⊙ f_t（几乎无损！）",
+    body: `细胞状态梯度反传是 LSTM 的核心优势：<br><br>
+从 C_t = f_t ⊙ C_{t-1} + i_t ⊙ g_t：<br>
+<div class="formula">∂C_t/∂C_{t-1} = f_t</div>
+所以：<br>
+<div class="formula">dC_{t-1} = dC_t ⊙ f_t</div>
+• f_t 通常接近 1（遗忘门偏向"记忆"）<br>
+• <span class="green">梯度乘以接近1的数 → 几乎不衰减！</span><br><br>
+<span class="highlight">这就是 LSTM 能训练"长期依赖"的数学根本原因。</span>`
+  },
+  {
+    section: "SECTION 7 · 反向传播", title: "BPTT：遗忘/输入门的梯度",
+    highlight: ["gateF", "gateI", "gateTanhC"],
+    val: "df_t = dC_t⊙C_{t-1}  di_t = dC_t⊙g_t  dg_t = dC_t⊙i_t",
+    body: `从 C_t = f_t ⊙ C_{t-1} + i_t ⊙ g_t 分别求导：<br><br>
+<div class="formula">df_t = dC_t ⊙ C_{t-1}</div>
+<div class="formula">di_t = dC_t ⊙ g_t</div>
+<div class="formula">dg_t = dC_t ⊙ i_t</div>
+然后这些梯度各自经过激活函数的导数：<br>
+• df_t 经过 σ'(z_f) = f_t(1-f_t)<br>
+• di_t 经过 σ'(z_i) = i_t(1-i_t)<br>
+• dg_t 经过 tanh'(z_g) = 1-g_t²`
+  },
+  {
+    section: "SECTION 7 · 反向传播", title: "BPTT：权重梯度",
+    highlight: ["gateF","gateI","gateTanhC","gateO"],
+    val: "dW_f = dz_f · [h_{t-1};x_t]^T（对所有t求和）",
+    body: `权重矩阵的梯度（以遗忘门为例）：<br><br>
+<div class="formula">dz_f = df_t ⊙ f_t ⊙ (1 - f_t)</div>
+<div class="formula">dW_f += dz_f · [h_{t-1}; x_t]^T</div>
+<div class="formula">db_f += dz_f</div>
+<div class="formula">d[h_{t-1}; x_t] += W_f^T · dz_f</div>
+<span class="green">注意"+="</span>：对序列中每个时间步 t，梯度都要<b>累加</b>到权重上，
+因为所有时间步<span class="highlight">共享同一套权重</span>！`
+  },
+  {
+    section: "SECTION 7 · 反向传播", title: "BPTT：梯度裁剪",
+    highlight: [],
+    val: "gradient clipping: if ||g||>threshold: g = g×threshold/||g||",
+    body: `即使 LSTM 缓解了梯度消失，<span class="highlight">梯度爆炸</span>依然可能发生。<br><br>
+<b>解决方案：梯度裁剪（Gradient Clipping）</b><br><br>
+<div class="formula">if ||g|| > threshold:
+    g = g × threshold / ||g||</div>
+• 阈值通常设为 1.0 或 5.0<br>
+• 保持梯度方向不变，只压缩幅度<br><br>
+<span class="green">PyTorch 实现</span>：<br>
+<div class="formula">torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)</div>`
+  },
+
+  // ──────────────── SECTION 8: PyTorch实现 (93-100) ────────────────
+  {
+    section: "SECTION 8 · 代码实现", title: "PyTorch：从零手写LSTM单元",
+    highlight: [],
+    val: "class LSTMCell: def forward(self, x, h_prev, c_prev): ...",
+    body: `<b>手写 LSTM 单元（理解原理用）</b>：<br><br>
+<div class="formula">class LSTMCell(nn.Module):
+  def __init__(self, input_size, hidden_size):
+    super().__init__()
+    # 4个门合并成一个大矩阵
+    self.W = nn.Linear(
+      input_size + hidden_size,
+      4 * hidden_size
+    )
+
+  def forward(self, x, h_prev, c_prev):
+    combined = torch.cat([h_prev, x], dim=1)
+    gates = self.W(combined)  # 4H
+    z_f,z_i,z_g,z_o = gates.chunk(4, dim=1)
+    f = torch.sigmoid(z_f)
+    i = torch.sigmoid(z_i)
+    g = torch.tanh(z_g)
+    o = torch.sigmoid(z_o)
+    c = f * c_prev + i * g
+    h = o * torch.tanh(c)
+    return h, c</div>`
+  },
+  {
+    section: "SECTION 8 · 代码实现", title: "PyTorch：内置 nn.LSTM",
+    highlight: [],
+    val: "nn.LSTM(input_size, hidden_size, num_layers, batch_first)",
+    body: `<b>实际使用PyTorch内置LSTM</b>：<br><br>
+<div class="formula">import torch
+import torch.nn as nn
+
+# 定义
+lstm = nn.LSTM(
+    input_size=128,   # x_t 维度
+    hidden_size=256,  # h_t, C_t 维度
+    num_layers=2,     # 堆叠2层LSTM
+    batch_first=True, # 输入形状: (batch,seq,feature)
+    dropout=0.1       # 层间dropout
+)
+
+# 前向传播
+x = torch.randn(32, 100, 128)  # (batch=32,seq=100,feat=128)
+h0 = torch.zeros(2, 32, 256)  # (num_layers, batch, hidden)
+c0 = torch.zeros(2, 32, 256)
+
+output, (hn, cn) = lstm(x, (h0, c0))
+# output: (32, 100, 256) 每步的h_t
+# hn: (2, 32, 256) 最后一步的h
+# cn: (2, 32, 256) 最后一步的C</div>`
+  },
+  {
+    section: "SECTION 8 · 代码实现", title: "完整的文本分类示例",
+    highlight: [],
+    val: "Embedding → LSTM → 取最后h_t → Linear → Softmax",
+    body: `<div class="formula">class TextClassifier(nn.Module):
+  def __init__(self, vocab_size, embed_dim,
+               hidden_size, num_classes):
+    super().__init__()
+    self.embed = nn.Embedding(vocab_size, embed_dim)
+    self.lstm = nn.LSTM(
+        embed_dim, hidden_size,
+        batch_first=True, bidirectional=True
+    )
+    self.fc = nn.Linear(hidden_size * 2, num_classes)
+
+  def forward(self, x):
+    # x: (batch, seq_len) 词ID序列
+    emb = self.embed(x)           # (batch, seq, embed)
+    out, (hn, _) = self.lstm(emb) # out:(batch,seq,2H)
+    # 取最后一步的双向隐状态拼接
+    last = torch.cat([hn[-2], hn[-1]], dim=1)
+    return self.fc(last)          # (batch, num_classes)</div>
+<span class="green">bidirectional=True</span>：双向LSTM，正向+反向各一套参数，
+hidden_size翻倍！`
+  },
+  {
+    section: "SECTION 8 · 代码实现", title: "数值验证：手动计算一步LSTM",
+    highlight: [],
+    val: "用具体数字验证公式，断点调试最佳方式",
+    body: `<div class="formula">import torch
+import torch.nn as nn
+
+torch.manual_seed(42)
+cell = nn.LSTMCell(3, 4)  # input=3, hidden=4
+
+# 模拟一步
+x  = torch.randn(1, 3)   # 1个样本，3维输入
+h0 = torch.zeros(1, 4)
+c0 = torch.zeros(1, 4)
+
+h1, c1 = cell(x, (h0, c0))
+print("h1:", h1)           # (1, 4)，在(-1,1)之间
+print("c1:", c1)           # (1, 4)，可能>1
+
+# 验证：手动计算
+W_ih = cell.weight_ih.data  # (16, 3) = 4*4 × 3
+W_hh = cell.weight_hh.data  # (16, 4)
+b_ih = cell.bias_ih.data
+b_hh = cell.bias_hh.data
+
+gates = W_ih @ x.T + W_hh @ h0.T + (b_ih+b_hh).unsqueeze(1)
+gates = gates.T  # (1, 16)
+f,i,g,o = gates.chunk(4, dim=1)
+c1_manual = torch.sigmoid(f)*c0 + torch.sigmoid(i)*torch.tanh(g)
+h1_manual = torch.sigmoid(o) * torch.tanh(c1_manual)
+print("手动h1:", h1_manual)  # 应与h1完全一致！</div>`
+  },
+
+  // ──────────────── SECTION 9: LSTM变体 (101-108) ────────────────
+  {
+    section: "SECTION 9 · LSTM变体", title: "GRU：LSTM的简化版",
+    highlight: [],
+    val: "GRU = 2个门（reset + update），无细胞状态C_t",
+    body: `<span class="green">GRU（Gated Recurrent Unit）</span> 由 Cho et al. 2014 提出：<br><br>
+<b>简化点</b>：<br>
+• 合并遗忘门+输入门 → <span class="highlight">更新门 z_t</span>（互补：z_t 和 1-z_t）<br>
+• 删除输出门<br>
+• 去掉细胞状态 C_t，只有 h_t<br>
+• 引入<span class="pink">重置门 r_t</span><br><br>
+<b>GRU 核心公式</b>：<br>
+<div class="formula">r_t = σ(W_r·[h_{t-1};x_t])  ← 重置门</div>
+<div class="formula">z_t = σ(W_z·[h_{t-1};x_t])  ← 更新门</div>
+<div class="formula">h̃_t = tanh(W·[r_t⊙h_{t-1};x_t])  ← 候选</div>
+<div class="formula">h_t = z_t⊙h_{t-1} + (1-z_t)⊙h̃_t</div>
+参数量约为 LSTM 的 75%，效果相近。`
+  },
+  {
+    section: "SECTION 9 · LSTM变体", title: "双向LSTM（BiLSTM）",
+    highlight: [],
+    val: "BiLSTM = 正向LSTM + 反向LSTM，拼接输出",
+    body: `<span class="green">双向LSTM（Bidirectional LSTM）</span>：<br><br>
+普通 LSTM 只能看<b>过去</b>的上下文，BiLSTM 同时利用<b>前后</b>上下文：<br><br>
+• <span class="highlight">正向 LSTM</span>：从左到右，h→_t<br>
+• <span class="pink">反向 LSTM</span>：从右到左，h←_t<br>
+• 输出：[h→_t; h←_t] 拼接，维度 2H<br><br>
+适用场景：NER、关系抽取等<b>需要全句上下文</b>的任务<br><br>
+<b>不适用</b>：语言模型（生成任务，不能看未来！）<br><br>
+PyTorch：<span class="formula">nn.LSTM(..., bidirectional=True)</span>`
+  },
+  {
+    section: "SECTION 9 · LSTM变体", title: "堆叠LSTM（Stacked LSTM）",
+    highlight: [],
+    val: "多层LSTM：第l层的h_t作为第l+1层的x_t",
+    body: `<span class="green">多层堆叠 LSTM</span>（Stacked LSTM）：<br><br>
+第 l 层的 h_t 输出，作为第 l+1 层的 x_t 输入：<br><br>
+• 第1层：从原始输入提取低级时序特征<br>
+• 第2层：在第1层特征上提取更抽象的时序模式<br>
+• ...<br><br>
+<span class="highlight">通常2~4层效果最好</span>，过深会导致梯度问题。<br><br>
+一般在层间加 Dropout（`nn.LSTM(dropout=0.3)`）防止过拟合。<br><br>
+著名应用：Google 翻译（2016）使用 <b>8层 LSTM</b>！`
+  },
+  {
+    section: "SECTION 9 · LSTM变体", title: "Peephole LSTM",
+    highlight: [],
+    val: "门额外输入C_{t-1}（而不只是h_{t-1}）",
+    body: `<span class="green">Peephole LSTM</span>（Gers & Schmidhuber 2000）：<br><br>
+普通 LSTM：门输入 = [h_{t-1}; x_t]<br>
+Peephole：门额外"窥视"细胞状态 C_{t-1}：<br><br>
+<div class="formula">f_t = σ(W_f·[C_{t-1}; h_{t-1}; x_t] + b_f)</div>
+<div class="formula">i_t = σ(W_i·[C_{t-1}; h_{t-1}; x_t] + b_i)</div>
+<div class="formula">o_t = σ(W_o·[C_t; h_{t-1}; x_t] + b_o)</div>
+<span class="highlight">优点</span>：门可以直接感知细胞状态的精确值，
+在需要精确计时的任务（如节奏识别）上效果更好。<br><br>
+现代实践中较少用，Transformer 基本取代了这类改进。`
+  },
+  {
+    section: "SECTION 9 · LSTM变体", title: "Attention + LSTM",
+    highlight: [],
+    val: "注意力：对所有h_t加权求和，聚焦关键时间步",
+    body: `<span class="green">注意力机制（Attention）+ LSTM</span>：<br><br>
+传统 LSTM 只用最后一步的 h_T 做预测，丢失了中间步骤信息。<br><br>
+<b>Bahdanau Attention（2014）</b>：<br>
+<div class="formula">e_t = v^T · tanh(W_a · h_t + W_b · s)</div>
+<div class="formula">α_t = softmax(e_t)（注意力权重）</div>
+<div class="formula">context = Σ α_t · h_t（加权求和）</div>
+• s 是解码器当前状态<br>
+• h_t 是编码器各步的隐状态<br><br>
+<span class="highlight">这直接催生了 Transformer！</span> 当整个网络都是注意力时，
+就不需要 LSTM 了。`
+  },
+  {
+    section: "SECTION 9 · LSTM变体", title: "LSTM vs Transformer",
+    highlight: [],
+    val: "LSTM: O(1)并行，O(T)推理；Transformer: O(T²)，O(1)串行",
+    body: `<b>LSTM 与 Transformer 对比</b>：<br><br>
+| 维度 | LSTM | Transformer |<br>
+|------|------|-------------|<br>
+| 训练并行 | 难并行（依赖序列） | 完全并行 |<br>
+| 推理速度 | O(1)/步（快） | O(T²)注意力 |<br>
+| 长依赖建模 | 受限（梯度衰减） | 直接（任意距离） |<br>
+| 参数效率 | 较高 | 需要大量数据 |<br>
+| 内存占用 | O(T) | O(T²)（KV缓存）|<br><br>
+<span class="green">当前趋势</span>：长序列语言模型用 Transformer，
+实时推理/边缘设备/时序预测仍大量使用 LSTM。`
+  },
+  {
+    section: "SECTION 9 · LSTM变体", title: "LSTM常见问题与调参技巧",
+    highlight: [],
+    val: "hidden_size, num_layers, dropout, 学习率, 梯度裁剪",
+    body: `<b>LSTM 调参核实清单</b>：<br><br>
+<span class="highlight">① 隐藏层大小 hidden_size</span>：128~512（任务越复杂越大）<br>
+<span class="green">② 层数 num_layers</span>：2~4层，超过4基本不增益<br>
+<span class="pink">③ Dropout</span>：0.2~0.5（层间、输入层都要加）<br>
+<span class="orange">④ 学习率</span>：1e-3 (Adam) 或 0.1 (SGD+clip)<br>
+<span class="highlight">⑤ 梯度裁剪</span>：max_norm=1.0（必须！）<br>
+⑥ b_f 初始化为1（遗忘门偏置）<br>
+⑦ 序列长度超200：考虑截断BPTT（每N步截断梯度）<br><br>
+<span class="green">一定要用梯度裁剪！没有它，LSTM训练极不稳定。</span>`
+  },
+  {
+    section: "SECTION 9 · LSTM变体", title: "🎉 恭喜！108步学完LSTM",
+    highlight: ["gateF","gateI","gateTanhC","gateO","addNode","tanhOut","multO","multF","multI","nodeX","nodeHPrev","nodeHOut","cLine"],
+    val: "C_t = f_t⊙C_{t-1} + i_t⊙g_t  |  h_t = o_t⊙tanh(C_t)",
+    body: `<b>🎉 你已经完整地学完了 LSTM！</b><br><br>
+<b>核心6公式（再默背一遍）</b>：<br>
+<div class="formula">f_t = σ(W_f·[h_{t-1};x_t] + b_f)  ← 遗忘</div>
+<div class="formula">i_t = σ(W_i·[h_{t-1};x_t] + b_i)  ← 输入</div>
+<div class="formula">g_t = tanh(W_g·[h_{t-1};x_t] + b_g) ← 候选</div>
+<div class="formula">o_t = σ(W_o·[h_{t-1};x_t] + b_o)  ← 输出</div>
+<div class="formula">C_t = f_t⊙C_{t-1} + i_t⊙g_t        ← 更新C</div>
+<div class="formula">h_t = o_t⊙tanh(C_t)                ← 输出h</div>
+<span class="green">下一步</span>：用 PyTorch 写一个情感分析项目，把今天学的全部用上！`
+  },
+];
+
+// ===================================================
+// 高亮映射
+// ===================================================
+const HIGHLIGHT_COLORS = {
+  "gateF": "#fcd34d",
+  "gateI": "#f9a8d4",
+  "gateTanhC": "#a78bfa",
+  "gateO": "#fdba74",
+  "multF": "#f9a8d4",
+  "multI": "#f9a8d4",
+  "multO": "#f9a8d4",
+  "addNode": "#6ee7b7",
+  "tanhOut": "#a78bfa",
+  "cLine": "#6ee7b7",
+  "nodeX": "#4a9eff",
+  "nodeHPrev": "#c4b5fd",
+  "nodeHOut": "#c4b5fd",
+  "concatBox": "#4a9eff",
+};
+
+// ===================================================
+// 渲染逻辑
+// ===================================================
+let current = 0;
+const total = steps.length;
+
+function buildDots() {
+  const container = document.getElementById('sectionDots');
+  // 每10步一个点
+  const count = Math.ceil(total / 5);
+  for (let i = 0; i < count; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    d.onclick = () => { current = i * 5; render(); };
+    container.appendChild(d);
+  }
+}
+
+function updateDots() {
+  const dots = document.querySelectorAll('.dot');
+  dots.forEach((d, i) => {
+    d.classList.remove('active', 'done');
+    const stepIdx = i * 5;
+    if (stepIdx === Math.floor(current / 5) * 5) d.classList.add('active');
+    else if (stepIdx < current) d.classList.add('done');
+  });
+}
+
+function applyHighlights(ids) {
+  // 清除所有高亮
+  Object.keys(HIGHLIGHT_COLORS).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.style.filter = '';
+      el.style.opacity = '0.7';
+    }
+  });
+  // 如果没有指定高亮，全部设为正常
+  if (!ids || ids.length === 0) {
+    Object.keys(HIGHLIGHT_COLORS).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.opacity = '1';
+    });
+    return;
+  }
+  // 高亮指定元素
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      const color = HIGHLIGHT_COLORS[id] || '#4a9eff';
+      el.style.filter = `drop-shadow(0 0 10px ${color})`;
+      el.style.opacity = '1';
+    }
+  });
+}
+
+function render() {
+  const s = steps[current];
+  document.getElementById('stepCounter').textContent = `步骤 ${current + 1} / ${total}`;
+  document.getElementById('progressBar').style.width = `${((current + 1) / total) * 100}%`;
+  document.getElementById('stepTag').textContent = s.section;
+  document.getElementById('stepTitle').textContent = s.title;
+  document.getElementById('stepBody').innerHTML = s.body;
+  document.getElementById('valText').textContent = s.val;
+  document.getElementById('prevBtn').disabled = current === 0;
+  document.getElementById('nextBtn').disabled = current === total - 1;
+  document.getElementById('nextBtn').textContent = current === total - 1 ? '完成 ✓' : '下一步 →';
+  applyHighlights(s.highlight);
+  updateDots();
+  // 滚动右侧面板到顶部
+  document.querySelector('.explain-panel').scrollTop = 0;
+}
+
+function navigate(dir) {
+  const newIdx = current + dir;
+  if (newIdx < 0 || newIdx >= total) return;
+  current = newIdx;
+  render();
+}
+
+// 键盘导航
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+    e.preventDefault(); navigate(1);
+  }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault(); navigate(-1);
+  }
+});
+
+// 初始化
+buildDots();
+render();
+</script>
+</body>
+</html>

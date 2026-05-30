@@ -321,3 +321,108 @@ embedding(x)  # OK
 - PyTorch 官方文档：`torch.nn.RNN`
 - Stanford CS224N: Natural Language Processing with Deep Learning
 - 《动手学深度学习》第 9 章：循环神经网络
+
+---
+
+## 🔧 手动实现 RNN 的代码理解
+
+> 从 `nn.Linear` 拆出权重矩阵，手动 matmul 实现 RNN 循环，理解每一步在做什么。
+
+### 核心思路
+
+RNN 公式：`H_t = tanh(U · X_t + W · H_{t-1})`
+
+用代码拆解就是：
+
+1. `input_linear = nn.Linear(e, 2*e)` → 这就是 U 矩阵，把输入从 e 维映射到 2e 维
+2. `hidden_linear = nn.Linear(2*e, 2*e)` → 这就是 W 矩阵，把隐状态从 2e 维映射到 2e 维
+3. `input_weight.T` → nn.Linear 的 weight 形状是 (out, in)，转置后才能做 X @ W.T
+
+### 关键理解点
+
+**1. 为什么用 nn.Linear 初始化而不是手动创建张量？**
+
+nn.Linear 会用 Kaiming uniform 策略初始化权重，比手动 torch.randn 更合理。拆出 weight 和 bias 是为了手动做 matmul，展示公式的对应关系。
+
+**2. embedding 之后的第一件事就是跟 U 做线性变换**
+
+每个时间步拿到 token 的 embedding `X_t` 后，第一件事就是 `U · X_t`，把输入从 embedding 维度映射到隐状态维度。U 的作用就是对齐维度 + 提取输入特征。
+
+**3. h_prev 为什么是 [bs, 2e]？**
+
+因为 h_prev 要和 x_trans 相加，而 x_trans 的形状是 [bs, 2e]。相加要求形状完全一致，所以 h_prev 也必须是 [bs, 2e]：
+- bs：每个样本独立算，需要 batch 维
+- 2e：隐状态维度，由 input_linear 的输出维度决定
+
+**4. for 循环之前必须初始化 h_prev**
+
+RNN 的隐状态是"记忆"，循环开始前记忆是空的，所以初始化为全零向量：`h_prev = torch.zeros(bs, 2*e, dtype=dtype)`
+
+**5. torch.cat(dim=1) 拼接所有时间步**
+
+每次循环 append 一个 [bs, 1, 2e] 的张量，循环结束后用 torch.cat 沿 dim=1（时间步维度）拼接成 [bs, seq_len, 2e]，就像把 5 块砖沿横向排成一排。
+
+**6. 激活函数用 torch.tanh() 而不是 nn.Tanh**
+
+`nn.Tanh` 是一个类，需要先实例化再调用。`torch.tanh()` 是函数，直接用。
+
+### 三矩阵角色对比
+
+| 矩阵 | 作用 | 代码对应 | 维度 |
+|------|------|---------|------|
+| U | 处理当前输入 X_t | input_weight | (2e, e) |
+| W | 处理上一时刻隐状态 H_{t-1} | hidden_weight | (2e, 2e) |
+| b | 偏移量 | input_bias / hidden_bias | (2e,) |
+
+U 管"现在看到了什么"，W 管"之前记住了什么"，两者加起来再过 tanh，就是 RNN 的核心：融合当前输入与历史记忆。
+
+### 完整代码
+
+```python
+import torch
+import torch.nn as nn
+
+def rnn():
+    bs, seq_len, e = 1, 5, 128
+    dtype = torch.float32
+
+    # U 矩阵：输入权重，把 X_t 从 e 维映射到 2e 维
+    input_linear = nn.Linear(e, 2 * e, dtype=dtype)
+    # W 矩阵：隐状态权重，把 H_{t-1} 从 2e 维映射到 2e 维
+    hidden_linear = nn.Linear(2 * e, 2 * e, dtype=dtype)
+
+    token_embeddings = torch.randn(bs, seq_len, e, dtype=dtype)  # [bs, t, e]
+    token_new_embeddings = []
+
+    input_w, input_b = input_linear.weight.T, input_linear.bias
+    hidden_w, hidden_b = hidden_linear.weight.T, hidden_linear.bias
+
+    # 隐状态初始化为零向量，还没有任何记忆
+    h_prev = torch.zeros(bs, 2 * e, dtype=dtype)  # [bs, 2e]
+
+    for t_index in range(seq_len):
+        # 1. 拿到当前时刻的输入
+        x_t = token_embeddings[:, t_index, :]              # [bs, e]
+
+        # 2. U · X_t + b_u：对当前输入做线性变换
+        x_trans = torch.matmul(x_t, input_w) + input_b     # [bs, 2e]
+
+        # 3. W · H_{t-1} + b_w：对上一时刻隐状态做线性变换
+        h_trans = torch.matmul(h_prev, hidden_w) + hidden_b  # [bs, 2e]
+
+        # 4. H_t = tanh(U·X_t + W·H_{t-1})：融合当前输入与历史记忆
+        h_t = torch.tanh(x_trans + h_trans)                # [bs, 2e]
+
+        # 5. 当前隐状态变成下一时刻的"上一时刻隐状态"
+        h_prev = h_t
+
+        # 6. 收集每个时刻的输出
+        token_new_embeddings.append(h_t[:, None])          # [bs, 1, 2e]
+
+    # 沿时间步维度拼接
+    output = torch.cat(token_new_embeddings, dim=1)        # [bs, seq_len, 2e]
+    print(f"RNN输出形状: {output.shape}")
+
+if __name__ == '__main__':
+    rnn()
+```
