@@ -7,10 +7,10 @@ read -p "输入选项 (1/2): " choice
 
 export http_proxy=http://127.0.0.1:7897
 export https_proxy=http://127.0.0.1:7897
-export OPENAI_API_KEY=sk-e2d1033bcd440b2bd7d2932310f6cacd58255fd385e3b1497aad5f6585b5e039
-export OPENAI_BASE_URL=http://localhost:9090/v1
-export ANTHROPIC_AUTH_TOKEN=sk-e2d1033bcd440b2bd7d2932310f6cacd58255fd385e3b1497aad5f6585b5e039
-export ANTHROPIC_BASE_URL=http://localhost:9090
+export OPENAI_API_KEY=sk-0c82e598f89a09a71970ff6312449e9290bf205847df93f807d7a28f2f5783e1
+export OPENAI_BASE_URL=http://49.12.223.172:9090/v1
+export ANTHROPIC_AUTH_TOKEN=sk-0c82e598f89a09a71970ff6312449e9290bf205847df93f807d7a28f2f5783e1
+export ANTHROPIC_BASE_URL=http://49.12.223.172:9090
 
 case $choice in
   1)
