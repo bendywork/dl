@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSTM 前向传播完整链路</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── 顶部标题区 ── */
+  #header {
+    width: 100%;
+    max-width: 1400px;
+    padding: 20px 30px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  #header h1 {
+    font-size: 22px;
+    color: #4fc3f7;
+    letter-spacing: 2px;
+  }
+  #timestep-indicator {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .ts-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid #30363d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #8b949e;
+    transition: all 0.4s;
+  }
+  .ts-dot.active {
+    border-color: #4fc3f7;
+    background: rgba(79,195,247,0.15);
+    color: #4fc3f7;
+    box-shadow: 0 0 12px rgba(79,195,247,0.4);
+  }
+  .ts-dot.done {
+    border-color: #69f0ae;
+    background: rgba(105,240,174,0.15);
+    color: #69f0ae;
+  }
+  #phase-label {
+    font-size: 14px;
+    color: #ffb74d;
+    min-width: 200px;
+    text-align: right;
+    letter-spacing: 1px;
+  }
+
+  /* ── 主画布 ── */
+  #main-canvas-wrap {
+    width: 100%;
+    max-width: 1400px;
+    padding: 0 20px;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid #21262d;
+    background: #0d1117;
+  }
+
+  /* ── 控制区 ── */
+  #controls {
+    width: 100%;
+    max-width: 1400px;
+    padding: 16px 30px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: #161b22;
+    border: 1px solid #30363d;
+    color: #e6edf3;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+  button:hover { border-color: #4fc3f7; color: #4fc3f7; }
+  button.active { border-color: #69f0ae; color: #69f0ae; }
+
+  .speed-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #8b949e;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 120px;
+    height: 4px;
+    background: #30363d;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #4fc3f7;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  #legend {
+    display: flex;
+    gap: 20px;
+    padding: 0 30px 16px;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 1400px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #8b949e;
+  }
+  .legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>⚡ LSTM 前向传播完整链路</h1>
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div id="timestep-indicator"></div>
+    <div id="phase-label">初始化中...</div>
+  </div>
+</div>
+
+<div id="main-canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="controls">
+  <button id="btn-play">⏸ 暂停</button>
+  <button id="btn-prev">◀ 上一步</button>
+  <button id="btn-next">下一步 ▶</button>
+  <button id="btn-reset">↺ 重置</button>
+  <div class="speed-wrap">
+    <span>速度：</span>
+    <input type="range" id="speed" min="0.3" max="2.0" step="0.1" value="1.0">
+    <span id="speed-label">1.0x</span>
+  </div>
+</div>
+
+<div id="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#4fc3f7"></div>遗忘门 f</div>
+  <div class="legend-item"><div class="legend-color" style="background:#69f0ae"></div>输入门 i</div>
+  <div class="legend-item"><div class="legend-color" style="background:#ffb74d"></div>候选记忆 C̃</div>
+  <div class="legend-item"><div class="legend-color" style="background:#ce93d8"></div>输出门 o</div>
+  <div class="legend-item"><div class="legend-color" style="background:#ef9a9a"></div>Cell State c</div>
+  <div class="legend-item"><div class="legend-color" style="background:#80cbc4"></div>隐藏状态 h</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  固定随机数 (seed=42 模拟)
+// ═══════════════════════════════════════════════
+function seededRand(seed) {
+  let s = seed;
+  return () => {
+    s = (s * 9301 + 49297) % 233280;
+    return (s / 233280) * 2 - 1;   // [-1, 1]
+  };
+}
+const rand = seededRand(42);
+function R(n, m) {
+  const arr = [];
+  for (let i = 0; i < n * m; i++) arr.push(rand() * 0.5);
+  return arr; // flat n×m matrix
+}
+function matVec(A, n, m, x) {
+  // A is n×m, x is m-vector, returns n-vector
+  const out = new Array(n).fill(0);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < m; j++)
+      out[i] += A[i*m+j] * x[j];
+  return out;
+}
+function vecAdd(a, b) { return a.map((v,i) => v + b[i]); }
+function sigmoid(x) { return x.map(v => 1/(1+Math.exp(-v))); }
+function tanh_(x) { return x.map(v => Math.tanh(v)); }
+function vecMul(a, b) { return a.map((v,i) => v*b[i]); }
+function vecScale(a, s) { return a.map(v => v*s); }
+
+// 维度
+const E = 4, V = 3, T = 5;
+
+// 权重
+const U_f = R(V,E), W_f = R(V,V);
+const U_i = R(V,E), W_i = R(V,V);
+const U_c = R(V,E), W_c = R(V,V);
+const U_o = R(V,E), W_o = R(V,V);
+
+// 输入序列（固定）
+const token_embs = [];
+const rand2 = seededRand(99);
+for (let t=0; t<T; t++) {
+  const row = [];
+  for (let e=0; e<E; e++) row.push(rand2()*0.8);
+  token_embs.push(row);
+}
+
+// 预计算所有时间步
+const steps = [];
+let ht = new Array(V).fill(0), ct = new Array(V).fill(0);
+for (let t=0; t<T; t++) {
+  const xt = token_embs[t];
+  const ft = sigmoid(vecAdd(matVec(U_f,V,E,xt), matVec(W_f,V,V,ht)));
+  const it = sigmoid(vecAdd(matVec(U_i,V,E,xt), matVec(W_i,V,V,ht)));
+  const cur_ct = tanh_(vecAdd(matVec(U_c,V,E,xt), matVec(W_c,V,V,ht)));
+  const ot = sigmoid(vecAdd(matVec(U_o,V,E,xt), matVec(W_o,V,V,ht)));
+  const new_ct = vecAdd(vecMul(ct, ft), vecMul(cur_ct, it));
+  const new_ht = vecMul(ot, tanh_(new_ct));
+  steps.push({
+    t, xt: [...xt], ht_prev: [...ht], ct_prev: [...ct],
+    ft, it, cur_ct, ot, new_ct, new_ht
+  });
+  ht = [...new_ht];
+  ct = [...new_ct];
+}
+
+// ═══════════════════════════════════════════════
+//  Canvas 设置
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W_CANVAS = 1360, H_CANVAS = 680;
+canvas.width = W_CANVAS;
+canvas.height = H_CANVAS;
+
+// ── 颜色常量
+const C = {
+  bg:      '#0d1117',
+  panel:   '#161b22',
+  border:  '#30363d',
+  text:    '#e6edf3',
+  dim:     '#8b949e',
+  blue:    '#4fc3f7',
+  green:   '#69f0ae',
+  orange:  '#ffb74d',
+  purple:  '#ce93d8',
+  red:     '#ef9a9a',
+  teal:    '#80cbc4',
+  yellow:  '#fff176',
+};
+
+// ── 状态机
+let curT = 0;          // 当前时间步 0..T-1
+let curPhase = 0;      // 0..5
+let phaseProgress = 0; // 0..1，只用于入场动画，到1后锁住不推进
+let phaseLoopTime = 0; // 阶段内持续循环的绝对时间（毫秒）
+let playing = true;
+let speedMul = 1.0;
+let lastTime = null;
+
+// 每个 phase 的入场动画时长（毫秒），到1后停在当前阶段等手动点击
+const PHASE_DUR = [1600, 2800, 2400, 2200, 1800, 1600];
+const PHASE_NAMES = [
+  '阶段1：输入准备',
+  '阶段2：四门并行计算',
+  '阶段3：长期记忆更新',
+  '阶段4：输出计算',
+  '阶段5：状态传递',
+  '阶段6：本步汇总',
+];
+
+// ── 粒子系统
+class Particle {
+  constructor(x,y,tx,ty,color,size=3) {
+    this.x=x; this.y=y; this.tx=tx; this.ty=ty;
+    this.color=color; this.size=size;
+    this.progress=0; this.speed=0.018+Math.random()*0.012;
+  }
+  update() { this.progress = Math.min(1, this.progress + this.speed * speedMul); }
+  draw(ctx) {
+    if (this.progress >= 1) return;
+    const t = easeInOut(this.progress);
+    const x = this.x + (this.tx - this.x)*t;
+    const y = this.y + (this.ty - this.y)*t;
+    ctx.beginPath();
+    ctx.arc(x, y, this.size, 0, Math.PI*2);
+    ctx.fillStyle = this.color;
+    ctx.globalAlpha = 1 - this.progress * 0.4;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  done() { return this.progress >= 1; }
+}
+let particles = [];
+
+function easeInOut(t) {
+  return t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+}
+
+// ═══════════════════════════════════════════════
+//  绘制工具函数
+// ═══════════════════════════════════════════════
+function roundRect(ctx, x, y, w, h, r, fill, stroke, alpha=1) {
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.5; ctx.stroke(); }
+  ctx.globalAlpha = 1;
+}
+
+function text(ctx, s, x, y, color, size=12, align='center', alpha=1) {
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.font = `${size}px 'Courier New', monospace`;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(s, x, y);
+  ctx.globalAlpha = 1;
+}
+
+function arrow(ctx, x1,y1,x2,y2,color,alpha=1,w=1.5) {
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = w;
+  ctx.beginPath();
+  ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+  ctx.stroke();
+  // arrowhead
+  const angle = Math.atan2(y2-y1,x2-x1);
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-8*Math.cos(angle-0.4), y2-8*Math.sin(angle-0.4));
+  ctx.lineTo(x2-8*Math.cos(angle+0.4), y2-8*Math.sin(angle+0.4));
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawVector(ctx, vec, x, y, label, color, blockW=22, blockH=18, alpha=1) {
+  // label above
+  text(ctx, label, x + (vec.length*blockW)/2, y-10, color, 11, 'center', alpha);
+  for (let i=0;i<vec.length;i++) {
+    const v = vec[i];
+    const intensity = Math.min(1, Math.abs(v) * 1.5);
+    const col = hexAlpha(color, 0.2 + intensity*0.7);
+    roundRect(ctx, x+i*blockW, y, blockW-2, blockH, 3, col, color, alpha);
+    text(ctx, v.toFixed(2), x+i*blockW+blockW/2-1, y+blockH/2, '#fff', 8, 'center', alpha);
+  }
+}
+
+function hexAlpha(hex, alpha) {
+  // convert #rrggbb to rgba
+  const r=parseInt(hex.slice(1,3),16);
+  const g=parseInt(hex.slice(3,5),16);
+  const b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function activationNode(ctx, x, y, label, color, glowAlpha=0, alpha=1) {
+  const r = 22;
+  if (glowAlpha>0) {
+    ctx.globalAlpha = glowAlpha * alpha;
+    ctx.beginPath();
+    ctx.arc(x,y,r+8,0,Math.PI*2);
+    ctx.fillStyle = hexAlpha(color, 0.25);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle = hexAlpha(color, 0.2);
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  text(ctx, label, x, y, color, 11, 'center', alpha);
+}
+
+function addNode(ctx, x, y, color, alpha=1) {
+  const r = 16;
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle = hexAlpha(color, 0.15);
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  text(ctx, '+', x, y, color, 18, 'center', alpha);
+}
+
+function mulNode(ctx, x, y, color, alpha=1) {
+  const r = 16;
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle = hexAlpha(color, 0.15);
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  text(ctx, '×', x, y, color, 18, 'center', alpha);
+}
+
+// ═══════════════════════════════════════════════
+//  生成粒子沿路径
+// ═══════════════════════════════════════════════
+function spawnParticles(x1,y1,x2,y2,color,n=6) {
+  for (let k=0;k<n;k++) {
+    const ox = (Math.random()-0.5)*4;
+    const oy = (Math.random()-0.5)*4;
+    particles.push(new Particle(x1+ox,y1+oy,x2+ox,y2+oy,color,3+Math.random()*2));
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  主绘制函数
+// ═══════════════════════════════════════════════
+function draw(dt) {
+  const step = steps[curT];
+  const p = phaseProgress; // 0..1
+  ctx.clearRect(0,0,W_CANVAS,H_CANVAS);
+
+  // background gradient
+  const grd = ctx.createLinearGradient(0,0,0,H_CANVAS);
+  grd.addColorStop(0,'#0d1117');
+  grd.addColorStop(1,'#0a0e14');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0,0,W_CANVAS,H_CANVAS);
+
+  // grid lines subtle
+  ctx.strokeStyle = '#161b22';
+  ctx.lineWidth = 1;
+  for (let x=0;x<W_CANVAS;x+=60) {
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H_CANVAS); ctx.stroke();
+  }
+  for (let y=0;y<H_CANVAS;y+=60) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W_CANVAS,y); ctx.stroke();
+  }
+
+  // dispatch to phase-specific draw
+  switch(curPhase) {
+    case 0: drawPhase0(step, p, dt); break;
+    case 1: drawPhase1(step, p, dt); break;
+    case 2: drawPhase2(step, p, dt); break;
+    case 3: drawPhase3(step, p, dt); break;
+    case 4: drawPhase4(step, p, dt); break;
+    case 5: drawPhase5(step, p, dt); break;
+  }
+
+  // draw particles
+  particles = particles.filter(pt => !pt.done());
+  particles.forEach(pt => { pt.update(); pt.draw(ctx); });
+
+  // 入场完成后常驻提示，呼吸闪烁
+  if (phaseProgress >= 1.0) {
+    const breathe = 0.5 + 0.5 * Math.sin(Date.now() * 0.003);
+    text(ctx, '▶  点击「下一步」继续', W_CANVAS / 2, H_CANVAS - 22,
+         C.dim, 13, 'center', 0.4 + 0.4 * breathe);
+  }
+}
+
+// ─── Phase 0: 输入准备 ───────────────────────────
+function drawPhase0(step, p, dt) {
+  const slideX = easeInOut(Math.min(1, p*2));
+  const slideX2 = easeInOut(Math.max(0, (p-0.3)*2));
+
+  // Panel
+  roundRect(ctx, 200, 80, 960, 500, 12, '#161b22', '#21262d');
+
+  // title
+  text(ctx, '阶段 1 · 输入准备', W_CANVAS/2, 50, C.blue, 16);
+
+  // x_t 从左滑入
+  const xtX = 240 + (1-slideX)*(-300);
+  drawVector(ctx, step.xt, xtX, 220, `x_t  (t=${step.t})`, C.orange, 60, 40);
+
+  // h_{t-1} 从右滑入
+  const htX = 720 + (1-slideX2)*(300);
+  drawVector(ctx, step.ht_prev, htX, 220, `h_{t-1}`, C.teal, 60, 40);
+
+  // c_{t-1} from right too
+  const ctX = 720 + (1-slideX2)*(300);
+  drawVector(ctx, step.ct_prev, ctX, 330, `c_{t-1}`, C.red, 60, 40);
+
+  // Labels
+  if (p > 0.5) {
+    text(ctx, `当前输入向量 x_t  (维度 E=${E})`, 270+120, 320, C.dim, 12, 'center', easeInOut((p-0.5)*2));
+    text(ctx, `上一步隐藏状态 h_{t-1}  (维度 V=${V})`, 750+90, 180, C.dim, 12, 'center', easeInOut((p-0.5)*2));
+    text(ctx, `上一步细胞状态 c_{t-1}  (维度 V=${V})`, 750+90, 290, C.dim, 12, 'center', easeInOut((p-0.5)*2));
+  }
+
+  // formula reminder
+  text(ctx, 'xt = token_embs[:, t, :]', W_CANVAS/2, H_CANVAS-60, C.dim, 13);
+
+  // 持续粒子流：x_t 飞向中心
+  if (slideX > 0.8 && Math.random() < 0.05) {
+    spawnParticles(xtX + 120, 240, W_CANVAS / 2, 300, C.orange, 3);
+    spawnParticles(htX + 60, 240, W_CANVAS / 2, 300, C.teal, 3);
+  }
+}
+
+// ─── Phase 1: 四个门并行计算 ─────────────────────
+const GATE_COLORS = [C.blue, C.green, C.orange, C.purple];
+const GATE_NAMES  = ['遗忘门 f', '输入门 i', '候选 C̃', '输出门 o'];
+const GATE_ACT    = ['σ', 'σ', 'tanh', 'σ'];
+const GATE_KEYS   = ['ft','it','cur_ct','ot'];
+const GATE_FORMULAS = [
+  'ft = σ(xt·Uf + ht·Wf)',
+  'it = σ(xt·Ui + ht·Wi)',
+  'c̃t = tanh(xt·Uc + ht·Wc)',
+  'ot = σ(xt·Uo + ht·Wo)',
+];
+
+function drawPhase1(step, p, dt) {
+  text(ctx, '阶段 2 · 四门并行计算', W_CANVAS/2, 50, C.blue, 16);
+
+  const laneH = 128;
+  const laneY = (i) => 80 + i * laneH;
+  const gateColor = (i) => GATE_COLORS[i];
+
+  // x_t 和 h_{t-1} 始终显示在两侧
+  // xt 固定左侧
+  drawVector(ctx, step.xt, 40, H_CANVAS/2-20, 'x_t', C.orange, 30, 26);
+  // ht_prev 固定右边偏左
+  drawVector(ctx, step.ht_prev, W_CANVAS-160, H_CANVAS/2-20, 'h_{t-1}', C.teal, 30, 26);
+
+  for (let i=0; i<4; i++) {
+    const yc = laneY(i) + laneH/2;
+    const color = gateColor(i);
+
+    // lane progress: staggered
+    const laneP = Math.min(1, Math.max(0, (p*4 - i*0.6)));
+    const laneAlpha = Math.min(1, laneP*3);
+
+    // Background lane
+    roundRect(ctx, 160, laneY(i)+4, W_CANVAS-320, laneH-8, 8,
+              hexAlpha(color, 0.04), hexAlpha(color, 0.2), laneAlpha*0.6);
+
+    // Gate name
+    text(ctx, GATE_NAMES[i], 170, yc, color, 12, 'left', laneAlpha);
+
+    // x_t → Matmul(U) node
+    const ux = 320, uy = yc;
+    const addX = 560, addY = yc;
+    const actX = 720, actY = yc;
+    const outX = 880, outY = yc;
+
+    // Arrow: xt → U_box
+    arrow(ctx, 165, yc, ux-28, yc, color, laneAlpha*Math.min(1,laneP*3));
+
+    // U box
+    const upBx = Math.min(1, laneP*4);
+    roundRect(ctx, ux-26, uy-16, 52, 32, 4,
+              hexAlpha(color,0.15), color, laneAlpha*upBx);
+    text(ctx, 'U×x', ux, uy, color, 10, 'center', laneAlpha*upBx);
+
+    // h_{t-1} → W box
+    const whBx = Math.min(1, Math.max(0,(laneP-0.15)*4));
+    arrow(ctx, W_CANVAS-155, yc, actX+60, yc, color, laneAlpha*whBx);
+    roundRect(ctx, actX+62, uy-16, 52, 32, 4,
+              hexAlpha(color,0.15), color, laneAlpha*whBx);
+    text(ctx, 'W×h', actX+88, uy, color, 10, 'center', laneAlpha*whBx);
+
+    // + node
+    const addBx = Math.min(1, Math.max(0,(laneP-0.3)*4));
+    arrow(ctx, ux+26, yc, addX-16, yc, color, laneAlpha*addBx);
+    arrow(ctx, actX+62+26, yc, addX+16, yc, color, laneAlpha*addBx, Math.PI);
+    // actually draw + node slightly right of center
+    addNode(ctx, addX, addY, color, laneAlpha*addBx);
+
+    // Activation node
+    const actBx = Math.min(1, Math.max(0,(laneP-0.5)*4));
+    arrow(ctx, addX+16, yc, actX-22, yc, color, laneAlpha*actBx);
+    const glowing = actBx > 0.7 ? (Math.sin(Date.now()*0.006)*0.5+0.5)*actBx : 0;
+    activationNode(ctx, actX, actY, GATE_ACT[i], color, glowing, laneAlpha*actBx);
+
+    // Output value
+    const outBx = Math.min(1, Math.max(0,(laneP-0.7)*5));
+    arrow(ctx, actX+22, yc, outX-40, yc, color, laneAlpha*outBx);
+    const valArr = step[GATE_KEYS[i]];
+    drawVector(ctx, valArr, outX-20, yc-20, GATE_KEYS[i], color, 30, 22, laneAlpha*outBx);
+
+    // Formula
+    text(ctx, GATE_FORMULAS[i], 170, laneY(i)+laneH-16, C.dim, 10, 'left', laneAlpha*0.8);
+
+    // 入场后持续生成粒子（数据流动效果）
+    if (laneP > 0.2 && Math.random() < 0.04) {
+      spawnParticles(ux+26, yc, addX-16, yc, color, 4);
+    }
+  }
+}
+
+// ─── Phase 2: 长期记忆更新 ─────────────────────────
+function drawPhase2(step, p, dt) {
+  text(ctx, '阶段 3 · 长期记忆更新', W_CANVAS/2, 50, C.blue, 16);
+  text(ctx, 'ct = ct * ft + cur_ct * it', W_CANVAS/2, H_CANVAS-50, C.dim, 14);
+
+  const cy = 300;
+  const beltY = cy - 15;
+  const beltH = 30;
+
+  // Cell state "传送带"
+  const beltAlpha = Math.min(1, p*3);
+  // draw belt
+  roundRect(ctx, 100, beltY, W_CANVAS-200, beltH, 8,
+            hexAlpha(C.red, 0.1), C.red, beltAlpha*0.5);
+  text(ctx, '── Cell State 传送带 ──', W_CANVAS/2, cy, hexAlpha(C.red,0.5), 11, 'center', beltAlpha);
+
+  // c_{t-1} 在左
+  const ctLX = 130;
+  drawVector(ctx, step.ct_prev, ctLX, cy-80, 'c_{t-1}', C.red, 50, 35, Math.min(1, p*4));
+
+  // Forget gate × c_{t-1}
+  const fp1 = Math.min(1, Math.max(0, (p-0.1)*3));
+  const mulF_X = 360, mulF_Y = cy;
+  arrow(ctx, ctLX+150, cy-62, mulF_X-16, mulF_Y, C.red, fp1);
+  arrow(ctx, 240, cy+100, mulF_X, mulF_Y+16, C.blue, fp1);
+  mulNode(ctx, mulF_X, mulF_Y, C.blue, fp1);
+  if (p > 0.1) {
+    drawVector(ctx, step.ft, 170, cy+88, 'ft (遗忘门)', C.blue, 40, 28, fp1);
+  }
+
+  // Forget result: c * f (dimmed)
+  const forgetResult = vecMul(step.ct_prev, step.ft);
+  const fp2 = Math.min(1, Math.max(0, (p-0.3)*3));
+  const forgetX = 500;
+  drawVector(ctx, forgetResult, forgetX-60, cy-80, 'ct × ft', C.red, 40, 28,
+             fp2 * (0.4 + 0.2*Math.sin(Date.now()*0.003))); // flicker dim
+
+  // Input: cur_ct × it
+  const fp3 = Math.min(1, Math.max(0, (p-0.2)*3));
+  const mulI_X = 700, mulI_Y = cy;
+  drawVector(ctx, step.cur_ct, 570, cy+88, 'C̃_t', C.orange, 40, 28, fp3);
+  drawVector(ctx, step.it,     700, cy+88, 'it (输入门)', C.green, 40, 28, fp3);
+  arrow(ctx, 590, cy+88, mulI_X-16, mulI_Y+16, C.orange, fp3);
+  arrow(ctx, 720, cy+88, mulI_X+16, mulI_Y+16, C.green, fp3);
+  mulNode(ctx, mulI_X, mulI_Y, C.green, fp3);
+
+  const inputResult = vecMul(step.cur_ct, step.it);
+  const fp4 = Math.min(1, Math.max(0, (p-0.4)*3));
+  drawVector(ctx, inputResult, mulI_X-60, cy-80, 'C̃t × it', C.green, 40, 28, fp4);
+
+  // + merge
+  const fp5 = Math.min(1, Math.max(0, (p-0.55)*3));
+  const addX = 870, addY = cy;
+  arrow(ctx, forgetX+100, cy-62, addX-16, addY, C.red, fp5);
+  arrow(ctx, mulI_X+60, cy-62, addX+16, addY, C.green, fp5);
+  addNode(ctx, addX, addY, C.yellow, fp5);
+
+  // new c_t
+  const fp6 = Math.min(1, Math.max(0, (p-0.7)*4));
+  arrow(ctx, addX+16, addY, addX+120, addY, C.red, fp6);
+  drawVector(ctx, step.new_ct, addX+110, cy-80, 'c_t (新)', C.red, 40, 28, fp6);
+
+  // Annotation
+  if (p > 0.6) {
+    text(ctx, '遗忘部分（旧记忆×遗忘率）', forgetX-60+80, cy-110, C.dim, 11, 'center', fp2);
+    text(ctx, '写入部分（新信息×输入门）', mulI_X, cy-110, C.dim, 11, 'center', fp4);
+  }
+
+  // 持续粒子流
+  if (p > 0.3 && Math.random() < 0.05) {
+    spawnParticles(mulF_X+16, cy, forgetX-30, cy-50, C.red, 4);
+    spawnParticles(mulI_X, cy-16, addX-16, addY, C.green, 4);
+  }
+}
+
+// ─── Phase 3: 输出计算 ──────────────────────────
+function drawPhase3(step, p, dt) {
+  text(ctx, '阶段 4 · 输出计算', W_CANVAS/2, 50, C.blue, 16);
+  text(ctx, 'ht = ot * tanh(ct)', W_CANVAS/2, H_CANVAS-50, C.dim, 14);
+
+  const cy = 300;
+
+  // c_t
+  const pa = Math.min(1, p*4);
+  drawVector(ctx, step.new_ct, 180, cy-40, 'c_t', C.red, 50, 35, pa);
+
+  // tanh node
+  const pb = Math.min(1, Math.max(0,(p-0.2)*4));
+  const tanhX = 460, tanhY = cy;
+  arrow(ctx, 180+V*50, cy-22, tanhX-22, tanhY, C.red, pb);
+  const glowing = pb > 0.7 ? (Math.sin(Date.now()*0.007)*0.5+0.5)*pb : 0;
+  activationNode(ctx, tanhX, tanhY, 'tanh', C.teal, glowing, pb);
+
+  // tanh result
+  const tanhResult = tanh_(step.new_ct);
+  const pc = Math.min(1, Math.max(0,(p-0.4)*4));
+  const resX = 600;
+  arrow(ctx, tanhX+22, tanhY, resX-30, tanhY, C.teal, pc);
+  drawVector(ctx, tanhResult, resX-30, cy-40, 'tanh(ct)', C.teal, 50, 35, pc);
+
+  // o_t from above
+  const pd = Math.min(1, Math.max(0,(p-0.3)*4));
+  drawVector(ctx, step.ot, resX+120, cy-160, 'o_t', C.purple, 50, 35, pd);
+
+  // × node
+  const pe = Math.min(1, Math.max(0,(p-0.5)*4));
+  const mulX = resX+200, mulY = cy;
+  arrow(ctx, resX-30+V*50, cy-22, mulX-16, mulY, C.teal, pe);
+  arrow(ctx, resX+120+V*50/2, cy-125, mulX, mulY-16, C.purple, pe);
+  mulNode(ctx, mulX, mulY, C.purple, pe);
+
+  // h_t result
+  const pf = Math.min(1, Math.max(0,(p-0.7)*5));
+  const htOutX = mulX+160;
+  arrow(ctx, mulX+16, mulY, htOutX-30, mulY, C.teal, pf);
+  drawVector(ctx, step.new_ht, htOutX-30, cy-40, 'h_t ✓', C.teal, 50, 35, pf);
+
+  // highlight ring around h_t
+  if (pf > 0.8) {
+    const ringAlpha = (Math.sin(Date.now()*0.006)*0.3+0.7)*pf;
+    ctx.globalAlpha = ringAlpha * 0.3;
+    ctx.beginPath();
+    ctx.arc(htOutX-30+V*25, cy, 60, 0, Math.PI*2);
+    ctx.strokeStyle = C.teal;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // 持续粒子流：tanh → 结果
+  if (pe > 0.3 && Math.random() < 0.05) {
+    spawnParticles(tanhX+22, tanhY, resX-30, tanhY, C.teal, 4);
+  }
+}
+
+// ─── Phase 4: 状态传递 ──────────────────────────
+function drawPhase4(step, p, dt) {
+  text(ctx, '阶段 5 · 状态传递', W_CANVAS/2, 50, C.blue, 16);
+  text(ctx, `t=${step.t}  →  t=${step.t+1}`, W_CANVAS/2, H_CANVAS-50, C.dim, 14);
+
+  const cy_h = 200, cy_c = 380;
+
+  // h_t box
+  roundRect(ctx, 80, cy_h-50, 260, 100, 10,
+            hexAlpha(C.teal, 0.12), C.teal, Math.min(1,p*4));
+  text(ctx, `h_t  (t=${step.t})`, 210, cy_h-30, C.teal, 13, 'center', Math.min(1,p*4));
+  drawVector(ctx, step.new_ht, 100, cy_h-8, '', C.teal, 60, 32, Math.min(1,p*4));
+
+  // c_t box
+  roundRect(ctx, 80, cy_c-50, 260, 100, 10,
+            hexAlpha(C.red, 0.12), C.red, Math.min(1,p*4));
+  text(ctx, `c_t  (t=${step.t})`, 210, cy_c-30, C.red, 13, 'center', Math.min(1,p*4));
+  drawVector(ctx, step.new_ct, 100, cy_c-8, '', C.red, 60, 32, Math.min(1,p*4));
+
+  // arrow to next step
+  const arrowP = Math.min(1, Math.max(0,(p-0.3)*3));
+  const arrowEndX = 1200;
+
+  // h arrow
+  const hAX = 80 + 260 + (arrowEndX - 340)*arrowP;
+  arrow(ctx, 340, cy_h, hAX, cy_h, C.teal, arrowP, 2.5);
+  if (arrowP > 0.3) {
+    text(ctx, 'h_{t-1} for next step', 340+(arrowEndX-340)*0.5, cy_h-20, C.dim, 11, 'center', arrowP);
+  }
+
+  // c arrow
+  const cAX = 80 + 260 + (arrowEndX - 340)*arrowP;
+  arrow(ctx, 340, cy_c, cAX, cy_c, C.red, arrowP, 2.5);
+  if (arrowP > 0.3) {
+    text(ctx, 'c_{t-1} for next step', 340+(arrowEndX-340)*0.5, cy_c-20, C.dim, 11, 'center', arrowP);
+  }
+
+  // Next step box
+  if (arrowP > 0.7) {
+    const nb = (arrowP - 0.7) * (1/0.3);
+    roundRect(ctx, arrowEndX-10, cy_h-50, 160, 280, 10,
+              hexAlpha(C.blue, 0.08), hexAlpha(C.blue, 0.4), nb);
+    text(ctx, step.t < T-1 ? `t = ${step.t+1}` : '循环开始', arrowEndX+70, cy_h+90, C.blue, 14, 'center', nb);
+    text(ctx, 'LSTM Cell', arrowEndX+70, cy_h+110, C.dim, 11, 'center', nb);
+  }
+
+  // 持续粒子流：状态向右传递
+  if (arrowP > 0.1 && Math.random() < 0.08) {
+    spawnParticles(340, cy_h, hAX, cy_h, C.teal, 3);
+    spawnParticles(340, cy_c, cAX, cy_c, C.red, 3);
+  }
+}
+
+// ─── Phase 5: 汇总 ──────────────────────────────
+function drawPhase5(step, p, dt) {
+  text(ctx, `阶段 6 · t=${step.t} 完成  ·  汇总`, W_CANVAS/2, 50, C.blue, 16);
+
+  const panelX = 100, panelY = 90, panelW = W_CANVAS-200, panelH = 480;
+  roundRect(ctx, panelX, panelY, panelW, panelH, 12,
+            hexAlpha(C.green, 0.04), hexAlpha(C.green, 0.3), Math.min(1,p*3));
+
+  const alpha = Math.min(1, p*2);
+
+  // title
+  text(ctx, `✅  t = ${step.t}  前向传播完成`, W_CANVAS/2, 130, C.green, 18, 'center', alpha);
+
+  // columns
+  const items = [
+    { label: 'x_t  (输入)', vec: step.xt, color: C.orange, x: 160, y: 190 },
+    { label: 'h_{t-1}', vec: step.ht_prev, color: C.teal, x: 480, y: 190 },
+    { label: 'c_{t-1}', vec: step.ct_prev, color: C.red, x: 800, y: 190 },
+  ];
+  const items2 = [
+    { label: 'ft  遗忘门', vec: step.ft, color: C.blue, x: 120, y: 330 },
+    { label: 'it  输入门', vec: step.it, color: C.green, x: 360, y: 330 },
+    { label: 'C̃t  候选', vec: step.cur_ct, color: C.orange, x: 600, y: 330 },
+    { label: 'ot  输出门', vec: step.ot, color: C.purple, x: 840, y: 330 },
+  ];
+  const items3 = [
+    { label: 'c_t  新细胞', vec: step.new_ct, color: C.red, x: 360, y: 450 },
+    { label: 'h_t  新输出', vec: step.new_ht, color: C.teal, x: 700, y: 450 },
+  ];
+
+  [...items, ...items2, ...items3].forEach(it => {
+    drawVector(ctx, it.vec, it.x, it.y, it.label, it.color, 40, 28, alpha);
+  });
+
+  // Next time step hint
+  if (step.t < T-1) {
+    const hint = Math.min(1, Math.max(0,(p-0.7)*5));
+    text(ctx, `下一步：t = ${step.t+1}  >>>`, W_CANVAS/2, H_CANVAS-40, C.dim, 13, 'center', hint);
+  } else {
+    const hint = Math.min(1, Math.max(0,(p-0.7)*5));
+    text(ctx, `所有时间步完成！即将循环 >>>`, W_CANVAS/2, H_CANVAS-40, C.yellow, 14, 'center', hint);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  Animation Loop
+// ═══════════════════════════════════════════════
+let animId = null;
+
+function updateTimestepUI() {
+  const container = document.getElementById('timestep-indicator');
+  container.innerHTML = '';
+  for (let i=0; i<T; i++) {
+    const d = document.createElement('div');
+    d.className = 'ts-dot' + (i===curT ? ' active' : (i<curT ? ' done' : ''));
+    d.textContent = `t${i}`;
+    container.appendChild(d);
+  }
+  document.getElementById('phase-label').textContent = PHASE_NAMES[curPhase] || '';
+}
+
+function loop(ts) {
+  if (!playing) { animId = requestAnimationFrame(loop); return; }
+  if (lastTime === null) lastTime = ts;
+  const dt = Math.min(ts - lastTime, 100);
+  lastTime = ts;
+
+  // 入场动画推进，到1.0后锁住，不自动推进到下一阶段
+  const dur = PHASE_DUR[curPhase] / speedMul;
+  if (phaseProgress < 1.0) {
+    phaseProgress = Math.min(1.0, phaseProgress + dt / dur);
+  }
+  // 阶段内循环时间，用于持续动画效果（粒子/闪烁等）
+  phaseLoopTime += dt;
+
+  draw(dt);
+  animId = requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════
+//  Controls
+// ═══════════════════════════════════════════════
+document.getElementById('btn-play').addEventListener('click', () => {
+  playing = !playing;
+  document.getElementById('btn-play').textContent = playing ? '⏸ 暂停' : '▶ 播放';
+  if (playing) lastTime = null;
+});
+
+document.getElementById('btn-prev').addEventListener('click', () => {
+  phaseProgress = 0;
+  phaseLoopTime = 0;
+  if (curPhase > 0) {
+    curPhase--;
+  } else {
+    curT = (curT - 1 + T) % T;
+    curPhase = 5;
+  }
+  particles = [];
+  lastTime = null;
+  updateTimestepUI();
+});
+
+document.getElementById('btn-next').addEventListener('click', () => {
+  phaseProgress = 0;
+  phaseLoopTime = 0;
+  curPhase++;
+  if (curPhase >= 6) {
+    curPhase = 0;
+    curT = (curT + 1) % T;
+  }
+  particles = [];
+  lastTime = null;
+  updateTimestepUI();
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  curT = 0; curPhase = 0; phaseProgress = 0; phaseLoopTime = 0; particles = [];
+  lastTime = null;
+  updateTimestepUI();
+});
+
+document.getElementById('speed').addEventListener('input', (e) => {
+  speedMul = parseFloat(e.target.value);
+  document.getElementById('speed-label').textContent = speedMul.toFixed(1) + 'x';
+});
+
+// ─── Start
+updateTimestepUI();
+animId = requestAnimationFrame(loop);
+</script>
+</body>
+</html>

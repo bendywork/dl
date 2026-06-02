@@ -1,0 +1,9 @@
+{
+  "name": "lanzou-capture",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "cloakbrowser": "/Volumes/Data/libs/npms/global/lib/node_modules/cloakbrowser",
+    "playwright-core": "latest"
+  }
+}
