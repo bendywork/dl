@@ -211,7 +211,7 @@ if __name__ == "__main__":
     TOKEN2IDS = "./output/text_classify/token2ids.json"
     LABEL2IDS = "./output/text_classify/label2ids.json"
 
-    # 第一次运行：构建并保存词典
+    # 第一次运行：构建并保存词典（已生成，无需重复执行）
     # token2ids, label2ids = build_vocab(TRAIN_CSV, TOKEN2IDS, LABEL2IDS)
 
     # 后续运行：直接加载
