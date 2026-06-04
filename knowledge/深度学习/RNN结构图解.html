@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RNN 工作原理 — 时序展开动画</title>
+  <style>
+    /* ===== 全局 ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 48px;
+      overflow-x: hidden;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: linear-gradient(90deg, #58a6ff, #79c0ff, #a5d6ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .subtitle {
+      font-size: 0.9rem;
+      color: #8b949e;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+
+    /* ===== 主画布 ===== */
+    #stage {
+      position: relative;
+      width: 900px;
+      max-width: 100%;
+      height: 420px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 16px;
+      overflow: visible;
+    }
+
+    /* ===== 时间步容器 ===== */
+    .step {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      pointer-events: none;
+    }
+    .step.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* ===== SVG 覆盖层（箭头） ===== */
+    #arrows {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+    }
+
+    /* ===== 节点共用样式 ===== */
+    .node {
+      position: absolute;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      gap: 2px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: default;
+      user-select: none;
+    }
+    .node:hover { transform: scale(1.06); }
+    .node .label { font-size: 1rem; font-weight: 700; line-height: 1; }
+    .node .sub   { font-size: 0.65rem; color: rgba(255,255,255,0.65); line-height: 1; }
+
+    /* 颜色变体 */
+    .node-input {
+      background: linear-gradient(135deg, #1c3d6e, #215a9e);
+      border: 2px solid #58a6ff;
+      box-shadow: 0 0 12px rgba(88,166,255,0.25);
+      color: #a5d6ff;
+      width: 70px; height: 70px;
+    }
+    .node-hidden {
+      background: linear-gradient(135deg, #1a4a2e, #1e6e3a);
+      border: 2px solid #3fb950;
+      box-shadow: 0 0 12px rgba(63,185,80,0.25);
+      color: #7ee787;
+      width: 80px; height: 80px;
+    }
+    .node-output {
+      background: linear-gradient(135deg, #4a2e0a, #7a4a10);
+      border: 2px solid #f0883e;
+      box-shadow: 0 0 12px rgba(240,136,62,0.25);
+      color: #ffa657;
+      width: 70px; height: 70px;
+    }
+    .node-init {
+      background: linear-gradient(135deg, #21262d, #30363d);
+      border: 2px dashed #484f58;
+      box-shadow: none;
+      color: #6e7681;
+      width: 70px; height: 70px;
+    }
+
+    /* ===== 时间轴标签 ===== */
+    .time-label {
+      position: absolute;
+      bottom: 18px;
+      font-size: 0.8rem;
+      color: #484f58;
+      font-weight: 600;
+      text-align: center;
+      transform: translateX(-50%);
+      transition: color 0.5s;
+    }
+    .time-label.active { color: #79c0ff; }
+
+    /* ===== 流动粒子 ===== */
+    .particle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    /* ===== 控制区 ===== */
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-top: 28px;
+      align-items: center;
+    }
+    .btn {
+      padding: 8px 22px;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      background: #21262d;
+      color: #c9d1d9;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .btn:hover  { background: #30363d; border-color: #58a6ff; color: #79c0ff; }
+    .btn.active { background: #1c3d6e; border-color: #58a6ff; color: #a5d6ff; }
+    .btn:disabled { opacity: 0.35; cursor: default; }
+
+    .speed-label { font-size: 0.8rem; color: #8b949e; }
+    select.speed-sel {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      font-size: 0.82rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    select.speed-sel:hover { border-color: #58a6ff; }
+
+    /* ===== 进度条 ===== */
+    .progress-wrap {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .progress-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #30363d;
+      border: 1px solid #484f58;
+      transition: background 0.4s, border-color 0.4s, transform 0.3s;
+    }
+    .progress-dot.done  { background: #3fb950; border-color: #3fb950; }
+    .progress-dot.active{ background: #58a6ff; border-color: #58a6ff; transform: scale(1.4); }
+
+    /* ===== 公式区 ===== */
+    .formula-box {
+      margin-top: 32px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px 32px;
+      text-align: center;
+      max-width: 660px;
+      width: 100%;
+    }
+    .formula-title {
+      font-size: 0.78rem;
+      color: #8b949e;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+    .formula {
+      font-size: 1.15rem;
+      font-family: 'Courier New', Courier, monospace;
+      color: #f0883e;
+      letter-spacing: 0.03em;
+      line-height: 1.8;
+    }
+    .formula span.ht  { color: #7ee787; }
+    .formula span.xt  { color: #79c0ff; }
+    .formula span.yt  { color: #ffa657; }
+    .formula-note {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #6e7681;
+      line-height: 1.6;
+    }
+
+    /* ===== 图例 ===== */
+    .legend {
+      display: flex;
+      gap: 24px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.8rem;
+      color: #8b949e;
+    }
+    .legend-dot {
+      width: 14px; height: 14px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    /* ===== 说明气泡 ===== */
+    .tooltip {
+      position: absolute;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      color: #c9d1d9;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      white-space: nowrap;
+      z-index: 99;
+      line-height: 1.5;
+    }
+    .node:hover + .tooltip,
+    .tooltip.show { opacity: 1; }
+
+    /* ===== 当前步说明 ===== */
+    #step-info {
+      margin-top: 14px;
+      min-height: 36px;
+      font-size: 0.85rem;
+      color: #8b949e;
+      text-align: center;
+      line-height: 1.7;
+      transition: color 0.3s;
+    }
+    #step-info span { color: #79c0ff; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<h1>RNN 工作原理 — 时序展开可视化</h1>
+<p class="subtitle">循环神经网络 · Recurrent Neural Network · 信息如何在时间轴上流动</p>
+
+<!-- ====== 主画布 ====== -->
+<div id="stage">
+  <svg id="arrows" xmlns="http://www.w3.org/2000/svg"></svg>
+  <!-- 动态内容由 JS 生成 -->
+</div>
+
+<!-- 进度点 -->
+<div class="progress-wrap" id="progress-dots"></div>
+
+<!-- 当前步说明 -->
+<div id="step-info">点击「播放」开始动画演示</div>
+
+<!-- 控制按钮 -->
+<div class="controls">
+  <button class="btn" id="btn-play">▶ 播放</button>
+  <button class="btn" id="btn-pause" disabled>⏸ 暂停</button>
+  <button class="btn" id="btn-reset">↺ 重置</button>
+  <span class="speed-label">速度：</span>
+  <select class="speed-sel" id="speed-sel">
+    <option value="1800">慢速</option>
+    <option value="1100" selected>正常</option>
+    <option value="650">快速</option>
+  </select>
+</div>
+
+<!-- 图例 -->
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#215a9e;border:2px solid #58a6ff"></div>
+    <span>输入 x_t（蓝色）</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#1e6e3a;border:2px solid #3fb950"></div>
+    <span>隐藏状态 h_t（绿色）</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#7a4a10;border:2px solid #f0883e"></div>
+    <span>输出 y_t（橙色）</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#21262d;border:2px dashed #484f58"></div>
+    <span>初始状态 h_0（灰色）</span>
+  </div>
+</div>
+
+<!-- 公式区 -->
+<div class="formula-box">
+  <div class="formula-title">核心递推公式</div>
+  <div class="formula">
+    <span class="ht">H<sub>t</sub></span> = relu(
+    <span class="xt">X<sub>t</sub></span> @ U
+    &nbsp;+&nbsp;
+    <span class="ht">H<sub>t-1</sub></span> @ W
+    &nbsp;+&nbsp; b )
+  </div>
+  <div class="formula" style="margin-top:6px;">
+    <span class="yt">Y<sub>t</sub></span> =
+    <span class="ht">H<sub>t</sub></span> @ V &nbsp;+&nbsp; c
+  </div>
+  <div class="formula-note">
+    U：输入权重矩阵（每步共享） &nbsp;|&nbsp;
+    W：循环权重矩阵（记忆权重，每步共享） &nbsp;|&nbsp;
+    V：输出权重矩阵<br/>
+    <strong>参数在所有时间步共享</strong>，这是 RNN 的核心设计
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   数据与布局定义
+   ============================================================ */
+
+const STEPS = 4;          // 时间步数量
+const W = 900, H = 420;   // 画布尺寸
+
+// 每列中心 X（h0 在最左，然后 t=1..4）
+// 相对于 900px 宽度
+const COL_X = [60, 215, 395, 575, 755];   // h0, t1, t2, t3, t4
+
+// 行中心 Y
+const ROW = {
+  output: 72,    // y_t
+  hidden: 210,   // h_t / h_0
+  input:  348,   // x_t
+};
+
+const NODE_W = { input: 70, hidden: 80, output: 70, init: 70 };
+
+/* ============================================================
+   构建节点数据
+   ============================================================ */
+const nodes = [];
+
+// h_0（初始隐藏状态）
+nodes.push({
+  id: 'h0', type: 'init', step: 0,
+  cx: COL_X[0], cy: ROW.hidden,
+  label: 'h₀', sub: '初始状态',
+});
+
+for (let t = 1; t <= STEPS; t++) {
+  const cx = COL_X[t];
+  // 输入
+  nodes.push({
+    id: `x${t}`, type: 'input', step: t,
+    cx, cy: ROW.input,
+    label: `x${t}`, sub: `输入 t=${t}`,
+  });
+  // 隐藏
+  nodes.push({
+    id: `h${t}`, type: 'hidden', step: t,
+    cx, cy: ROW.hidden,
+    label: `h${t}`, sub: `隐藏 t=${t}`,
+  });
+  // 输出
+  nodes.push({
+    id: `y${t}`, type: 'output', step: t,
+    cx, cy: ROW.output,
+    label: `y${t}`, sub: `输出 t=${t}`,
+  });
+}
+
+/* ============================================================
+   构建箭头数据  { from, to, color, step, dash }
+   ============================================================ */
+const arrows = [];
+
+// h0 → h1
+arrows.push({ from: 'h0', to: 'h1', color: '#3fb950', step: 1, label: '记忆传递' });
+
+for (let t = 1; t <= STEPS; t++) {
+  // x_t ↑ → h_t
+  arrows.push({ from: `x${t}`, to: `h${t}`, color: '#58a6ff', step: t, label: '输入注入' });
+  // h_t ↑ → y_t
+  arrows.push({ from: `h${t}`, to: `y${t}`, color: '#f0883e', step: t, label: '生成输出' });
+  // h_t → h_{t+1}
+  if (t < STEPS) {
+    arrows.push({ from: `h${t}`, to: `h${t+1}`, color: '#3fb950', step: t + 1, label: '记忆传递' });
+  }
+}
+
+/* ============================================================
+   渲染节点
+   ============================================================ */
+const stage = document.getElementById('stage');
+const svgEl = document.getElementById('arrows');
+
+function nodeById(id) { return nodes.find(n => n.id === id); }
+
+function halfW(type) {
+  const m = { input: 35, hidden: 40, output: 35, init: 35 };
+  return m[type] || 35;
+}
+
+function renderNodes() {
+  nodes.forEach(n => {
+    const div = document.createElement('div');
+    div.id = 'node-' + n.id;
+    div.className = `node node-${n.type === 'init' ? 'init' : n.type}`;
+    div.dataset.step = n.step;
+    div.style.left = (n.cx - halfW(n.type)) + 'px';
+    div.style.top  = (n.cy - halfW(n.type)) + 'px';
+    div.style.width  = (halfW(n.type) * 2) + 'px';
+    div.style.height = (halfW(n.type) * 2) + 'px';
+    div.style.opacity = n.step === 0 ? '0' : '0';  // 全部先隐藏
+    div.innerHTML = `<span class="label">${n.label}</span><span class="sub">${n.sub}</span>`;
+    stage.appendChild(div);
+  });
+}
+
+/* ============================================================
+   渲染时间轴标签
+   ============================================================ */
+function renderTimeLabels() {
+  const labels = ['h₀', 't = 1', 't = 2', 't = 3', 't = 4'];
+  COL_X.forEach((cx, i) => {
+    const d = document.createElement('div');
+    d.className = 'time-label';
+    d.id = `tlabel-${i}`;
+    d.style.left = cx + 'px';
+    d.textContent = labels[i];
+    stage.appendChild(d);
+  });
+}
+
+/* ============================================================
+   SVG 箭头工具函数
+   ============================================================ */
+function arrowId(a) { return `arrow-${a.from}-${a.to}`; }
+
+function makeArrow(a) {
+  const fn = nodeById(a.from), tn = nodeById(a.to);
+  const fw = halfW(fn.type), tw = halfW(tn.type);
+
+  // 确定起止点（避免与节点重叠）
+  let x1 = fn.cx, y1 = fn.cy, x2 = tn.cx, y2 = tn.cy;
+  const dx = x2 - x1, dy = y2 - y1;
+  const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+  x1 += dx / dist * fw;
+  y1 += dy / dist * fw;
+  x2 -= dx / dist * tw;
+  y2 -= dy / dist * tw;
+
+  // 水平箭头（记忆传递）加轻微弧度
+  let pathD;
+  if (Math.abs(dy) < 10) {
+    const midX = (x1 + x2) / 2;
+    const cy1 = y1 - 22;
+    pathD = `M ${x1} ${y1} Q ${midX} ${cy1} ${x2} ${y2}`;
+  } else {
+    pathD = `M ${x1} ${y1} L ${x2} ${y2}`;
+  }
+
+  const markerId = `marker-${a.color.replace('#','')}`;
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('id', arrowId(a));
+  path.setAttribute('d', pathD);
+  path.setAttribute('stroke', a.color);
+  path.setAttribute('stroke-width', '2.2');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('marker-end', `url(#${markerId})`);
+  path.setAttribute('opacity', '0');
+  path.style.transition = 'opacity 0.5s ease';
+  svgEl.appendChild(path);
+  return path;
+}
+
+function ensureMarker(color) {
+  const id = `marker-${color.replace('#','')}`;
+  if (svgEl.querySelector(`#${id}`)) return;
+  const defs = svgEl.querySelector('defs') || (() => {
+    const d = document.createElementNS('http://www.w3.org/2000/svg','defs');
+    svgEl.insertBefore(d, svgEl.firstChild);
+    return d;
+  })();
+  const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  marker.setAttribute('id', id);
+  marker.setAttribute('markerWidth', '8');
+  marker.setAttribute('markerHeight', '8');
+  marker.setAttribute('refX', '6');
+  marker.setAttribute('refY', '3');
+  marker.setAttribute('orient', 'auto');
+  const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  poly.setAttribute('points', '0 0, 8 3, 0 6');
+  poly.setAttribute('fill', color);
+  marker.appendChild(poly);
+  defs.appendChild(marker);
+}
+
+function renderArrows() {
+  ['#3fb950','#58a6ff','#f0883e'].forEach(c => ensureMarker(c));
+  arrows.forEach(a => makeArrow(a));
+}
+
+/* ============================================================
+   粒子动画（沿箭头路径流动）
+   ============================================================ */
+function animateParticle(arrowData, color) {
+  const path = svgEl.querySelector(`#${arrowId(arrowData)}`);
+  if (!path) return;
+  const totalLen = path.getTotalLength();
+
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  p.setAttribute('r', '5');
+  p.setAttribute('fill', color);
+  p.setAttribute('opacity', '0.9');
+  p.setAttribute('filter', `drop-shadow(0 0 4px ${color})`);
+  svgEl.appendChild(p);
+
+  const duration = 600;
+  const start = performance.now();
+
+  function tick(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const pt = path.getPointAtLength(t * totalLen);
+    p.setAttribute('cx', pt.x);
+    p.setAttribute('cy', pt.y);
+    p.setAttribute('opacity', t < 0.1 ? t * 9 : t > 0.85 ? (1 - t) / 0.15 : '0.9');
+    if (t < 1) requestAnimationFrame(tick);
+    else p.remove();
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ============================================================
+   进度点
+   ============================================================ */
+function renderProgressDots() {
+  const wrap = document.getElementById('progress-dots');
+  for (let i = 1; i <= STEPS; i++) {
+    const d = document.createElement('div');
+    d.className = 'progress-dot';
+    d.id = `pdot-${i}`;
+    wrap.appendChild(d);
+  }
+}
+
+function updateProgressDots(currentStep) {
+  for (let i = 1; i <= STEPS; i++) {
+    const d = document.getElementById(`pdot-${i}`);
+    d.className = 'progress-dot' +
+      (i < currentStep ? ' done' : i === currentStep ? ' active' : '');
+  }
+}
+
+/* ============================================================
+   步骤信息
+   ============================================================ */
+const STEP_MSGS = [
+  '初始状态 <span>h₀ = 0</span>，所有时间步尚未开始',
+  '<span>t=1</span>：输入 x₁ 注入 → 与 h₀ 融合 → 生成新隐藏状态 h₁ → 输出 y₁',
+  '<span>t=2</span>：输入 x₂ 注入 → 与 h₁（携带过去记忆）融合 → 生成 h₂ → 输出 y₂',
+  '<span>t=3</span>：输入 x₃ 注入 → 与 h₂ 融合 → 生成 h₃ → 输出 y₃',
+  '<span>t=4</span>：输入 x₄ 注入 → 与 h₃ 融合 → 生成 h₄ → 输出 y₄ · 序列处理完毕',
+];
+function setStepInfo(s) {
+  document.getElementById('step-info').innerHTML = STEP_MSGS[s] || '';
+}
+
+/* ============================================================
+   显示某一步的节点 + 箭头
+   ============================================================ */
+function showNodeId(id, delay = 0) {
+  setTimeout(() => {
+    const el = document.getElementById('node-' + id);
+    if (el) el.style.opacity = '1';
+  }, delay);
+}
+
+function showArrow(from, to, delay = 0) {
+  setTimeout(() => {
+    const a = arrows.find(x => x.from === from && x.to === to);
+    if (!a) return;
+    const el = svgEl.querySelector(`#${arrowId(a)}`);
+    if (el) el.style.opacity = '1';
+    // 粒子
+    const colors = { input: '#58a6ff', hidden: '#3fb950', output: '#f0883e', init: '#6e7681' };
+    const fn = nodeById(from);
+    animateParticle(a, colors[fn.type]);
+  }, delay);
+}
+
+/* ============================================================
+   状态机
+   ============================================================ */
+let currentStep = -1;  // -1 = 重置状态
+let playing = false;
+let playTimer = null;
+
+function getInterval() {
+  return parseInt(document.getElementById('speed-sel').value, 10);
+}
+
+function showStep(s) {
+  if (s === 0) {
+    // 显示 h0
+    showNodeId('h0');
+    document.getElementById('tlabel-0').classList.add('active');
+    setStepInfo(0);
+  } else {
+    document.getElementById(`tlabel-${s}`)?.classList.add('active');
+    // 节点出现顺序：x_t → h_t → y_t
+    showNodeId(`x${s}`, 0);
+    showNodeId(`h${s}`, 220);
+    showNodeId(`y${s}`, 450);
+    // 箭头
+    showArrow(`x${s}`, `h${s}`, 80);
+    showArrow(`h${s-1}`, `h${s}`, 80);
+    showArrow(`h${s}`, `y${s}`, 380);
+    setStepInfo(s);
+    updateProgressDots(s);
+  }
+}
+
+function playNext() {
+  if (currentStep >= STEPS) {
+    stopPlay();
+    return;
+  }
+  currentStep++;
+  showStep(currentStep);
+  if (currentStep >= STEPS) {
+    stopPlay();
+    document.getElementById('btn-play').disabled = true;
+    return;
+  }
+  playTimer = setTimeout(playNext, getInterval());
+}
+
+function startPlay() {
+  if (currentStep >= STEPS) return;
+  playing = true;
+  document.getElementById('btn-play').classList.add('active');
+  document.getElementById('btn-pause').disabled = false;
+  document.getElementById('btn-play').disabled = true;
+  playNext();
+}
+
+function stopPlay() {
+  playing = false;
+  clearTimeout(playTimer);
+  document.getElementById('btn-play').classList.remove('active');
+  document.getElementById('btn-play').disabled = currentStep >= STEPS;
+  document.getElementById('btn-pause').disabled = true;
+}
+
+function resetAll() {
+  stopPlay();
+  currentStep = -1;
+  // 隐藏所有节点
+  nodes.forEach(n => {
+    const el = document.getElementById('node-' + n.id);
+    if (el) el.style.opacity = '0';
+  });
+  // 隐藏所有箭头
+  svgEl.querySelectorAll('path').forEach(p => { p.style.opacity = '0'; });
+  // 重置时间轴标签
+  document.querySelectorAll('.time-label').forEach(l => l.classList.remove('active'));
+  // 重置进度点
+  document.querySelectorAll('.progress-dot').forEach(d => {
+    d.className = 'progress-dot';
+  });
+  document.getElementById('step-info').innerHTML = '点击「播放」开始动画演示';
+  document.getElementById('btn-play').disabled = false;
+  document.getElementById('btn-pause').disabled = true;
+}
+
+/* ============================================================
+   初始化
+   ============================================================ */
+renderNodes();
+renderTimeLabels();
+renderArrows();
+renderProgressDots();
+
+document.getElementById('btn-play').addEventListener('click', () => {
+  if (currentStep === -1) { currentStep = -1; }
+  if (!playing) startPlay();
+});
+document.getElementById('btn-pause').addEventListener('click', () => {
+  if (playing) stopPlay();
+  else startPlay();
+});
+document.getElementById('btn-reset').addEventListener('click', resetAll);
+
+</script>
+</body>
+</html>

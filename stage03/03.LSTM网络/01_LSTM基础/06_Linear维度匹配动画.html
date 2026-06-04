@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>LSTM Linear 维度匹配演示</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; padding: 30px; }
+  h1 { text-align: center; font-size: 22px; color: #7eb8f7; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: #888; font-size: 14px; margin-bottom: 40px; }
+
+  .section { margin-bottom: 50px; }
+  .section-title { font-size: 16px; color: #f0c040; margin-bottom: 20px; padding-left: 10px; border-left: 3px solid #f0c040; }
+
+  .diagram { display: flex; align-items: center; justify-content: center; gap: 0; flex-wrap: nowrap; }
+
+  .matrix {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .matrix-label { font-size: 13px; color: #aaa; margin-bottom: 4px; }
+  .matrix-name { font-size: 16px; font-weight: bold; }
+  .matrix-shape { font-size: 12px; color: #888; margin-top: 2px; }
+
+  .grid {
+    display: grid;
+    border: 2px solid;
+    border-radius: 4px;
+  }
+  .cell {
+    width: 18px;
+    height: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 2px;
+  }
+
+  /* 颜色主题 */
+  .blue  { border-color: #5b9cf6; }
+  .blue  .cell { background: #1a3a6b; }
+  .green { border-color: #4caf7d; }
+  .green .cell { background: #1a4a30; }
+  .orange{ border-color: #f0a040; }
+  .orange .cell { background: #4a3010; }
+  .red   { border-color: #e05555; }
+  .red   .cell { background: #4a1a1a; }
+  .purple{ border-color: #a97cf8; }
+  .purple .cell { background: #2d1a5a; }
+
+  .arrow {
+    font-size: 28px;
+    color: #555;
+    margin: 0 12px;
+    align-self: center;
+  }
+  .op {
+    font-size: 22px;
+    color: #ccc;
+    margin: 0 10px;
+    align-self: center;
+    font-weight: bold;
+  }
+
+  /* 维度标注 */
+  .dim-row { display: flex; align-items: center; justify-content: center; margin-top: 6px; gap: 4px; }
+  .dim-box {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+  .dim-match   { background: #1a4a20; color: #4cdf80; border: 1px solid #4caf7d; }
+  .dim-no      { background: #4a1a1a; color: #f07070; border: 1px solid #e05555; }
+  .dim-neutral { background: #1a2a4a; color: #7eb8f7; border: 1px solid #5b9cf6; }
+  .dim-sep     { color: #555; font-size: 13px; }
+
+  .match-label {
+    text-align: center;
+    margin-top: 14px;
+    font-size: 14px;
+    padding: 8px 20px;
+    border-radius: 6px;
+    display: inline-block;
+  }
+  .match-ok  { background: #1a4a20; color: #4cdf80; border: 1px solid #4caf7d; }
+  .match-err { background: #4a1a1a; color: #f07070; border: 1px solid #e05555; }
+
+  .center { text-align: center; }
+
+  .rule-box {
+    background: #1a1d2e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 16px 24px;
+    margin: 0 auto;
+    max-width: 600px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #ccc;
+  }
+  .rule-box strong { color: #7eb8f7; }
+
+  hr { border: none; border-top: 1px solid #222; margin: 40px 0; }
+
+  .highlight { color: #f0c040; font-weight: bold; }
+  .code { font-family: monospace; background: #1a1d2e; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>Linear 维度匹配 — 矩阵乘法图解</h1>
+<p class="subtitle">理解为什么 h_t_prev 对应的 Linear 输入维度必须是 hidden_size</p>
+
+<hr>
+
+<!-- 核心规律 -->
+<div class="rule-box" style="margin-bottom:40px;">
+  <strong>核心规律：</strong><br>
+  矩阵乘法 <span class="code">A @ B</span> 要合法，A 的<strong style="color:#f0c040;">列数</strong>必须等于 B 的<strong style="color:#f0c040;">行数</strong>。<br>
+  <span class="code">torch.nn.Linear(in, out)</span> 的权重 shape 是 <span class="code">(out, in)</span>，取 <span class="code">.weight.T</span> 后变成 <span class="code">(in, out)</span>。<br>
+  所以 <strong>Linear 的 in_features 必须等于你要乘的向量维度</strong>。
+</div>
+
+<!-- Case 1: x_t @ w_xf -->
+<div class="section">
+  <div class="section-title">Case 1：x_t @ w_xf — 输入门对 x_t</div>
+
+  <div class="diagram">
+    <!-- x_t -->
+    <div class="matrix">
+      <div class="matrix-label">x_t（取一个时间步）</div>
+      <div class="matrix-name" style="color:#7eb8f7;">x_t</div>
+      <div class="grid blue" style="grid-template-columns: repeat(8, 18px); grid-template-rows: repeat(4, 18px);">
+        <div class="cell" style="background:#2a5aab;" id="c1"></div>
+        <script>
+          const g1 = document.querySelector('#c1').parentElement;
+          for(let i=0;i<32;i++){ const d=document.createElement('div'); d.className='cell'; g1.appendChild(d); }
+        </script>
+      </div>
+      <div class="dim-row">
+        <div class="dim-box dim-neutral">batch=10</div>
+        <div class="dim-sep">×</div>
+        <div class="dim-box dim-match">128</div>
+      </div>
+      <div class="matrix-shape">shape: (10, 128)</div>
+    </div>
+
+    <div class="op">@</div>
+
+    <!-- w_xf -->
+    <div class="matrix">
+      <div class="matrix-label">w_xf = Linear(128, 256).weight.T</div>
+      <div class="matrix-name" style="color:#4cdf80;">w_xf</div>
+      <div class="grid green" style="grid-template-columns: repeat(14, 18px); grid-template-rows: repeat(8, 18px);">
+        <div class="cell" style="background:#2a6a40;" id="c2"></div>
+        <script>
+          const g2 = document.querySelector('#c2').parentElement;
+          for(let i=0;i<112;i++){ const d=document.createElement('div'); d.className='cell'; g2.appendChild(d); }
+        </script>
+      </div>
+      <div class="dim-row">
+        <div class="dim-box dim-match">128</div>
+        <div class="dim-sep">×</div>
+        <div class="dim-box dim-neutral">256</div>
+      </div>
+      <div class="matrix-shape">shape: (128, 256)</div>
+    </div>
+
+    <div class="op">=</div>
+
+    <!-- result -->
+    <div class="matrix">
+      <div class="matrix-label">输出</div>
+      <div class="matrix-name" style="color:#a97cf8;">result</div>
+      <div class="grid purple" style="grid-template-columns: repeat(14, 18px); grid-template-rows: repeat(4, 18px);">
+        <div class="cell" style="background:#3d2a7a;" id="c3"></div>
+        <script>
+          const g3 = document.querySelector('#c3').parentElement;
+          for(let i=0;i<56;i++){ const d=document.createElement('div'); d.className='cell'; g3.appendChild(d); }
+        </script>
+      </div>
+      <div class="dim-row">
+        <div class="dim-box dim-neutral">batch=10</div>
+        <div class="dim-sep">×</div>
+        <div class="dim-box dim-neutral">256</div>
+      </div>
+      <div class="matrix-shape">shape: (10, 256) ✅</div>
+    </div>
+  </div>
+
+  <div class="center">
+    <div class="match-label match-ok">✅ x_t 列数(128) = w_xf 行数(128)，维度匹配</div>
+  </div>
+  <div class="center" style="margin-top:10px; color:#888; font-size:13px;">
+    代码：<span class="code">Linear(input_size=128, hidden_size=256)</span> ← in_features = input_size ✅
+  </div>
+</div>
+
+<hr>
+
+<!-- Case 2: h_t_prev @ w_hf 正确 -->
+<div class="section">
+  <div class="section-title">Case 2：h_t_prev @ w_hf — 正确写法</div>
+
+  <div class="diagram">
+    <div class="matrix">
+      <div class="matrix-label">h_t_prev</div>
+      <div class="matrix-name" style="color:#f0a040;">h_t_prev</div>
+      <div class="grid orange" style="grid-template-columns: repeat(14, 18px); grid-template-rows: repeat(4, 18px);">
+        <div class="cell" style="background:#6a3a10;" id="c4"></div>
+        <script>
+          const g4 = document.querySelector('#c4').parentElement;
+          for(let i=0;i<56;i++){ const d=document.createElement('div'); d.className='cell'; g4.appendChild(d); }
+        </script>
+      </div>
+      <div class="dim-row">
+        <div class="dim-box dim-neutral">batch=10</div>
+        <div class="dim-sep">×</div>
+        <div class="dim-box dim-match">256</div>
+      </div>
+      <div class="matrix-shape">shape: (10, 256)</div>
+    </div>
+
+    <div class="op">@</div>
+
+    <div class="matrix">
+      <div class="matrix-label">w_hf = Linear(256, 256).weight.T</div>
+      <div class="matrix-name" style="color:#4cdf80;">w_hf</div>
+      <div class="grid green" style="grid-template-columns: repeat(14, 18px); grid-template-rows: repeat(14, 18px);">
+        <div class="cell" style="background:#2a6a40;" id="c5"></div>
+        <script>
+          const g5 = document.querySelector('#c5').parentElement;
+          for(let i=0;i<196;i++){ const d=document.createElement('div'); d.className='cell'; g5.appendChild(d); }
+        </script>
+      </div>
+      <div class="dim-row">
+        <div class="dim-box dim-match">256</div>
+        <div class="dim-sep">×</div>
+        <div class="dim-box dim-neutral">256</div>
+      </div>
+      <div class="matrix-shape">shape: (256, 256)</div>
+    </div>
+
+    <div class="op">=</div>
+
+    <div class="matrix">
+      <div class="matrix-label">输出</div>
+      <div class="matrix-name" style="color:#a97cf8;">result</div>
+      <div class="grid purple" style="grid-template-columns: repeat(14, 18px); grid-template-rows: repeat(4, 18px);">
+        <div class="cell" style="background:#3d2a7a;" id="c6"></div>
+        <script>
+          const g6 = document.querySelector('#c6').parentElement;
+          for(let i=0;i<56;i++){ const d=document.createElement('div'); d.className='cell'; g6.appendChild(d); }
+        </script>
+      </div>
+      <div class="dim-row">
+        <div class="dim-box dim-neutral">batch=10</div>
+        <div class="dim-sep">×</div>
+        <div class="dim-box dim-neutral">256</div>
+      </div>
+      <div class="matrix-shape">shape: (10, 256) ✅</div>
+    </div>
+  </div>
+
+  <div class="center">
+    <div class="match-label match-ok">✅ h_t_prev 列数(256) = w_hf 行数(256)，维度匹配</div>
+  </div>
+  <div class="center" style="margin-top:10px; color:#888; font-size:13px;">
+    代码：<span class="code">Linear(hidden_size=256, hidden_size=256)</span> ← in_features = hidden_size ✅
+  </div>
+</div>
+
+<hr>
+
+<!-- Case 3: h_t_prev @ w_hf 错误 -->
+<div class="section">
+  <div class="section-title">Case 3：h_t_prev @ w_hf — 你原来的错误写法</div>
+
+  <div class="diagram">
+    <div class="matrix">
+      <div class="matrix-label">h_t_prev</div>
+      <div class="matrix-name" style="color:#f0a040;">h_t_prev</div>
+      <div class="grid orange" style="grid-template-columns: repeat(14, 18px); grid-template-rows: repeat(4, 18px);">
+        <div class="cell" style="background:#6a3a10;" id="c7"></div>
+        <script>
+          const g7 = document.querySelector('#c7').parentElement;
+          for(let i=0;i<56;i++){ const d=document.createElement('div'); d.className='cell'; g7.appendChild(d); }
+        </script>
+      </div>
+      <div class="dim-row">
+        <div class="dim-box dim-neutral">batch=10</div>
+        <div class="dim-sep">×</div>
+        <div class="dim-box dim-no">256</div>
+      </div>
+      <div class="matrix-shape">shape: (10, 256)</div>
+    </div>
+
+    <div class="op">@</div>
+
+    <div class="matrix">
+      <div class="matrix-label">w_hf = Linear(128, 256).weight.T ← 错误</div>
+      <div class="matrix-name" style="color:#e05555;">w_hf ❌</div>
+      <div class="grid red" style="grid-template-columns: repeat(14, 18px); grid-template-rows: repeat(8, 18px);">
+        <div class="cell" style="background:#6a1a1a;" id="c8"></div>
+        <script>
+          const g8 = document.querySelector('#c8').parentElement;
+          for(let i=0;i<112;i++){ const d=document.createElement('div'); d.className='cell'; g8.appendChild(d); }
+        </script>
+      </div>
+      <div class="dim-row">
+        <div class="dim-box dim-no">128</div>
+        <div class="dim-sep">×</div>
+        <div class="dim-box dim-neutral">256</div>
+      </div>
+      <div class="matrix-shape">shape: (128, 256)</div>
+    </div>
+
+    <div class="op" style="color:#e05555;">✗</div>
+
+    <div class="matrix">
+      <div class="matrix-label">报错</div>
+      <div class="matrix-name" style="color:#e05555;">RuntimeError</div>
+      <div style="background:#2a0a0a; border:2px solid #e05555; border-radius:6px; padding:14px 18px; font-size:12px; color:#f07070; font-family:monospace; max-width:200px; line-height:1.6;">
+        mat1 and mat2<br>shapes cannot be<br>multiplied<br>(10x<span style="color:#ff4444;font-weight:bold;">256</span>) and (<span style="color:#ff4444;font-weight:bold;">128</span>x256)
+      </div>
+    </div>
+  </div>
+
+  <div class="center">
+    <div class="match-label match-err">❌ h_t_prev 列数(256) ≠ w_hf 行数(128)，维度不匹配，直接报错</div>
+  </div>
+  <div class="center" style="margin-top:10px; color:#888; font-size:13px;">
+    代码：<span class="code">Linear(input_size=128, hidden_size=256)</span> ← in_features 应该是 hidden_size，不是 input_size ❌
+  </div>
+</div>
+
+<hr>
+
+<!-- 总结 -->
+<div style="text-align:center; margin-top:10px;">
+  <div class="rule-box">
+    <strong>记住这一条就够了：</strong><br><br>
+    <span class="code">A @ B</span> 合法的条件：<span class="highlight">A 的列数 = B 的行数</span><br><br>
+    <span class="code">Linear(in, out).weight.T</span> 的 shape 是 <span class="highlight">(in, out)</span><br><br>
+    所以 <span class="code">h_t_prev(batch, 256) @ w_hf</span><br>
+    需要 <span class="code">w_hf</span> 的行数 = <span class="highlight">256</span><br>
+    → <span class="code">Linear(<span class="highlight">hidden_size</span>, hidden_size)</span> ✅
+  </div>
+</div>
+
+</body>
+</html>
