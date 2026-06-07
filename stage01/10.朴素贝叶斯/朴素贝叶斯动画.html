@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>朴素贝叶斯动画</title>
+<style>
+body{font-family:Arial,sans-serif;background:#1a1a2e;color:#eee;margin:0;padding:20px;}
+h1{text-align:center;color:#00d4ff;}
+.container{max-width:860px;margin:0 auto;}
+.section{background:#16213e;border-radius:12px;padding:20px;margin:16px 0;}
+h2{color:#00d4ff;}
+canvas{display:block;margin:8px auto;border-radius:8px;background:#0d1117;}
+button{background:#00d4ff;color:#000;border:none;padding:8px 18px;
+       border-radius:6px;cursor:pointer;margin:4px;font-weight:bold;}
+button:hover{background:#0099bb;}
+.controls{text-align:center;margin:8px;}
+#stepLog{background:#0d1117;padding:10px;border-radius:6px;font-size:13px;
+         color:#7ee787;min-height:60px;white-space:pre-wrap;}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🧮 朴素贝叶斯：垃圾邮件分类动画</h1>
+<div class="section">
+<h2>贝叶斯公式逐步推导</h2>
+<canvas id="cv" width="800" height="320"></canvas>
+<div class="controls">
+  <button onclick="step()">▶ 下一步</button>
+  <button onclick="reset()">↺ 重置</button>
+</div>
+<div id="stepLog">点击"下一步"开始演示...</div>
+</div>
+</div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const log=document.getElementById('stepLog');
+let s=0;
+const words=['免费','中奖','点击','领取'];
+const pSpam=[0.8,0.7,0.6,0.65];
+const pHam =[0.1,0.05,0.2,0.08];
+const pS=0.4, pH=0.6;
+function reset(){s=0;ctx.clearRect(0,0,800,320);log.textContent='点击"下一步"开始演示...';}
+function box(x,y,w,h,col,text,sub){
+  ctx.fillStyle=col; ctx.beginPath();
+  ctx.roundRect(x,y,w,h,8); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='bold 14px Arial';
+  ctx.fillText(text,x+w/2-ctx.measureText(text).width/2,y+h/2-4);
+  if(sub){ctx.font='11px Arial';ctx.fillStyle='#ccc';
+    ctx.fillText(sub,x+w/2-ctx.measureText(sub).width/2,y+h/2+14);}
+}
+function step(){
+  ctx.clearRect(0,0,800,320);
+  if(s===0){
+    box(50,40,180,60,'#1565c0','邮件词语','["免费","中奖","点击"]');
+    box(300,40,200,60,'#4a148c','P(垃圾)=0.4','P(正常)=0.6');
+    log.textContent='Step1: 已知先验概率 P(垃圾)=0.4, P(正常)=0.6\n邮件包含词：'+words.slice(0,3).join(', ');
+  } else if(s===1){
+    let ps=pS, ph=pH;
+    for(let i=0;i<3;i++){ps*=pSpam[i];ph*=pHam[i];}
+    words.slice(0,3).forEach((w,i)=>{
+      box(30+i*250,140,200,55,'#0d47a1',w,`P(w|垃圾)=${pSpam[i]} P(w|正常)=${pHam[i]}`);
+    });
+    log.textContent=`Step2: 条件独立假设 — 各词概率连乘\nP(词|垃圾)=${pS.toFixed(2)}×${pSpam.slice(0,3).join('×')}=${ps.toFixed(5)}\nP(词|正常)=${pH.toFixed(2)}×${pHam.slice(0,3).join('×')}=${ph.toFixed(5)}`;
+  } else if(s===2){
+    let ps=pS,ph=pH;
+    for(let i=0;i<3;i++){ps*=pSpam[i];ph*=pHam[i];}
+    const total=ps+ph;
+    const probS=(ps/total).toFixed(3), probH=(ph/total).toFixed(3);
+    box(150,60,200,70,'#b71c1c','P(垃圾|词)='+probS,'归一化后');
+    box(450,60,200,70,'#1b5e20','P(正常|词)='+probH,'归一化后');
+    ctx.fillStyle='#ffd700';ctx.font='bold 18px Arial';
+    ctx.fillText(+probS>0.5?'→ 判定：垃圾邮件 🚫':'→ 判定：正常邮件 ✅',280,200);
+    log.textContent=`Step3: 归一化 → 后验概率\nP(垃圾|词)=${probS}  P(正常|词)=${probH}\n${+probS>0.5?'垃圾邮件！':'正常邮件！'}`;
+  } else {
+    reset(); return;
+  }
+  s++;
+}
+reset();
+</script></body></html>

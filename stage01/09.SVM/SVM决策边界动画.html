@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>SVM 决策边界动画</title>
+<style>
+body{font-family:Arial,sans-serif;background:#1a1a2e;color:#eee;margin:0;padding:20px;}
+h1{text-align:center;color:#00d4ff;}
+.container{max-width:860px;margin:0 auto;}
+.section{background:#16213e;border-radius:12px;padding:20px;margin:20px 0;}
+h2{color:#00d4ff;}
+canvas{display:block;margin:10px auto;border-radius:8px;background:#0d1117;}
+.controls{text-align:center;margin:8px;}
+button{background:#00d4ff;color:#000;border:none;padding:8px 18px;
+       border-radius:6px;cursor:pointer;margin:4px;font-weight:bold;}
+button:hover{background:#0099bb;}
+label{margin:0 8px;font-size:14px;}
+input[type=range]{vertical-align:middle;width:120px;}
+#info{text-align:center;font-size:13px;color:#7ee787;margin-top:6px;}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>📐 SVM 决策边界动画</h1>
+<div class="section">
+<h2>最大间隔超平面 + 支持向量</h2>
+<canvas id="cv" width="800" height="400"></canvas>
+<div class="controls">
+  <button onclick="generate()">🎲 随机数据</button>
+  <button onclick="toggleMargin()">⟺ 显示/隐藏间隔带</button>
+  <label>C值:
+    <input type="range" id="cSlider" min="1" max="10" value="5" oninput="updateC()">
+    <span id="cVal">5</span>
+  </label>
+</div>
+<div id="info">支持向量用方框标出，间隔带越宽泛化越好</div>
+</div>
+</div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+let pts=[],showMargin=true,C=5;
+function rnd(a,b){return Math.random()*(b-a)+a;}
+function generate(){
+  pts=[];
+  for(let i=0;i<20;i++) pts.push({x:rnd(80,320),y:rnd(60,340),cls:0});
+  for(let i=0;i<20;i++) pts.push({x:rnd(480,720),y:rnd(60,340),cls:1});
+  draw();
+}
+function toggleMargin(){showMargin=!showMargin;draw();}
+function updateC(){C=+document.getElementById('cSlider').value;
+  document.getElementById('cVal').textContent=C;draw();}
+function draw(){
+  ctx.clearRect(0,0,800,400);
+  // 背景分区
+  let grd=ctx.createLinearGradient(0,0,800,0);
+  grd.addColorStop(0,'#1a2a3a'); grd.addColorStop(1,'#2a1a1a');
+  ctx.fillStyle=grd; ctx.fillRect(0,0,800,400);
+  // 决策线（简化为垂直线 x=400）
+  const mid=400, margin=Math.max(20, 80-C*6);
+  ctx.setLineDash([8,4]);
+  ctx.strokeStyle='#00d4ff'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(mid,0); ctx.lineTo(mid,400); ctx.stroke();
+  ctx.setLineDash([]);
+  if(showMargin){
+    ctx.fillStyle='rgba(0,212,255,0.08)';
+    ctx.fillRect(mid-margin,0,margin*2,400);
+    ctx.strokeStyle='rgba(0,212,255,0.4)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(mid-margin,0); ctx.lineTo(mid-margin,400); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mid+margin,0); ctx.lineTo(mid+margin,400); ctx.stroke();
+  }
+  // 绘制点
+  pts.forEach(p=>{
+    const isSV=Math.abs(p.x-mid)<margin+15;
+    ctx.beginPath(); ctx.arc(p.x,p.y,7,0,2*Math.PI);
+    ctx.fillStyle=p.cls===0?'#4fc3f7':'#ef9a9a';
+    ctx.fill();
+    if(isSV){ctx.strokeStyle='#ffd700';ctx.lineWidth=2.5;ctx.stroke();}
+  });
+  // 标注
+  ctx.fillStyle='#00d4ff'; ctx.font='13px Arial';
+  ctx.fillText('决策超平面',mid+5,20);
+  ctx.fillStyle='rgba(0,212,255,0.6)'; ctx.font='12px Arial';
+  ctx.fillText(`间隔宽度=${margin*2}px (C=${C})`,mid-60,390);
+  ctx.fillStyle='#ffd700'; ctx.font='12px Arial';
+  ctx.fillText('□ 金色边框 = 支持向量',10,390);
+}
+generate();
+</script></body></html>

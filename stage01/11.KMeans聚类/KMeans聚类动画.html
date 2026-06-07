@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>KMeans 聚类动画</title>
+<style>
+body{font-family:Arial,sans-serif;background:#1a1a2e;color:#eee;margin:0;padding:20px;}
+h1{text-align:center;color:#00d4ff;}
+.container{max-width:860px;margin:0 auto;}
+.section{background:#16213e;border-radius:12px;padding:20px;margin:16px 0;}
+h2{color:#00d4ff;}
+canvas{display:block;margin:8px auto;border-radius:8px;background:#0d1117;}
+button{background:#00d4ff;color:#000;border:none;padding:8px 18px;
+       border-radius:6px;cursor:pointer;margin:4px;font-weight:bold;}
+button:hover{background:#0099bb;}
+.controls{text-align:center;margin:8px;}
+#info{text-align:center;font-size:14px;color:#ffd700;margin-top:6px;min-height:20px;}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🔵 K-Means 聚类动画演示</h1>
+<div class="section">
+<h2>Lloyd 算法迭代过程</h2>
+<canvas id="cv" width="800" height="380"></canvas>
+<div class="controls">
+  <button onclick="initData()">🎲 随机数据</button>
+  <button onclick="nextStep()">▶ 下一步</button>
+  <button onclick="autoRun()">⚡ 自动运行</button>
+</div>
+<div id="info">点击"随机数据"初始化，再点"下一步"观察迭代</div>
+</div>
+</div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const info=document.getElementById('info');
+const K=3,COLS=['#4fc3f7','#ef9a9a','#a5d6a7'];
+let pts=[],centers=[],iter=0,running=false;
+
+function rnd(a,b){return Math.random()*(b-a)+a;}
+
+function initData(){
+  pts=[];iter=0;running=false;
+  // 生成3个簇的数据
+  [[180,150],[500,120],[350,290]].forEach(([cx,cy])=>{
+    for(let i=0;i<25;i++) pts.push({x:cx+rnd(-70,70),y:cy+rnd(-60,60),c:-1});
+  });
+  // 随机初始化中心
+  centers=Array.from({length:K},()=>({x:rnd(80,720),y:rnd(60,320)}));
+  draw(); info.textContent='初始化完成：随机放置3个中心（★），点击"下一步"开始迭代';
+}
+
+function assign(){
+  pts.forEach(p=>{
+    let minD=Infinity,best=0;
+    centers.forEach((c,i)=>{
+      const d=(p.x-c.x)**2+(p.y-c.y)**2;
+      if(d<minD){minD=d;best=i;}
+    });
+    p.c=best;
+  });
+}
+
+function update(){
+  centers=centers.map((_,i)=>{
+    const grp=pts.filter(p=>p.c===i);
+    if(grp.length===0) return centers[i];
+    return {x:grp.reduce((s,p)=>s+p.x,0)/grp.length,
+            y:grp.reduce((s,p)=>s+p.y,0)/grp.length};
+  });
+}
+function draw(){
+  ctx.clearRect(0,0,800,380);
+  // 画点
+  pts.forEach(p=>{
+    ctx.beginPath(); ctx.arc(p.x,p.y,6,0,2*Math.PI);
+    ctx.fillStyle=p.c>=0?COLS[p.c]:'#888';
+    ctx.globalAlpha=0.8; ctx.fill(); ctx.globalAlpha=1;
+  });
+  // 画中心
+  centers.forEach((c,i)=>{
+    ctx.beginPath(); ctx.arc(c.x,c.y,12,0,2*Math.PI);
+    ctx.fillStyle=COLS[i]; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();
+    ctx.fillStyle='#000'; ctx.font='bold 13px Arial';
+    ctx.fillText('★',c.x-7,c.y+5);
+  });
+  // 图例
+  ctx.fillStyle='#aaa'; ctx.font='12px Arial';
+  ctx.fillText(`迭代次数: ${iter}`,10,370);
+}
+
+function nextStep(){
+  if(pts.length===0){info.textContent='请先点击"随机数据"';return;}
+  assign(); update(); iter++;
+  draw();
+  info.textContent=`第${iter}轮：① 每个点分配到最近中心 → ② 中心移到簇均值位置`;
+  if(iter>=10) info.textContent+='  ✅ 已收敛';
+}
+
+async function autoRun(){
+  if(pts.length===0){initData();}
+  running=true;
+  for(let i=0;i<8;i++){
+    if(!running) break;
+    nextStep();
+    await new Promise(r=>setTimeout(r,700));
+  }
+  info.textContent=`✅ 自动运行完毕（${iter}轮），K-Means已收敛`;
+}
+
+initData();
+</script></body></html>
