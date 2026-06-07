@@ -15,7 +15,7 @@ export ANTHROPIC_BASE_URL=http://49.12.223.172:9090
 case $choice in
   1)
     unset ANTHROPIC_API_KEY
-    export ANTHROPIC_MODEL=claude-sonnet-4-6
+    export ANTHROPIC_MODEL=claude-sonnet-4-6-max
     echo "启动 Claude (模型: claude-sonnet-4-6)..."
     claude --dangerously-skip-permissions
     ;;
