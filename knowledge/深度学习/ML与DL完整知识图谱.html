@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ML与DL完整知识图谱</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0a0a0a;color:#e0e0e0;font-family:'Menlo','Consolas','Courier New',monospace;overflow:hidden;height:100vh;}
+/* TOP BAR */
+#topbar{position:fixed;top:0;left:0;right:0;z-index:100;background:#111;border-bottom:1px solid #333;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+#topbar h1{font-size:16px;color:#fff;margin-right:20px;white-space:nowrap;}
+#searchbox{flex:0 1 260px;padding:6px 12px;background:#1a1a1a;border:1px solid #444;border-radius:4px;color:#e0e0e0;font-size:13px;outline:none;}
+#searchbox:focus{border-color:#4488ff;}
+#searchbox::placeholder{color:#666;}
+.stage-btn{padding:4px 10px;background:#1a1a1a;border:1px solid #333;border-radius:3px;color:#999;font-size:11px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.stage-btn:hover,.stage-btn.active{background:#4488ff;color:#fff;border-color:#4488ff;}
+.stage-btn-all{background:#222;color:#ccc;border-color:#555;}
+.stage-btn-all:hover,.stage-btn-all.active{background:#44cc66;color:#000;border-color:#44cc66;}
+/* LAYOUT */
+#main{display:flex;margin-top:50px;height:calc(100vh - 50px);}
+#tree-container{flex:1;overflow-y:auto;padding:20px 10px 20px 20px;scrollbar-width:thin;scrollbar-color:#333 #0a0a0a;}
+#tree-container::-webkit-scrollbar{width:6px;}
+#tree-container::-webkit-scrollbar-thumb{background:#333;border-radius:3px;}
+#card-panel{width:420px;min-width:420px;background:#111;border-left:1px solid #333;overflow-y:auto;padding:0;transform:translateX(100%);transition:transform .3s ease;position:relative;scrollbar-width:thin;scrollbar-color:#333 #111;}
+#card-panel.open{transform:translateX(0);}
+#card-panel::-webkit-scrollbar{width:6px;}
+#card-panel::-webkit-scrollbar-thumb{background:#333;border-radius:3px;}
+/* STAGE */
+.stage-block{margin-bottom:24px;border-radius:8px;padding:16px 16px 12px 16px;border:1px solid #282828;}
+.stage-header{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:8px;}
+.stage-number{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;font-size:14px;font-weight:bold;flex-shrink:0;}
+.stage-title{font-size:18px;font-weight:bold;color:#fff;}
+.stage-summary{font-size:12px;color:#888;margin-bottom:8px;padding-left:42px;}
+.stage-arrow{color:#555;font-size:16px;margin:-4px 0 4px 42px;}
+/* TREE */
+.tree-list{list-style:none;padding-left:0;}
+.tree-list .tree-list{padding-left:20px;border-left:1px solid #282828;margin-left:10px;}
+.tree-item{position:relative;}
+.node-header{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;cursor:pointer;transition:background .15s;user-select:none;}
+.node-header:hover{background:rgba(255,255,255,0.05);}
+.node-toggle{width:16px;text-align:center;font-size:11px;color:#666;flex-shrink:0;transition:transform .2s;}
+.node-toggle.collapsed{transform:rotate(-90deg);}
+.node-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.node-label{font-size:14px;color:#e0e0e0;}
+.node-label.l1{font-size:18px;font-weight:bold;color:#fff;}
+.node-label.l2{font-size:15px;font-weight:bold;color:#ccc;}
+.node-label.l3{font-size:14px;}
+.node-label.l4{font-size:13px;}
+/* COLOR DOTS */
+.dot-red{background:#ff4444;}
+.dot-blue{background:#4488ff;}
+.dot-green{background:#44cc66;}
+.dot-purple{background:#aa66ff;}
+.dot-red-triple{background:#ff4444;box-shadow:0 0 8px #ff4444,0 0 16px #ff4444;width:10px;height:10px;}
+.node-label.triple-emphasis{font-size:16px!important;font-weight:bold;color:#ff4444!important;text-shadow:0 0 8px rgba(255,68,68,0.5);background:rgba(255,68,68,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(255,68,68,0.3);}
+/* CHILD CONTAINER */
+.node-children{overflow:hidden;transition:max-height .3s ease;}
+.node-children.collapsed{max-height:0!important;}
+/* SEARCH HIGHLIGHT */
+.search-highlight{background:rgba(68,136,255,0.3);border-radius:2px;}
+/* DETAIL CARD */
+.card-inner{padding:24px;}
+.card-close{position:absolute;top:12px;right:12px;width:28px;height:28px;background:#222;border:1px solid #444;border-radius:4px;color:#999;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.card-close:hover{background:#ff4444;color:#fff;}
+.card-title{font-size:18px;font-weight:bold;color:#fff;margin-bottom:6px;padding-right:36px;}
+.card-subtitle{font-size:13px;color:#888;margin-bottom:16px;}
+.card-section{margin-bottom:16px;}
+.card-section-title{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;border-bottom:1px solid #222;padding-bottom:4px;}
+.card-summary{font-size:14px;color:#ccc;line-height:1.6;}
+.card-formula{font-size:14px;color:#4488ff;background:#1a1a1a;padding:10px 14px;border-radius:4px;border-left:3px solid #4488ff;font-family:'Menlo',monospace;line-height:1.6;}
+.card-key{font-size:14px;color:#44cc66;line-height:1.6;}
+.card-error{font-size:13px;color:#ff8888;line-height:1.6;}
+.card-error li{margin-bottom:4px;}
+.card-code{background:#0d0d0d;border:1px solid #333;border-radius:4px;padding:12px;font-size:12px;color:#44cc66;line-height:1.6;white-space:pre;overflow-x:auto;}
+.card-code .kw{color:#4488ff;}
+.card-code .cm{color:#666;}
+.card-code .fn{color:#aa66ff;}
+.card-code .num{color:#ff8844;}
+.card-links{font-size:13px;color:#888;line-height:1.8;}
+.card-links a{color:#4488ff;text-decoration:none;cursor:pointer;}
+.card-links a:hover{text-decoration:underline;}
+.card-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;margin-right:4px;margin-top:8px;}
+.tag-red{background:rgba(255,68,68,0.15);color:#ff4444;border:1px solid rgba(255,68,68,0.3);}
+.tag-blue{background:rgba(68,136,255,0.15);color:#4488ff;border:1px solid rgba(68,136,255,0.3);}
+.tag-green{background:rgba(68,204,102,0.15);color:#44cc66;border:1px solid rgba(68,204,102,0.3);}
+.tag-purple{background:rgba(170,102,255,0.15);color:#aa66ff;border:1px solid rgba(170,102,255,0.3);}
+/* STAGE COLORS */
+.s1 .stage-number{background:#1a1a1a;color:#999;border:1px solid #333;}
+.s2 .stage-number{background:#1a1a1a;color:#999;border:1px solid #333;}
+.s3 .stage-number{background:#1a1a1a;color:#999;border:1px solid #333;}
+.s4 .stage-number{background:#1a1a1a;color:#999;border:1px solid #333;}
+.s5 .stage-number{background:#1a1a1a;color:#999;border:1px solid #333;}
+.s6 .stage-number{background:#1a1a1a;color:#999;border:1px solid #333;}
+.s7 .stage-number{background:#1a1a1a;color:#999;border:1px solid #333;}
+.s8 .stage-number{background:#1a1a1a;color:#999;border:1px solid #333;}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <h1>ML & DL 知识图谱</h1>
+  <input id="searchbox" type="text" placeholder="搜索知识点..." />
+  <button class="stage-btn stage-btn-all active" onclick="filterStage('all')">全部</button>
+  <button class="stage-btn" onclick="filterStage(1)">一·数学</button>
+  <button class="stage-btn" onclick="filterStage(2)">二·ML</button>
+  <button class="stage-btn" onclick="filterStage(3)">三·DL</button>
+  <button class="stage-btn" onclick="filterStage(4)">四·CNN</button>
+  <button class="stage-btn" onclick="filterStage(5)">五·序列</button>
+  <button class="stage-btn" onclick="filterStage(6)">六·Attn</button>
+  <button class="stage-btn" onclick="filterStage(7)">七·预训练</button>
+  <button class="stage-btn" onclick="filterStage(8)">八·LLM</button>
+</div>
+<div id="main">
+  <div id="tree-container"></div>
+  <div id="card-panel">
+    <button class="card-close" onclick="closeCard()">&times;</button>
+    <div class="card-inner" id="card-content"></div>
+  </div>
+</div>
+<script>
+// ========== COMPLETE DATA ==========
+const DATA = [
+  { id:"s1", title:"阶段一：数学基础", summary:"所有ML/DL的根基——没有数学，就没有理论保证", bg:"#111", stage:1, children:[
+    { id:"la", label:"线性代数", level:2, color:"green", children:[
+      { id:"la1", label:"矩阵运算（乘法、转置、逆）", level:3, color:"green", isLeaf:true, card:{ title:"矩阵运算 Matrix Operations", summary:"线性代数的基本操作，神经网络中所有计算都是矩阵运算", formula:"C = AB → Cᵢⱼ = Σₖ Aᵢₖ·Bₖⱼ\nAᵀ: 行列互换\nA⁻¹: A·A⁻¹ = I", key:"矩阵乘法是神经网络前向传播的核心操作——Wx+b 就是一次矩阵乘加偏置", errors:["矩阵乘法不满足交换律：AB ≠ BA，但满足结合律","转置在反向传播中自动出现：∂(Wx)/∂x = Wᵀ"], code:"# PyTorch矩阵运算\nimport torch\nA = torch.randn(3,4)\nB = torch.randn(4,2)\nC = A @ B        # 矩阵乘法\nprint(A.T)        # 转置\nprint(torch.inverse(A[:3,:3]))  # 逆", links:["前向传播","反向传播","SVD"] }},
+      { id:"la2", label:"特征值与特征向量", level:3, color:"blue", isLeaf:true, card:{ title:"特征值与特征向量 Eigenvalue & Eigenvector", summary:"方阵 A 作用后方向不变的向量，缩放倍数即特征值", formula:"Av = λv（v是特征向量，λ是特征值）\n|A - λI| = 0 求解λ", key:"PCA的本质就是对协方差矩阵做特征分解，最大特征值对应主成分方向", errors:["只有方阵才有特征值，非方阵用SVD","特征值可能为复数，实对称矩阵的特征值一定为实数"], code:"import numpy as np\nA = np.array([[2,1],[1,2]])\neigvals, eigvecs = np.linalg.eig(A)\nprint(eigvals)  # [3. 1.]", links:["PCA降维","SVD","协方差矩阵"] }},
+      { id:"la3", label:"SVD 奇异值分解", level:3, color:"purple", isLeaf:true, card:{ title:"SVD 奇异值分解 Singular Value Decomposition", summary:"任意矩阵都能分解为 UΣVᵀ，是PCA的推广", formula:"A = UΣVᵀ\nA: m×n, U: m×m正交, Σ: m×n对角, Vᵀ: n×n正交\n奇异值σ₁≥σ₂≥...≥0", key:"SVD把矩阵分解为旋转→缩放→旋转三步，奇异值大小代表各方向的信息量", errors:["SVD与特征分解不同：SVD适用于任意矩阵，特征分解只适用于方阵","截断SVD保留前k个奇异值=低秩近似，损失由舍去的奇异值决定"], code:"import numpy as np\nA = np.random.randn(4,3)\nU, S, Vt = np.linalg.svd(A, full_matrices=False)\nA_approx = U[:,:2] @ np.diag(S[:2]) @ Vt[:2,:]", links:["PCA降维","矩阵运算","推荐系统"] }},
+      { id:"la4", label:"向量空间与基", level:3, color:"green", isLeaf:true, card:{ title:"向量空间与基 Vector Space & Basis", summary:"向量空间的基是最小线性无关生成集，所有向量都可由基线性表示", formula:"span{e₁,e₂,...,eₙ} = V\ndim(V) = 基中向量个数", key:"嵌入的本质就是把数据映射到另一个向量空间——Word2Vec就是把词映射到低维向量空间", errors:["基不唯一，但维数唯一","正交基最方便计算，Gram-Schmidt正交化可以构造正交基"], code:"import numpy as np\nv1, v2 = np.array([1,0,0]), np.array([0,1,0])\n# 线性组合生成空间中的任意向量\nx = 3*v1 + 5*v2  # [3,5,0]", links:["词嵌入","PCA降维","特征值与特征向量"] }}
+    ]},
+    { id:"ps", label:"概率与统计", level:2, color:"green", children:[
+      { id:"ps1", label:"贝叶斯定理", level:3, color:"red", isLeaf:true, card:{ title:"贝叶斯定理 Bayes' Theorem", summary:"用先验概率和似然更新后验概率——逆概率推理的基石", formula:"P(A|B) = P(B|A)·P(A) / P(B)\n后验 = 似然 × 先验 / 证据", key:"ML中的贝叶斯视角：先验是训练前的信念，似然是数据告诉我们什么，后验是训练后的信念", errors:["先验选择影响结果，但数据量足够大时后验趋同","朴素贝叶斯假设特征独立，现实中几乎不成立，但效果常出奇好"], code:"import numpy as np\n# 垃圾邮件分类\nP_spam = 0.3  # 先验\nP_word_given_spam = 0.8\nP_word = 0.4\nP_spam_given_word = P_word_given_spam * P_spam / P_word  # 0.6", links:["朴素贝叶斯","MLE与MAP","贝叶斯深度学习"] }},
+      { id:"ps2", label:"常见分布（高斯/伯努利/多项式）", level:3, color:"green", isLeaf:true, card:{ title:"常见概率分布 Common Distributions", summary:"高斯分布用于回归，伯努利用于二分类，多项式用于多分类", formula:"高斯: N(μ,σ²) = (1/√2πσ)exp(-(x-μ)²/2σ²)\n伯努利: P(x=1)=p, P(x=0)=1-p\n多项式: P(x=k) = C(n,k)·pₖᵏ·(1-pₖ)ⁿ⁻ᵏ", key:"逻辑回归输出服从伯努利分布，softmax输出服从多项式分布，MSE损失假设高斯噪声", errors:["高斯分布不是万能的——长尾分布用Cauchy，计数数据用Poisson","混淆分布的参数（高斯的μ和σ）和统计量（样本均值和方差）"], code:"import torch\ngauss = torch.distributions.Normal(0, 1)\nbern = torch.distributions.Bernoulli(0.7)\nprint(gauss.sample())  # 标准正态\nprint(bern.sample())   # 0 or 1", links:["线性回归","逻辑回归","MLE与MAP"] }},
+      { id:"ps3", label:"MLE 与 MAP", level:3, color:"blue", isLeaf:true, card:{ title:"MLE 与 MAP 最大似然估计与最大后验估计", summary:"MLE只看数据找最可能参数，MAP额外加入先验偏好", formula:"MLE: θ* = argmax P(D|θ)\nMAP: θ* = argmax P(θ|D) = argmax P(D|θ)·P(θ)\nMAP = MLE + 先验（L2正则=高斯先验）", key:"L2正则化等价于参数服从高斯先验的MAP估计——正则化本质是引入先验", errors:["MLE可能过拟合（只看数据），MAP加入先验可缓解","当数据量→∞时，MAP→MLE，先验影响消失"], code:"import numpy as np\n# MLE: 样本均值就是高斯分布的MLE估计\ndata = np.random.randn(100) * 2 + 3\nmu_mle = np.mean(data)  # ≈3\nsigma_mle = np.std(data)  # ≈2", links:["贝叶斯定理","线性回归","正则化"] }},
+      { id:"ps4", label:"期望与方差", level:3, color:"green", isLeaf:true, card:{ title:"期望与方差 Expectation & Variance", summary:"期望是均值，方差衡量离散程度——Bias-Variance Tradeoff的核心概念", formula:"E[X] = Σ xᵢ·P(xᵢ)\nVar(X) = E[(X-μ)²] = E[X²] - (E[X])²\nBias² + Variance = 总误差（偏差-方差权衡）", key:"模型复杂度↑ → 偏差↓方差↑（过拟合）；复杂度↓ → 偏差↑方差↓（欠拟合）", errors:["方差公式用E[X²]-E[X]²比定义式更方便计算","样本方差分母是n-1（无偏估计），不是n"], code:"import numpy as np\ndata = np.array([2,4,4,4,5,5,7,9])\nprint(np.mean(data))    # 期望 5.0\nprint(np.var(data))     # 方差 4.0\nprint(np.var(data, ddof=1))  # 无偏估计 4.57", links:["Bias-Variance","正则化","集成学习"] }}
+    ]},
+    { id:"cal", label:"微积分", level:2, color:"green", children:[
+      { id:"cal1", label:"偏导数与梯度", level:3, color:"red", isLeaf:true, card:{ title:"偏导数与梯度 Partial Derivative & Gradient", summary:"梯度是多元函数最快上升方向——梯度下降就沿负梯度走", formula:"∂f/∂xᵢ = 极限定义\n∇f = (∂f/∂x₁, ∂f/∂x₂, ..., ∂f/∂xₙ)\n梯度方向=最快上升，负梯度=最快下降", key:"神经网络训练就是：算梯度→沿负梯度更新参数→重复直到收敛", errors:["梯度指向上升方向！训练要沿负梯度方向走","偏导数只看一个变量，其他视为常数；全微分要考虑所有变量"], code:"import torch\nx = torch.tensor([2.0, 3.0], requires_grad=True)\ny = x[0]**2 + x[1]**3\ny.backward()\nprint(x.grad)  # [4.0, 27.0] = ∇f", links:["梯度下降法","反向传播","链式法则"] }},
+      { id:"cal2", label:"链式法则", level:3, color:"red", isLeaf:true, card:{ title:"链式法则 Chain Rule", summary:"复合函数的导数=各层导数相乘——反向传播的数学基础", formula:"y = f(g(x))\ndy/dx = (dy/dg)·(dg/dx)\n多层: dy/dx = ∂y/∂hₙ · ∂hₙ/∂hₙ₋₁ · ... · ∂h₁/∂x", key:"反向传播就是链式法则的自动化——从loss开始逐层往回乘偏导", errors:["链式法则是乘法，所以梯度消失=每层乘的数<1，连乘→0","不要混淆全导数和偏导数的链式法则形式"], code:"import torch\nx = torch.tensor(2.0, requires_grad=True)\ny = torch.sin(x**2)  # sin(g(x)), g(x)=x²\ny.backward()\nprint(x.grad)  # cos(4)*2*4 = chain rule!", links:["反向传播","偏导数与梯度","BPTT"] }},
+      { id:"cal3", label:"泰勒展开", level:3, color:"purple", isLeaf:true, card:{ title:"泰勒展开 Taylor Expansion", summary:"用多项式近似任意光滑函数——理解优化算法的数学基础", formula:"f(x) ≈ f(a) + f'(a)(x-a) + f''(a)(x-a)²/2! + ...\n一阶近似: f(x) ≈ f(a) + f'(a)(x-a) → 梯度下降\n二阶近似: 加入Hessian → 牛顿法", key:"梯度下降=一阶泰勒近似，牛顿法=二阶泰勒近似，Adam≈对角牛顿法", errors:["泰勒展开是局部近似，远离展开点后误差急剧增大","牛顿法需要Hessian矩阵，维度高时计算量O(n³)不可行"], code:"import numpy as np\n# 一阶泰勒近似 sin(x) 在 x=0\nx = np.linspace(-1, 1, 100)\nf = np.sin(x)\nf_approx = x  # sin(0)+cos(0)*(x-0) = 0+1*x", links:["梯度下降法","优化器","凸优化"] }}
+    ]},
+    { id:"opt", label:"优化理论", level:2, color:"green", children:[
+      { id:"opt1", label:"梯度下降法", level:3, color:"red", isLeaf:true, card:{ title:"梯度下降法 Gradient Descent", summary:"沿负梯度方向迭代更新参数——最基础的优化算法", formula:"θₜ₊₁ = θₜ - η·∇L(θₜ)\nη: 学习率(步长)\n∇L: 损失函数对参数的梯度", key:"核心思想：梯度指向函数值增长最快的方向，负梯度指向减少最快的方向", errors:["学习率太大→发散振荡，太小→收敛慢","鞍点比局部最小值更常见，SGD的随机性有助于逃离鞍点"], code:"import torch\nmodel = torch.nn.Linear(10,1)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.01)\nloss = (model(x) - y).pow(2).mean()\nloss.backward(); optimizer.step()", links:["偏导数与梯度","优化器","反向传播"] }},
+      { id:"opt2", label:"凸优化基础", level:3, color:"green", isLeaf:true, card:{ title:"凸优化基础 Convex Optimization", summary:"凸函数的局部最小=全局最小——但深度学习的损失函数几乎都不是凸的", formula:"凸函数: f(λx+(1-λ)y) ≤ λf(x)+(1-λ)f(y)\n凸集: 任意两点连线仍在集合内", key:"线性回归/逻辑回归的损失函数是凸的→有全局最优解；神经网络损失函数非凸→只能找局部最优", errors:["深度学习非凸，但SGD常能找到足够好的局部最优","凸优化的理论保证（如KKT条件）对理解约束优化仍有价值"], code:"# 凸性检查\nimport numpy as np\ndef is_convex(f, x1, x2, lam=0.5):\n    return f(lam*x1+(1-lam)*x2) <= lam*f(x1)+(1-lam)*f(x2)\nprint(is_convex(lambda x: x**2, -1, 1))  # True", links:["梯度下降法","拉格朗日乘子","SVM"] }},
+      { id:"opt3", label:"拉格朗日乘子", level:3, color:"purple", isLeaf:true, card:{ title:"拉格朗日乘子 Lagrange Multipliers", summary:"带约束优化问题转化为无约束问题——SVM对偶推导的数学工具", formula:"L(x,λ) = f(x) + Σλᵢgᵢ(x)\nKKT条件: ∇f + Σλᵢ∇gᵢ = 0, λᵢ≥0, gᵢ≤0\n对偶问题: max_λ min_x L(x,λ)", key:"SVM的最大间隔优化问题通过拉格朗日对偶转化为更容易求解的形式，还引出了核函数", errors:["KKT条件是必要条件，凸问题时也是充分条件","强对偶性不一定成立，Slater条件保证强对偶"], code:"# SVM对偶问题示意\n# 原问题: min ½||w||²\n# 对偶: max Σαᵢ - ½ΣΣαᵢαⱼyᵢyⱼ(xᵢ·xⱼ)\n# 核函数替换 (xᵢ·xⱼ) → K(xᵢ,xⱼ)", links:["SVM","凸优化","对偶问题"] }}
+    ]}
+  ]},
+  { id:"s2", title:"阶段二：机器学习基础", summary:"传统算法的核心思想——理解这些才能知道深度学习解决了什么问题", bg:"#131313", stage:2, children:[
+    { id:"sup", label:"监督学习", level:2, color:"green", children:[
+      { id:"sup1", label:"线性回归", level:3, color:"red", isLeaf:true, card:{ title:"线性回归 Linear Regression", summary:"最简单的回归模型——用线性组合拟合目标值", formula:"ŷ = wᵀx + b\n损失: L = (1/n)Σ(ŷᵢ-yᵢ)²  (MSE)\n解析解: w* = (XᵀX)⁻¹Xᵀy", key:"MSE损失等价于假设噪声服从高斯分布的MLE估计；正则化=加入先验", errors:["特征尺度不同时必须标准化，否则系数不可比","解析解O(d³)在大特征维度时不如梯度下降"], code:"from sklearn.linear_model import LinearRegression\nmodel = LinearRegression()\nmodel.fit(X_train, y_train)\nprint(model.coef_)     # 权重w\nprint(model.intercept_) # 偏置b", links:["逻辑回归","梯度下降法","正则化"] }},
+      { id:"sup2", label:"逻辑回归", level:3, color:"red", isLeaf:true, card:{ title:"逻辑回归 Logistic Regression", summary:"线性回归+sigmoid=分类模型——不是回归是分类", formula:"p = σ(wᵀx+b) = 1/(1+e⁻⁽ʷᵀˣ⁺ᵇ⁾)\n损失: L = -Σ[y·log(p)+(1-y)·log(1-p)] (交叉熵)\n决策边界: wᵀx+b=0", key:"交叉熵损失来自伯努利分布的MLE；sigmoid输出是概率，阈值0.5做分类", errors:["名字叫回归但做的是分类！","线性决策边界——特征不线性可分时需要特征工程或核方法"], code:"from sklearn.linear_model import LogisticRegression\nmodel = LogisticRegression()\nmodel.fit(X_train, y_train)\nprint(model.predict_proba(X_test))  # 概率输出", links:["线性回归","常见分布","损失函数"] }},
+      { id:"sup3", label:"决策树", level:3, color:"green", isLeaf:true, card:{ title:"决策树 Decision Tree", summary:"通过递归分裂特征空间构建if-then规则——直观可解释", formula:"信息增益: IG = H(D) - Σ(|Dᵥ|/|D|)·H(Dᵥ)\n基尼系数: Gini = 1 - Σpᵢ²\nH(D) = -Σpᵢ·log(pᵢ)", key:"信息增益选最有助于分类的特征；基尼系数更简单计算量更小，CART用基尼", errors:["决策树极易过拟合——必须剪枝或限制深度","信息增益偏向取值多的特征，用信息增益率可修正"], code:"from sklearn.tree import DecisionTreeClassifier\nmodel = DecisionTreeClassifier(max_depth=5)\nmodel.fit(X_train, y_train)\nprint(model.feature_importances_)", links:["随机森林","梯度提升","信息论"] }},
+      { id:"sup4", label:"支持向量机", level:3, color:"blue", isLeaf:true, card:{ title:"支持向量机 SVM", summary:"找最大间隔超平面——小样本高维数据的经典利器", formula:"min ½||w||²  s.t. yᵢ(wᵀxᵢ+b)≥1\n对偶: max Σαᵢ-½ΣΣαᵢαⱼyᵢyⱼK(xᵢ,xⱼ)\n核函数: K(x,z) = φ(x)·φ(z)", key:"核函数把低维线性不可分映射到高维线性可分，无需显式计算φ(x)", errors:["核函数选择是关键：RBF最通用，但需要调γ","SVM对特征尺度敏感，必须标准化","大数据集训练慢O(n²~n³)"], code:"from sklearn.svm import SVC\nmodel = SVC(kernel='rbf', C=1.0)\nmodel.fit(X_train, y_train)\nprint(model.support_vectors_.shape)", links:["拉格朗日乘子","凸优化","核方法"] }},
+      { id:"sup5", label:"K近邻", level:3, color:"green", isLeaf:true, card:{ title:"K近邻 KNN", summary:"最简单的分类器——看邻居怎么投就怎么投", formula:"ŷ = majority(yᵢ), i ∈ Nₖ(x)\n距离: d(x,z) = √Σ(xᵢ-zᵢ)²  (欧氏)", key:"懒学习——没有训练过程，预测时才计算；K越大越平滑，K越小越容易过拟合", errors:["必须标准化！特征尺度不同时距离被大尺度特征主导","高维空间中所有点距离趋同（维度灾难），KNN在高维效果差"], code:"from sklearn.neighbors import KNeighborsClassifier\nmodel = KNeighborsClassifier(n_neighbors=5)\nmodel.fit(X_train, y_train)\nprint(model.predict(X_test))", links:["距离度量","维度灾难","特征工程"] }},
+      { id:"sup6", label:"朴素贝叶斯", level:3, color:"green", isLeaf:true, card:{ title:"朴素贝叶斯 Naive Bayes", summary:"假设特征独立的贝叶斯分类器——简单但常出奇效", formula:"P(y|x) ∝ P(y)·ΠP(xᵢ|y)\n高斯NB: P(xᵢ|y) = N(μᵧ,σᵧ²)", key:"朴素=假设特征条件独立，极大简化计算；文本分类经典基线方法", errors:["特征独立假设几乎不成立，但为什么效果还行？因为分类只需要比较大小，不需要精确概率","概率可能下溢→取log变成加法"], code:"from sklearn.naive_bayes import GaussianNB\nmodel = GaussianNB()\nmodel.fit(X_train, y_train)\nprint(model.predict_log_proba(X_test))", links:["贝叶斯定理","文本分类","MLE与MAP"] }}
+    ]},
+    { id:"ens", label:"集成学习", level:2, color:"green", children:[
+      { id:"ens1", label:"Bagging 与随机森林", level:3, color:"blue", isLeaf:true, card:{ title:"Bagging 与随机森林 Random Forest", summary:"多个模型投票——降低方差，减少过拟合", formula:"Bagging: 训练m个模型，每个用bootstrap采样\nRF: 每棵树还随机选特征子集\n预测: 回归取均值，分类取投票", key:"随机森林=Bagging+特征随机→树之间的相关性降低→集成效果更好", errors:["随机森林不容易过拟合，树越多越好（不像单棵决策树）","OOB(Out-of-Bag)误差可以代替交叉验证，省计算"], code:"from sklearn.ensemble import RandomForestClassifier\nmodel = RandomForestClassifier(n_estimators=100, max_depth=10)\nmodel.fit(X_train, y_train)\nprint(model.oob_score_)", links:["决策树","Boosting","期望与方差"] }},
+      { id:"ens2", label:"Boosting（AdaBoost/GBDT/XGBoost）", level:3, color:"blue", isLeaf:true, card:{ title:"Boosting 提升方法", summary:"串行训练弱学习器，每个纠正前一个的错误——降低偏差", formula:"AdaBoost: wᵢ₊₁ ∝ wᵢ·exp(-αᵢyᵢhᵢ(xᵢ))\nGBDT: Fₜ₊₁ = Fₜ + η·hₜ, hₜ拟合负梯度\nXGBoost: 加二阶泰勒+正则", key:"Bagging降方差，Boosting降偏差；XGBoost是GBDT的工程优化版（二阶导+正则+并行）", errors:["Boosting容易过拟合——需要早停和正则","GBDT用负梯度=残差，所以叫梯度提升","XGBoost的二阶近似比一阶更精确"], code:"import xgboost as xgb\nmodel = xgb.XGBClassifier(n_estimators=100, learning_rate=0.1, max_depth=6)\nmodel.fit(X_train, y_train, eval_set=[(X_val, y_val)], early_stopping_rounds=10)", links:["决策树","随机森林","泰勒展开"] }}
+    ]},
+    { id:"unsup", label:"无监督学习", level:2, color:"green", children:[
+      { id:"unsup1", label:"K-Means 聚类", level:3, color:"green", isLeaf:true, card:{ title:"K-Means 聚类", summary:"最简单的聚类——迭代找K个中心点", formula:"1. 随机初始化K个中心\n2. 分配每个点到最近中心\n3. 更新中心为簇内均值\n4. 重复2-3直到收敛\n目标: min Σₖ Σ ‖x-μₖ‖²", key:"K-Means假设簇是球形且等大小，不满足时效果差；K必须手动指定", errors:["K值选择没有万能方法——肘部法则/轮廓系数/Gap Statistic","对初始化敏感——K-Means++解决初始化问题","只能处理球形簇，非凸簇用DBSCAN"], code:"from sklearn.cluster import KMeans\nmodel = KMeans(n_clusters=3, init='k-means++')\nmodel.fit(X)\nprint(model.cluster_centers_)", links:["DBSCAN","PCA降维","无监督学习"] }},
+      { id:"unsup2", label:"DBSCAN", level:3, color:"green", isLeaf:true, card:{ title:"DBSCAN 密度聚类", summary:"基于密度的聚类——能发现任意形状的簇，自动识别噪声", formula:"核心点: ε邻域内≥MinPts个点\n边界点: 非核心但在核心点ε邻域内\n噪声点: 既非核心也非边界\n簇=密度可达的核心点集合", key:"不需要指定K，能发现任意形状的簇，还能标记噪声点", errors:["ε和MinPts需要调参，不同密度簇效果差","高维空间密度定义困难（维度灾难）"], code:"from sklearn.cluster import DBSCAN\nmodel = DBSCAN(eps=0.5, min_samples=5)\nlabels = model.fit_predict(X)\nprint(set(labels))  # -1=噪声", links:["K-Means","密度估计","异常检测"] }},
+      { id:"unsup3", label:"PCA 降维", level:3, color:"blue", isLeaf:true, card:{ title:"PCA 主成分分析 Principal Component Analysis", summary:"找方差最大的方向作为主成分——最经典的降维方法", formula:"协方差矩阵: C = (1/n)XᵀX\n特征分解: C = VΛVᵀ\n投影: X' = XVₖ (取前k个特征向量)", key:"PCA=对协方差矩阵特征分解=保留方差最大的方向；本质是线性变换", errors:["PCA只保留全局方差最大的方向，不保证对分类有用","PCA后特征不可解释——原始特征含义丢失","必须先标准化（除非特征尺度相同）"], code:"from sklearn.decomposition import PCA\npca = PCA(n_components=2)\nX_reduced = pca.fit_transform(X)\nprint(pca.explained_variance_ratio_)", links:["特征值与特征向量","SVD","t-SNE"] }},
+      { id:"unsup4", label:"t-SNE", level:3, color:"purple", isLeaf:true, card:{ title:"t-SNE t-分布随机邻域嵌入", summary:"非线性降维可视化——高维数据的2D/3D可视化首选", formula:"高维: pⱼᵢ ∝ exp(-‖xᵢ-xⱼ‖²/2σ²)\n低维: qⱼᵢ ∝ (1+‖yᵢ-yⱼ‖²)⁻¹  (t分布)\n目标: min KL(P‖Q)", key:"用t分布代替高斯解决拥挤问题——高维等距点在低维应更分散", errors:["t-SNE只用于可视化，不适合作为下游任务的特征提取","不同运行结果可能不同——perplexity参数影响大","簇间距离无意义，只有局部结构可靠"], code:"from sklearn.manifold import TSNE\ntsne = TSNE(n_components=2, perplexity=30)\nX_2d = tsne.fit_transform(X)\nplt.scatter(X_2d[:,0], X_2d[:,1])", links:["PCA降维","可视化","降维"] }}
+    ]},
+    { id:"rl", label:"强化学习", level:2, color:"green", children:[
+      { id:"rl1", label:"MDP 与贝尔曼方程", level:3, color:"blue", isLeaf:true, card:{ title:"MDP 与贝尔曼方程", summary:"马尔可夫决策过程——强化学习的数学框架", formula:"V(s) = maxₐ[R(s,a)+γΣP(s'|s,a)V(s')]\nQ(s,a) = R(s,a)+γΣP(s'|s,a)maxₐ'Q(s',a')\nγ: 折扣因子(0~1)", key:"贝尔曼方程把全局优化分解为局部一步+剩余的递归——动态规划的思想", errors:["马尔可夫假设：未来只依赖当前状态，与历史无关","γ接近1重视长远，接近0重视短期"], code:"# 贝尔曼更新\nimport numpy as np\nV = np.zeros(n_states)\nfor s in range(n_states):\n    V[s] = max([R[s,a]+gamma*sum(P[s,a,s2]*V[s2] for s2 in range(n_states)) for a in range(n_actions)])", links:["Q-Learning","DQN","动态规划"] }},
+      { id:"rl2", label:"Q-Learning", level:3, color:"blue", isLeaf:true, card:{ title:"Q-Learning", summary:"无模型学习Q值表——通过试错学习最优策略", formula:"Q(s,a) ← Q(s,a)+α[r+γmaxₐ'Q(s',a')-Q(s,a)]\nε-greedy: 以ε概率随机探索，1-ε选最优", key:"Q-Learning是off-policy的——用ε-greedy探索但学习的是最优Q值", errors:["状态空间大时Q表存不下→DQN用神经网络近似Q值","探索-利用困境：太多探索浪费时间，太少探索错过最优"], code:"# Q-Learning核心更新\nQ[state, action] += lr * (\n    reward + gamma * np.max(Q[next_state]) \n    - Q[state, action]\n)", links:["MDP","DQN","探索利用"] }},
+      { id:"rl3", label:"DQN", level:3, color:"purple", isLeaf:true, card:{ title:"DQN Deep Q-Network", summary:"用神经网络代替Q表——深度学习+强化学习的里程碑", formula:"L(θ) = E[(r+γmaxₐ'Q(s',a';θ⁻)-Q(s,a;θ))²]\nθ⁻: 目标网络(定期从θ复制)\n经验回放: 打破样本相关性", key:"DQN三大创新：经验回放+目标网络+ε-greedy，解决了RL训练不稳定的问题", errors:["Q值会被高估——Double DQN解决","经验回放池大小需要调整，太小遗忘太慢占内存"], code:"import torch\nq_values = model(state)\naction = q_values.argmax()\ntarget = reward + gamma * target_model(next_state).max()\nloss = (target - q_values[action]).pow(2)", links:["Q-Learning","RLHF","经验回放"] }}
+    ]}
+  ]},
