@@ -5,8 +5,8 @@ echo "1) Claude"
 echo "2) Codex"
 read -p "输入选项 (1/2): " choice
 
-export http_proxy=http://127.0.0.1:7897
-export https_proxy=http://127.0.0.1:7897
+export http_proxy=http://127.0.0.1:7890
+export https_proxy=http://127.0.0.1:7890
 export OPENAI_API_KEY=sk-UrHldCrF1tZEl1iix7d6J8aR1Du3VyIUziOds4cX5JO7YRGC
 export OPENAI_BASE_URL=https://api.01122002.xyz/
 export ANTHROPIC_AUTH_TOKEN=sk-UrHldCrF1tZEl1iix7d6J8aR1Du3VyIUziOds4cX5JO7YRGC
