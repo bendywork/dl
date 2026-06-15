@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GloVe 词向量 — 动画演示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0f1117;
+    color: #e8e8e8;
+    font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ===== Header ===== */
+  header {
+    background: linear-gradient(135deg, #1a1d2e 0%, #16192a 100%);
+    border-bottom: 1px solid #2a2d3e;
+    padding: 18px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 {
+    font-size: 1.4rem;
+    background: linear-gradient(90deg, #f5a623, #f7c948);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  header .subtitle {
+    font-size: 0.82rem;
+    color: #666;
+    margin-top: 3px;
+  }
+
+  /* ===== Progress bar ===== */
+  .progress-wrap {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .step-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid #333;
+    color: #555;
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all .3s;
+  }
+  .step-dot.active {
+    border-color: #f5a623;
+    background: #f5a623;
+    color: #0f1117;
+  }
+  .step-dot.done {
+    border-color: #f5a623;
+    color: #f5a623;
+  }
+
+  /* ===== Main stage ===== */
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 20px 120px;
+  }
+
+  .scene {
+    display: none;
+    animation: fadeIn .5s ease;
+  }
+  .scene.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ===== Scene card ===== */
+  .card {
+    background: #161922;
+    border: 1px solid #242738;
+    border-radius: 14px;
+    padding: 32px 36px;
+    margin-bottom: 22px;
+  }
+  .card-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #f5a623;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .tag {
+    font-size: 0.7rem;
+    background: rgba(245,166,35,.15);
+    border: 1px solid rgba(245,166,35,.3);
+    color: #f5a623;
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-weight: 600;
+  }
+
+  /* ===== Step title ===== */
+  .step-label {
+    font-size: 0.78rem;
+    color: #666;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .scene-title {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 28px;
+    line-height: 1.4;
+  }
+
+  /* ===== Text styles ===== */
+  p { color: #aaa; line-height: 1.85; font-size: 0.93rem; }
+  p + p { margin-top: 10px; }
+  .highlight { color: #f7c948; font-weight: 600; }
+  .orange { color: #f5a623; font-weight: 600; }
+  .cyan { color: #5dd3d3; font-weight: 600; }
+  .green { color: #6fcf97; font-weight: 600; }
+  .red { color: #eb5757; font-weight: 600; }
+
+  /* ===== Two-column ===== */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-top: 20px;
+  }
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+  .info-box {
+    background: #1c1f2e;
+    border: 1px solid #2a2d3e;
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .info-box h4 {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .info-box p { font-size: 0.88rem; }
+
+  /* ===== Formula box ===== */
+  .formula-box {
+    background: #0d0f18;
+    border: 1px solid #2a3048;
+    border-radius: 10px;
+    padding: 20px 28px;
+    margin: 20px 0;
+    text-align: center;
+    position: relative;
+  }
+  .formula-box .formula-label {
+    position: absolute;
+    top: -10px; left: 20px;
+    background: #0d0f18;
+    padding: 0 8px;
+    font-size: 0.7rem;
+    color: #555;
+    letter-spacing: .06em;
+  }
+  .formula {
+    font-family: 'Courier New', 'Lucida Console', monospace;
+    font-size: 1.05rem;
+    color: #f7c948;
+    line-height: 2;
+  }
+  .formula sub { font-size: 0.68rem; }
+  .formula sup { font-size: 0.68rem; }
+
+  /* ===== Co-occurrence Matrix ===== */
+  .matrix-wrap {
+    overflow-x: auto;
+    margin-top: 20px;
+  }
+  .matrix-table {
+    border-collapse: collapse;
+    margin: 0 auto;
+    min-width: 420px;
+  }
+  .matrix-table th, .matrix-table td {
+    width: 70px; height: 46px;
+    text-align: center;
+    border: 1px solid #242738;
+    font-size: 0.88rem;
+  }
+  .matrix-table th {
+    background: #1c1f2e;
+    color: #888;
+    font-weight: 600;
+  }
+  .matrix-table td {
+    background: #161922;
+    color: #ccc;
+    transition: all .4s;
+  }
+  .matrix-table td.row-header {
+    background: #1c1f2e;
+    color: #888;
+    font-weight: 600;
+  }
+  .matrix-table td.hl-orange {
+    background: rgba(245,166,35,.2);
+    color: #f5a623;
+    font-weight: 700;
+    box-shadow: inset 0 0 0 2px rgba(245,166,35,.5);
+  }
+  .matrix-table td.hl-cyan {
+    background: rgba(93,211,211,.15);
+    color: #5dd3d3;
+    font-weight: 700;
+    box-shadow: inset 0 0 0 2px rgba(93,211,211,.4);
+  }
+  .matrix-table td.hl-green {
+    background: rgba(111,207,151,.15);
+    color: #6fcf97;
+    font-weight: 700;
+    box-shadow: inset 0 0 0 2px rgba(111,207,151,.4);
+  }
+
+  /* ===== Ratio table ===== */
+  .ratio-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 18px;
+    font-size: 0.88rem;
+  }
+  .ratio-table th {
+    background: #1c1f2e;
+    color: #888;
+    font-weight: 600;
+    padding: 10px 14px;
+    border: 1px solid #2a2d3e;
+    text-align: center;
+  }
+  .ratio-table td {
+    padding: 10px 14px;
+    border: 1px solid #242738;
+    color: #ccc;
+    text-align: center;
+    background: #161922;
+  }
+  .ratio-table tr.highlight-row td {
+    color: #f5a623;
+    background: rgba(245,166,35,.08);
+    font-weight: 600;
+  }
+
+  /* ===== Weight function chart ===== */
+  .chart-wrap {
+    margin: 20px auto;
+    text-align: center;
+  }
+  canvas { border-radius: 8px; }
+
+  /* ===== Vector space ===== */
+  .vec-space {
+    position: relative;
+    width: 100%;
+    height: 320px;
+    background: #0d0f18;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #2a2d3e;
+    margin-top: 18px;
+  }
+  .vec-space svg { width: 100%; height: 100%; }
+
+  /* ===== Comparison table ===== */
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  .compare-table th {
+    background: #1c1f2e;
+    color: #888;
+    font-weight: 700;
+    padding: 12px 16px;
+    border: 1px solid #2a2d3e;
+    text-align: left;
+  }
+  .compare-table th.word2vec-h { color: #5dd3d3; }
+  .compare-table th.glove-h { color: #f5a623; }
+  .compare-table td {
+    padding: 11px 16px;
+    border: 1px solid #242738;
+    color: #ccc;
+    background: #161922;
+    line-height: 1.6;
+  }
+  .compare-table tr:hover td { background: #1c1f2e; }
+  .compare-table .icon-good { color: #6fcf97; }
+  .compare-table .icon-bad { color: #eb5757; }
+
+  /* ===== Navigation ===== */
+  .nav-wrap {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #11131d;
+    border-top: 1px solid #242738;
+    padding: 16px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 100;
+  }
+  .nav-wrap .step-info {
+    font-size: 0.82rem;
+    color: #555;
+  }
+  .btn {
+    padding: 10px 28px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all .25s;
+    letter-spacing: .03em;
+  }
+  .btn-prev {
+    background: #1c1f2e;
+    color: #888;
+    border: 1px solid #2a2d3e;
+  }
+  .btn-prev:hover { background: #242738; color: #ccc; }
+  .btn-next {
+    background: linear-gradient(135deg, #f5a623, #f7c948);
+    color: #0f1117;
+  }
+  .btn-next:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+
+  /* ===== Animated elements ===== */
+  .fade-in { opacity: 0; transition: opacity .5s ease; }
+  .fade-in.show { opacity: 1; }
+  .slide-up { opacity: 0; transform: translateY(20px); transition: all .5s ease; }
+  .slide-up.show { opacity: 1; transform: translateY(0); }
+
+  /* ===== Arrow ===== */
+  .arrow-down {
+    text-align: center;
+    font-size: 1.4rem;
+    color: #f5a623;
+    margin: 10px 0;
+    animation: bounce 1.5s infinite;
+  }
+  @keyframes bounce {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(6px); }
+  }
+
+  /* ===== Word bubble ===== */
+  .word-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+    justify-content: center;
+  }
+  .word-bubble {
+    background: #1c1f2e;
+    border: 1px solid #2a2d3e;
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 0.85rem;
+    color: #aaa;
+    transition: all .3s;
+  }
+  .word-bubble.center-word {
+    background: rgba(245,166,35,.18);
+    border-color: rgba(245,166,35,.5);
+    color: #f5a623;
+    font-weight: 700;
+  }
+  .word-bubble.context-word {
+    background: rgba(93,211,211,.12);
+    border-color: rgba(93,211,211,.35);
+    color: #5dd3d3;
+  }
+
+  /* ===== Progress bar strip ===== */
+  .progress-bar-strip {
+    height: 3px;
+    background: #242738;
+    border-radius: 2px;
+    margin: 6px 0 0;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f5a623, #f7c948);
+    border-radius: 2px;
+    transition: width .4s ease;
+  }
+
+  /* ===== f(x) bars ===== */
+  .fx-demo {
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    height: 80px;
+    margin-top: 16px;
+    padding: 0 10px;
+    justify-content: center;
+  }
+  .fx-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .fx-bar {
+    width: 30px;
+    border-radius: 3px 3px 0 0;
+    transition: height .6s ease, background .3s;
+  }
+  .fx-label { font-size: 0.7rem; color: #666; }
+
+  /* ===== Analogy box ===== */
+  .analogy-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 22px 0;
+  }
+  .word-chip {
+    background: #1c1f2e;
+    border: 2px solid #2a2d3e;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    transition: all .4s;
+  }
+  .word-chip.king   { border-color: #f5a623; color: #f5a623; }
+  .word-chip.man    { border-color: #eb5757; color: #eb5757; }
+  .word-chip.woman  { border-color: #5dd3d3; color: #5dd3d3; }
+  .word-chip.queen  { border-color: #6fcf97; color: #6fcf97; background: rgba(111,207,151,.12); }
+  .op-chip {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #555;
+  }
+
+  /* ===== Tooltip ===== */
+  .note {
+    background: rgba(245,166,35,.07);
+    border-left: 3px solid #f5a623;
+    border-radius: 0 8px 8px 0;
+    padding: 12px 18px;
+    margin-top: 16px;
+    font-size: 0.88rem;
+    color: #bbb;
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GloVe 词向量 — 动画演示</h1>
+    <div class="subtitle">Global Vectors for Word Representation · Pennington et al. 2014</div>
+  </div>
+  <div style="text-align:right">
+    <div class="progress-wrap" id="stepDots"></div>
+    <div class="progress-bar-strip" style="margin-top:10px; width:200px">
+      <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ======================== SCENE 1 ======================== -->
+  <div class="scene active" id="scene-1">
+    <div class="step-label">步骤 1 / 6</div>
+    <div class="scene-title">Word2Vec 的局限：只看局部，忽略全局</div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">问题动机</span>Word2Vec 的工作方式</div>
+      <p>Word2Vec（CBOW / Skip-gram）通过<span class="highlight">滑动窗口</span>扫描语料，每次只看中心词附近的若干词（通常 ±5 个）。</p>
+      <p>优点是计算高效，缺点是<span class="red">每次训练只利用局部信息</span>，无法直接感知某两个词在整个语料库中的全局共现关系。</p>
+
+      <div class="word-cloud" id="wc1">
+        <div class="word-bubble">The</div>
+        <div class="word-bubble">cat</div>
+        <div class="word-bubble center-word">sat</div>
+        <div class="word-bubble context-word">on</div>
+        <div class="word-bubble context-word">the</div>
+        <div class="word-bubble">mat</div>
+        <div class="word-bubble">.</div>
+      </div>
+      <p style="text-align:center; font-size:0.8rem; color:#555; margin-top:8px">
+        ↑ Skip-gram 以 "sat" 为中心，只看左右窗口内的词（蓝色）
+      </p>
+    </div>
+
+    <div class="two-col">
+      <div class="info-box">
+        <h4>Word2Vec 的问题</h4>
+        <p>· 同一对词可能出现在语料的很多地方，但每次训练只看一个窗口</p>
+        <p style="margin-top:8px">· 统计信息（全局共现频率）<span class="red">没有被显式利用</span></p>
+        <p style="margin-top:8px">· 需要大量 epoch 才能隐式学到全局规律</p>
+      </div>
+      <div class="info-box">
+        <h4>GloVe 的思路</h4>
+        <p>· 先一次性扫描整个语料库，构建<span class="orange">全局共现矩阵 X</span></p>
+        <p style="margin-top:8px">· 直接对共现统计信息建模，<span class="orange">显式优化</span>全局目标</p>
+        <p style="margin-top:8px">· 兼顾全局统计 + 局部上下文的优点</p>
+      </div>
+    </div>
+
+    <div class="note">
+      💡 <strong>核心洞察：</strong>LSA（奇异值分解）能高效利用全局统计，但类比推理差；Word2Vec 类比推理好，但全局利用不足。GloVe 的目标是两者兼得。
+    </div>
+  </div>
+
+  <!-- ======================== SCENE 2 ======================== -->
+  <div class="scene" id="scene-2">
+    <div class="step-label">步骤 2 / 6</div>
+    <div class="scene-title">全局共现矩阵 X</div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">数据结构</span>共现矩阵的构建</div>
+      <p>扫描整个语料库，统计每对词 (i, j) 在上下文窗口内同时出现的次数，记为 <span class="highlight">X<sub>ij</sub></span>。</p>
+      <p style="margin-top:8px">矩阵 X 的大小为 <span class="orange">|V| × |V|</span>（V 为词表大小），实际中词表可达数十万，因此存储稀疏矩阵。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">可视化</span>示例共现矩阵（简化语料）</div>
+      <p style="font-size:0.82rem; color:#555; margin-bottom:14px">语料：ice is solid water · steam is hot gas · ice and steam are water vapor</p>
+      <div class="matrix-wrap">
+        <table class="matrix-table" id="coocMatrix">
+          <thead>
+            <tr>
+              <th style="width:80px">词 i \ j</th>
+              <th>ice</th>
+              <th>steam</th>
+              <th>water</th>
+              <th>solid</th>
+              <th>gas</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-header">ice</td>
+              <td>0</td><td id="m12">1</td><td id="m13">4</td><td id="m14">3</td><td id="m15">0</td>
+            </tr>
+            <tr>
+              <td class="row-header">steam</td>
+              <td>1</td><td>0</td><td id="m23">2</td><td>0</td><td id="m25">3</td>
+            </tr>
+            <tr>
+              <td class="row-header">water</td>
+              <td>4</td><td>2</td><td>0</td><td>1</td><td>1</td>
+            </tr>
+            <tr>
+              <td class="row-header">solid</td>
+              <td>3</td><td>0</td><td>1</td><td>0</td><td>0</td>
+            </tr>
+            <tr>
+              <td class="row-header">gas</td>
+              <td>0</td><td>3</td><td>1</td><td>0</td><td>0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px; display:flex; gap:12px; flex-wrap:wrap; justify-content:center">
+        <button class="btn btn-prev" onclick="hlMatrix('orange')" style="font-size:0.8rem; padding:7px 16px">
+          高亮 ice ↔ water（X<sub>ij</sub>=4）
+        </button>
+        <button class="btn btn-prev" onclick="hlMatrix('cyan')" style="font-size:0.8rem; padding:7px 16px">
+          高亮 steam ↔ gas（X<sub>ij</sub>=3）
+        </button>
+        <button class="btn btn-prev" onclick="hlMatrix('green')" style="font-size:0.8rem; padding:7px 16px">
+          高亮 steam ↔ water（X<sub>ij</sub>=2）
+        </button>
+        <button class="btn btn-prev" onclick="hlMatrix('none')" style="font-size:0.8rem; padding:7px 16px">
+          清除高亮
+        </button>
+      </div>
+    </div>
+
+    <div class="formula-box">
+      <div class="formula-label">KEY NOTATION</div>
+      <div class="formula">
+        X<sub>i</sub> = Σ<sub>k</sub> X<sub>ik</sub> &nbsp;&nbsp; （词 i 的上下文总词频）
+        <br><br>
+        P(k|i) = X<sub>ik</sub> / X<sub>i</sub> &nbsp;&nbsp; （词 k 出现在词 i 上下文的概率）
+      </div>
+    </div>
+
+    <div class="note">
+      💡 共现矩阵是对称的（X<sub>ij</sub> = X<sub>ji</sub>，假设上下文窗口双向），实际实现中还会按距离加权：越近的共现词贡献越大。
+    </div>
+  </div>
+
+  <!-- ======================== SCENE 3 ======================== -->
+  <div class="scene" id="scene-3">
+    <div class="step-label">步骤 3 / 6</div>
+    <div class="scene-title">核心洞察：共现概率的比值</div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">关键思路</span>比值 P(k|i) / P(k|j) 捕捉词的关系</div>
+      <p>单独看 P(k|i) 和 P(k|j) 可能受词频影响，但它们的<span class="highlight">比值</span>能稳定地反映词 i 和词 j 与词 k 的相对亲近程度。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">实例</span>ice vs steam 与不同词的共现比值</div>
+      <table class="ratio-table" id="ratioTable">
+        <thead>
+          <tr>
+            <th>探针词 k</th>
+            <th>P(k | ice)</th>
+            <th>P(k | steam)</th>
+            <th>比值 P(k|ice)/P(k|steam)</th>
+            <th>含义</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="highlight-row" id="r1">
+            <td>solid（固态）</td>
+            <td>0.00019</td>
+            <td>0.000022</td>
+            <td style="color:#f5a623; font-weight:700">≈ <span id="rv1">8.9</span></td>
+            <td>远大于1 → 与 ice 更相关</td>
+          </tr>
+          <tr id="r2">
+            <td>gas（气态）</td>
+            <td>0.000066</td>
+            <td>0.00078</td>
+            <td style="color:#5dd3d3; font-weight:700">≈ <span id="rv2">0.085</span></td>
+            <td>远小于1 → 与 steam 更相关</td>
+          </tr>
+          <tr id="r3">
+            <td>water（水）</td>
+            <td>0.0022</td>
+            <td>0.0018</td>
+            <td style="color:#6fcf97; font-weight:700">≈ <span id="rv3">1.36</span></td>
+            <td>接近1 → 与两者都相关</td>
+          </tr>
+          <tr id="r4">
+            <td>fashion（时尚）</td>
+            <td>0.0000017</td>
+            <td>0.0000018</td>
+            <td style="color:#888; font-weight:700">≈ <span id="rv4">1.0</span></td>
+            <td>接近1 → 与两者都无关</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note" style="margin-top:18px">
+        🎯 <strong>结论：</strong>比值远大于 1 → k 是 i 的专属属性；比值远小于 1 → k 是 j 的专属属性；接近 1 → 与两者同等相关或同等无关。<br><br>
+        GloVe 的目标就是让词向量的<span class="highlight">内积</span>能够重建这种比值关系！
+      </div>
+    </div>
+
+    <div class="formula-box">
+      <div class="formula-label">GLOVE INTUITION</div>
+      <div class="formula">
+        F(w<sub>i</sub>, w<sub>j</sub>, w̃<sub>k</sub>) &nbsp;=&nbsp; P<sub>ik</sub> / P<sub>jk</sub>
+        <br><br>
+        <span style="font-size:0.85rem; color:#888">目标函数应能从词向量中重建共现概率之比</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== SCENE 4 ======================== -->
+  <div class="scene" id="scene-4">
+    <div class="step-label">步骤 4 / 6</div>
+    <div class="scene-title">GloVe 目标函数</div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">目标函数</span>加权最小二乘损失</div>
+      <p>GloVe 的推导过程：</p>
+      <p style="margin-top:8px">从 F(w<sub>i</sub>·w̃<sub>j</sub>) = P<sub>ij</sub>/P<sub>ij</sub> 出发，通过一系列约束（线性性、交换对称性），最终得到：</p>
+      <div class="formula-box">
+        <div class="formula-label">FINAL OBJECTIVE</div>
+        <div class="formula">
+          J &nbsp;=&nbsp; Σ<sub>i,j=1</sub><sup>|V|</sup> &nbsp;
+          <span style="color:#5dd3d3">f(X<sub>ij</sub>)</span> &nbsp;·&nbsp;
+          <span style="color:#f7c948">( w<sub>i</sub><sup>T</sup>w̃<sub>j</sub> + b<sub>i</sub> + b̃<sub>j</sub> − log X<sub>ij</sub> )</span><sup>2</sup>
+        </div>
+      </div>
+      <p style="margin-top:14px">其中各符号含义：</p>
+      <div class="two-col" style="margin-top:12px">
+        <div class="info-box">
+          <h4>向量部分</h4>
+          <p><span class="orange">w<sub>i</sub></span>：中心词向量</p>
+          <p style="margin-top:6px"><span class="cyan">w̃<sub>j</sub></span>：上下文词向量</p>
+          <p style="margin-top:6px"><span class="highlight">b<sub>i</sub>, b̃<sub>j</sub></span>：偏置项（标量）</p>
+        </div>
+        <div class="info-box">
+          <h4>统计部分</h4>
+          <p><span class="orange">X<sub>ij</sub></span>：词 j 出现在词 i 上下文的次数</p>
+          <p style="margin-top:6px"><span class="cyan">log X<sub>ij</sub></span>：对数化，防止极端值</p>
+          <p style="margin-top:6px"><span class="green">f(X<sub>ij</sub>)</span>：权重函数（见下）</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">权重函数</span>f(x) — 平衡高频与低频共现</div>
+      <p>若不加权重，高频词对 (ice, the) 会主导训练，忽略有意义的低频共现。</p>
+      <div class="formula-box">
+        <div class="formula-label">WEIGHTING FUNCTION</div>
+        <div class="formula">
+          f(x) = <br>
+          <span style="font-size:0.9rem">
+          &nbsp;&nbsp; (x / x<sub>max</sub>)<sup>α</sup> &nbsp;&nbsp; 若 x &lt; x<sub>max</sub><br>
+          &nbsp;&nbsp; 1 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 若 x ≥ x<sub>max</sub>
+          </span>
+        </div>
+      </div>
+      <p style="margin-top:10px">通常 x<sub>max</sub> = 100，α = 3/4。低共现次数的词对权重较低，防止它们过度影响结果。</p>
+      <div class="chart-wrap">
+        <canvas id="fxChart" width="500" height="160"></canvas>
+      </div>
+      <div class="note">
+        💡 f(x) 的作用：<span class="orange">从不惩罚 X<sub>ij</sub>=0</span>（直接跳过），低频对给小权重，高频对不超过 1，避免频繁词对主导梯度。
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== SCENE 5 ======================== -->
+  <div class="scene" id="scene-5">
+    <div class="step-label">步骤 5 / 6</div>
+    <div class="scene-title">词向量类比推理：king − man + woman = queen</div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">类比推理</span>向量空间中的语义关系</div>
+      <p>训练好的 GloVe 词向量能捕捉词与词之间的语义偏移关系。经典实验：</p>
+
+      <div class="analogy-row">
+        <div class="word-chip king">king</div>
+        <div class="op-chip">−</div>
+        <div class="word-chip man">man</div>
+        <div class="op-chip">+</div>
+        <div class="word-chip woman">woman</div>
+        <div class="op-chip">=</div>
+        <div class="word-chip queen" id="queenChip">queen ✓</div>
+      </div>
+
+      <p style="text-align:center; font-size:0.85rem; color:#666; margin-bottom:16px">
+        即：向量(king) − 向量(man) + 向量(woman) ≈ 向量(queen)
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">可视化</span>2D 词向量空间（PCA 降维示意）</div>
+      <div class="vec-space" id="vecSpace">
+        <svg id="vecSvg" viewBox="0 0 700 280" preserveAspectRatio="xMidYMid meet">
+          <!-- Grid lines -->
+          <defs>
+            <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#555"/>
+            </marker>
+            <marker id="arrowhead-orange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#f5a623"/>
+            </marker>
+            <marker id="arrowhead-cyan" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#5dd3d3"/>
+            </marker>
+            <marker id="arrowhead-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#6fcf97"/>
+            </marker>
+          </defs>
+
+          <!-- axis -->
+          <line x1="40" y1="250" x2="660" y2="250" stroke="#2a2d3e" stroke-width="1"/>
+          <line x1="40" y1="250" x2="40"  y2="20"  stroke="#2a2d3e" stroke-width="1"/>
+          <text x="665" y="254" fill="#444" font-size="11">dim1</text>
+          <text x="44"  y="16"  fill="#444" font-size="11">dim2</text>
+
+          <!-- Origin-to-word vectors (from origin 40,250) -->
+          <!-- man: (140,170) -->
+          <line x1="40" y1="250" x2="138" y2="172" stroke="#eb5757" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
+          <!-- woman: (200,100) -->
+          <line x1="40" y1="250" x2="258" y2="108" stroke="#5dd3d3" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
+          <!-- king: (380,140) -->
+          <line x1="40" y1="250" x2="408" y2="112" stroke="#f5a623" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
+          <!-- queen: (460,80) -->
+          <line x1="40" y1="250" x2="518" y2="68" stroke="#6fcf97" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
+
+          <!-- Gender offset arrow: man -> woman (highlight the offset vector) -->
+          <line x1="140" y1="170" x2="260" y2="110" stroke="#5dd3d3" stroke-width="2.5" marker-end="url(#arrowhead-cyan)"/>
+          <text x="175" y="128" fill="#5dd3d3" font-size="10" font-style="italic">gender offset</text>
+
+          <!-- Gender offset arrow: king -> queen -->
+          <line x1="410" y1="113" x2="519" y2="71" stroke="#6fcf97" stroke-width="2.5" marker-end="url(#arrowhead-green)"/>
+          <text x="438" y="80" fill="#6fcf97" font-size="10" font-style="italic">same offset</text>
+
+          <!-- Word labels -->
+          <circle cx="140" cy="170" r="18" fill="rgba(235,87,87,.18)" stroke="#eb5757" stroke-width="1.5"/>
+          <text x="140" y="174" fill="#eb5757" font-size="12" font-weight="bold" text-anchor="middle">man</text>
+
+          <circle cx="260" cy="110" r="22" fill="rgba(93,211,211,.15)" stroke="#5dd3d3" stroke-width="1.5"/>
+          <text x="260" y="114" fill="#5dd3d3" font-size="12" font-weight="bold" text-anchor="middle">woman</text>
+
+          <circle cx="410" cy="113" r="20" fill="rgba(245,166,35,.18)" stroke="#f5a623" stroke-width="1.5"/>
+          <text x="410" y="117" fill="#f5a623" font-size="12" font-weight="bold" text-anchor="middle">king</text>
+
+          <circle cx="520" cy="70" r="22" fill="rgba(111,207,151,.18)" stroke="#6fcf97" stroke-width="2"/>
+          <text x="520" y="74" fill="#6fcf97" font-size="12" font-weight="bold" text-anchor="middle">queen</text>
+
+          <!-- Annotation: parallelogram -->
+          <line x1="140" y1="170" x2="410" y2="113" stroke="#333" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="260" y1="110" x2="520" y2="70"  stroke="#333" stroke-width="1" stroke-dasharray="3,3"/>
+          <text x="280" y="165" fill="#555" font-size="10">royalty offset</text>
+          <line x1="140" y1="170" x2="138" y2="172" stroke="#555" stroke-width="0"/>
+        </svg>
+      </div>
+
+      <div class="note">
+        💡 词向量构成<span class="highlight">平行四边形</span>：man→woman 的偏移量 ≈ king→queen 的偏移量，说明向量空间学到了"性别"这一语义维度。
+        <br><br>
+        GloVe 通过全局共现统计，比 Word2Vec 在这类类比任务上收敛更快、结果更稳定。
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== SCENE 6 ======================== -->
+  <div class="scene" id="scene-6">
+    <div class="step-label">步骤 6 / 6</div>
+    <div class="scene-title">GloVe vs Word2Vec — 全面对比</div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">对比</span>两种方法的核心差异</div>
+      <table class="compare-table" id="cmpTable">
+        <thead>
+          <tr>
+            <th>对比维度</th>
+            <th class="word2vec-h">Word2Vec</th>
+            <th class="glove-h">GloVe</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>训练数据</strong></td>
+            <td>局部上下文窗口（逐句扫描）</td>
+            <td>全局共现矩阵（一次性统计）</td>
+          </tr>
+          <tr>
+            <td><strong>目标函数</strong></td>
+            <td>预测任务（最大化条件概率）</td>
+            <td>重建对数共现频率（最小二乘）</td>
+          </tr>
+          <tr>
+            <td><strong>全局统计</strong></td>
+            <td><span class="icon-bad">✗</span> 隐式，需多 epoch</td>
+            <td><span class="icon-good">✓</span> 显式建模，一次利用</td>
+          </tr>
+          <tr>
+            <td><strong>训练速度</strong></td>
+            <td>中等（可并行 Negative Sampling）</td>
+            <td>较快（稀疏矩阵，可并行）</td>
+          </tr>
+          <tr>
+            <td><strong>类比推理</strong></td>
+            <td><span class="icon-good">✓</span> 很强</td>
+            <td><span class="icon-good">✓</span> 同样很强（有时更快收敛）</td>
+          </tr>
+          <tr>
+            <td><strong>语义相似度</strong></td>
+            <td><span class="icon-good">✓</span> 强</td>
+            <td><span class="icon-good">✓</span> 强</td>
+          </tr>
+          <tr>
+            <td><strong>内存占用</strong></td>
+            <td>低（流式训练）</td>
+            <td>较高（需存储共现矩阵）</td>
+          </tr>
+          <tr>
+            <td><strong>超参数</strong></td>
+            <td>窗口大小、负采样数、维度</td>
+            <td>窗口大小、x_max、α、维度</td>
+          </tr>
+          <tr>
+            <td><strong>最终用法</strong></td>
+            <td>w<sub>i</sub>（中心词向量）</td>
+            <td>(w<sub>i</sub> + w̃<sub>i</sub>) / 2（取两向量平均）</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="tag">现代地位</span>GloVe 的影响与传承</div>
+      <div class="two-col">
+        <div class="info-box">
+          <h4>GloVe 的贡献</h4>
+          <p>· 理论上优雅：将共现矩阵分解与神经词向量统一在同一框架</p>
+          <p style="margin-top:8px">· 训练的预训练向量（840B tokens）至今仍被广泛下载使用</p>
+          <p style="margin-top:8px">· 为后续 fastText、ELMo 等提供了基线与思路</p>
+        </div>
+        <div class="info-box">
+          <h4>被超越的地方</h4>
+          <p>· 静态词向量：同一词在不同语境下向量相同（bank: 银行/河岸）</p>
+          <p style="margin-top:8px">· ELMo / BERT / GPT 引入<span class="orange">上下文相关</span>词向量，性能全面超越</p>
+          <p style="margin-top:8px">· 但在低资源、嵌入层初始化等场景仍有价值</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="formula-box">
+      <div class="formula-label">KNOWLEDGE SUMMARY</div>
+      <div class="formula" style="font-size:0.92rem; line-height:2.2">
+        GloVe = <span style="color:#5dd3d3">全局共现矩阵</span> + <span style="color:#f7c948">对数最小二乘</span> + <span style="color:#6fcf97">加权函数</span>
+        <br>
+        J = Σ f(X<sub>ij</sub>)(w<sub>i</sub>·w̃<sub>j</sub> + b<sub>i</sub> + b̃<sub>j</sub> − log X<sub>ij</sub>)²
+        <br>
+        <span style="font-size:0.8rem; color:#666">最终词向量 = (w + w̃) / 2，同时利用两组向量的信息</span>
+      </div>
+    </div>
+
+    <div class="note">
+      🎉 恭喜完成 GloVe 动画演示！核心要记住：GloVe 的精髓在于<span class="highlight">把共现概率的比值</span>编码进词向量内积，同时用<span class="highlight">权重函数 f(x)</span> 平衡高低频共现的影响。
+    </div>
+  </div>
+
+</main>
+
+<!-- Navigation -->
+<div class="nav-wrap">
+  <button class="btn btn-prev" id="btnPrev" onclick="navigate(-1)" disabled>← 上一步</button>
+  <div class="step-info" id="stepInfo">步骤 1 / 6</div>
+  <button class="btn btn-next" id="btnNext" onclick="navigate(1)">下一步 →</button>
+</div>
+
+<script>
+// ===== State =====
+let current = 1;
+const TOTAL = 6;
+
+// ===== Init step dots =====
+const dotsWrap = document.getElementById('stepDots');
+for (let i = 1; i <= TOTAL; i++) {
+  const d = document.createElement('div');
+  d.className = 'step-dot' + (i === 1 ? ' active' : '');
+  d.textContent = i;
+  d.onclick = () => goTo(i);
+  d.id = 'dot-' + i;
+  dotsWrap.appendChild(d);
+}
+
+// ===== Navigation =====
+function navigate(dir) {
+  goTo(current + dir);
+}
+
+function goTo(n) {
+  if (n < 1 || n > TOTAL) return;
+  // hide current
+  document.getElementById('scene-' + current).classList.remove('active');
+  document.getElementById('dot-' + current).classList.remove('active');
+  document.getElementById('dot-' + current).classList.add('done');
+  // show new
+  current = n;
+  document.getElementById('scene-' + current).classList.add('active');
+  document.getElementById('dot-' + current).classList.remove('done');
+  document.getElementById('dot-' + current).classList.add('active');
+  // buttons
+  document.getElementById('btnPrev').disabled = (current === 1);
+  document.getElementById('btnNext').disabled = (current === TOTAL);
+  document.getElementById('btnNext').textContent = current === TOTAL ? '完成 ✓' : '下一步 →';
+  document.getElementById('stepInfo').textContent = '步骤 ' + current + ' / ' + TOTAL;
+  // progress bar
+  document.getElementById('progressFill').style.width = ((current / TOTAL) * 100) + '%';
+  // scene-specific init
+  if (current === 4) drawFxChart();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ===== Scene 2: Matrix highlight =====
+function hlMatrix(type) {
+  // clear all
+  const cells = document.querySelectorAll('#coocMatrix td:not(.row-header)');
+  cells.forEach(c => { c.className = ''; });
+
+  if (type === 'orange') {
+    document.getElementById('m13').className = 'hl-orange'; // ice-water
+  } else if (type === 'cyan') {
+    document.getElementById('m25').className = 'hl-cyan'; // steam-gas
+  } else if (type === 'green') {
+    document.getElementById('m23').className = 'hl-green'; // steam-water
+  }
+}
+
+// ===== Scene 4: Draw f(x) chart =====
+function drawFxChart() {
+  const canvas = document.getElementById('fxChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const xmax = 100, alpha = 0.75;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // background
+  ctx.fillStyle = '#0d0f18';
+  ctx.fillRect(0, 0, W, H);
+
+  // grid
+  ctx.strokeStyle = '#1c1f2e';
+  ctx.lineWidth = 1;
+  for (let x = 50; x < W; x += 80) {
+    ctx.beginPath(); ctx.moveTo(x, 10); ctx.lineTo(x, H - 30); ctx.stroke();
+  }
+  for (let y = 10; y < H - 30; y += 30) {
+    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 10, y); ctx.stroke();
+  }
+
+  // axes
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(40, H - 30); ctx.lineTo(W - 10, H - 30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(40, 10); ctx.lineTo(40, H - 30); ctx.stroke();
+
+  // f(x) curve
+  const scaleX = (W - 60) / 200;
+  const scaleY = (H - 50) / 1.1;
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#f5a623';
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = '#f5a623';
+  ctx.shadowBlur = 6;
+
+  for (let xi = 0; xi <= 200; xi++) {
+    const fx = xi < xmax ? Math.pow(xi / xmax, alpha) : 1.0;
+    const px = 40 + xi * scaleX;
+    const py = (H - 30) - fx * scaleY;
+    if (xi === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // xmax vertical line
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  const xmaxPx = 40 + xmax * scaleX;
+  ctx.beginPath(); ctx.moveTo(xmaxPx, 10); ctx.lineTo(xmaxPx, H - 30); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels
+  ctx.fillStyle = '#888';
+  ctx.font = '11px PingFang SC';
+  ctx.fillText('x', W - 14, H - 26);
+  ctx.fillText('f(x)', 44, 18);
+  ctx.fillStyle = '#555';
+  ctx.fillText('x_max=100', xmaxPx - 28, H - 10);
+  ctx.fillStyle = '#f7c948';
+  ctx.font = 'bold 11px PingFang SC';
+  ctx.fillText('f(x) = (x/x_max)^α', 120, 50);
+  ctx.fillStyle = '#888';
+  ctx.font = '11px PingFang SC';
+  ctx.fillText('f(x) = 1', W - 70, 55);
+
+  // dot at (1,1)
+  const satPx = 40 + xmax * scaleX;
+  const satPy = (H - 30) - 1.0 * scaleY;
+  ctx.beginPath();
+  ctx.arc(satPx, satPy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#f5a623';
+  ctx.fill();
+}
+
+// ===== Scene 5: animate queen chip on enter =====
+function animateScene5() {
+  const q = document.getElementById('queenChip');
+  q.style.transform = 'scale(0)';
+  q.style.transition = 'transform .5s cubic-bezier(.175,.885,.32,1.275)';
+  setTimeout(() => { q.style.transform = 'scale(1)'; }, 300);
+}
+
+// Override goTo to trigger animations
+const _origGoTo = goTo;
+// patch
+const origGoTo = goTo;
+window.navigate = navigate;
+// reinit
+document.getElementById('progressFill').style.width = (1/TOTAL*100) + '%';
+
+// Draw chart if already on step 4 on load
+if (current === 4) drawFxChart();
+
+// Observe scene changes via MutationObserver for animation triggers
+const observer = new MutationObserver(() => {
+  const active = document.querySelector('.scene.active');
+  if (!active) return;
+  const id = active.id;
+  if (id === 'scene-4') drawFxChart();
+  if (id === 'scene-5') {
+    setTimeout(animateScene5, 200);
+  }
+  if (id === 'scene-6') animateCmpTable();
+});
+observer.observe(document.getElementById('scene-4'), { attributes: true, attributeFilter: ['class'] });
+observer.observe(document.getElementById('scene-5'), { attributes: true, attributeFilter: ['class'] });
+observer.observe(document.getElementById('scene-6'), { attributes: true, attributeFilter: ['class'] });
+
+// ===== Scene 6: stagger table rows =====
+function animateCmpTable() {
+  const rows = document.querySelectorAll('#cmpTable tbody tr');
+  rows.forEach((r, i) => {
+    r.style.opacity = '0';
+    r.style.transform = 'translateX(-12px)';
+    r.style.transition = 'all .35s ease';
+    setTimeout(() => {
+      r.style.opacity = '1';
+      r.style.transform = 'translateX(0)';
+    }, i * 80 + 100);
+  });
+}
+
+// ===== Scene 3: animate ratio values =====
+function animateRatioValues() {
+  const vals = [
+    { id: 'rv1', target: 8.9, suffix: '' },
+    { id: 'rv2', target: 0.085, suffix: '' },
+    { id: 'rv3', target: 1.36, suffix: '' },
+    { id: 'rv4', target: 1.0, suffix: '' },
+  ];
+  vals.forEach(({ id, target }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    let start = 0, steps = 40;
+    const inc = target / steps;
+    let i = 0;
+    const t = setInterval(() => {
+      i++;
+      start += inc;
+      el.textContent = start.toFixed(target < 1 ? 3 : 2);
+      if (i >= steps) { clearInterval(t); el.textContent = target; }
+    }, 30);
+  });
+}
+observer.observe(document.getElementById('scene-3'), { attributes: true, attributeFilter: ['class'] });
+document.getElementById('scene-3').addEventListener('DOMAttrModified', () => {});
+// Use MO for scene 3 too
+const obs3 = new MutationObserver(() => {
+  if (document.getElementById('scene-3').classList.contains('active')) {
+    setTimeout(animateRatioValues, 300);
+  }
+});
+obs3.observe(document.getElementById('scene-3'), { attributes: true, attributeFilter: ['class'] });
+</script>
+</body>
+</html>

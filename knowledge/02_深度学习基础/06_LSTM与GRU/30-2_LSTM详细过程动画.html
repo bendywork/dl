@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSTM 交互式动画 — TF Playground 风格</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f1117;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── 顶部标题栏 ── */
+.topbar{
+  background:linear-gradient(90deg,#13151f,#1a1d2e);
+  border-bottom:1px solid #2a2d3e;
+  padding:0 24px;height:52px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.topbar h1{font-size:1.1rem;color:#e2e8f0;font-weight:600;letter-spacing:.5px}
+.topbar h1 span{color:#6ee7b7;margin-right:6px}
+.ctrl-group{display:flex;gap:10px;align-items:center}
+.ctrl-btn{
+  padding:6px 16px;border-radius:6px;border:1px solid #3a3d4e;
+  background:#1e2130;color:#cbd5e1;font-size:0.82rem;cursor:pointer;
+  transition:all .15s;
+}
+.ctrl-btn:hover{background:#2a2d40;color:#fff;border-color:#4a9eff}
+.ctrl-btn.primary{background:#3b82f6;border-color:#3b82f6;color:#fff}
+.ctrl-btn.primary:hover{background:#2563eb}
+.speed-wrap{display:flex;align-items:center;gap:6px;font-size:.8rem;color:#94a3b8}
+.speed-wrap input{width:80px;accent-color:#3b82f6}
+
+/* ── 进度条 ── */
+.progress-track{height:3px;background:#1e2130;flex-shrink:0}
+.progress-fill{height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6,#6ee7b7);transition:width .3s;width:0%}
+
+/* ── 主体 ── */
+.main{display:flex;flex:1;overflow:hidden}
+
+/* ── 左侧图示 ── */
+.diagram-col{
+  width:52%;border-right:1px solid #1e2130;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:16px;position:relative;background:#0c0e16;
+}
+#lstmCanvas{width:100%;max-width:600px;max-height:calc(100vh - 120px)}
+
+/* ── 右侧面板 ── */
+.right-col{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+  padding:20px 24px 0;
+}
+
+/* 步骤区 */
+.step-area{flex:1;overflow-y:auto;padding-bottom:12px}
+.step-section-tag{
+  font-size:.7rem;letter-spacing:2px;font-weight:700;
+  color:#3b82f6;margin-bottom:6px;text-transform:uppercase;
+}
+.step-title{font-size:1.25rem;font-weight:700;color:#f1f5f9;margin-bottom:14px;line-height:1.4}
+.step-body{font-size:.88rem;color:#94a3b8;line-height:1.85}
+.step-body .hl{color:#fcd34d;font-weight:600}
+.step-body .gr{color:#6ee7b7;font-weight:600}
+.step-body .pk{color:#f472b6;font-weight:600}
+.step-body .bl{color:#60a5fa;font-weight:600}
+.step-body .or{color:#fb923c;font-weight:600}
+.step-body .vl{color:#a78bfa;font-weight:600}
+.formula-box{
+  background:#141726;border-left:3px solid #3b82f6;
+  padding:10px 14px;border-radius:4px;margin:10px 0;
+  font-family:'Courier New',monospace;font-size:.9rem;
+  color:#7dd3fc;line-height:1.7;
+}
+
+/* 数值可视化区 */
+.vals-area{
+  border-top:1px solid #1e2130;padding:14px 0 16px;
+  display:flex;flex-direction:column;gap:10px;
+  flex-shrink:0;
+}
+.val-row{display:flex;align-items:center;gap:10px}
+.val-label{font-size:.75rem;color:#64748b;min-width:70px;font-family:monospace}
+.vec-bars{display:flex;gap:4px;align-items:flex-end}
+.vec-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
+.vec-bar{
+  width:26px;border-radius:3px 3px 0 0;
+  transition:height .4s ease,background-color .4s ease;
+  min-height:2px;
+}
+.vec-val{font-size:.65rem;color:#64748b;font-family:monospace}
+
+/* ── 底部导航 ── */
+.nav-bar{
+  height:54px;background:#0c0e16;border-top:1px solid #1e2130;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;flex-shrink:0;
+}
+.nav-btn{
+  padding:8px 22px;border-radius:7px;border:none;cursor:pointer;
+  font-size:.88rem;font-weight:600;transition:all .15s;
+}
+.nav-btn.prev{background:#1e2130;color:#94a3b8}
+.nav-btn.prev:hover:not(:disabled){background:#2a2d40;color:#fff}
+.nav-btn.next{background:#3b82f6;color:#fff}
+.nav-btn.next:hover:not(:disabled){background:#2563eb}
+.nav-btn:disabled{opacity:.3;cursor:not-allowed}
+.step-counter{font-size:.82rem;color:#64748b}
+.dot-row{display:flex;gap:5px;align-items:center}
+.dot{
+  width:7px;height:7px;border-radius:50%;
+  background:#2a2d40;cursor:pointer;transition:all .2s;
+}
+.dot.done{background:#3b82f640}
+.dot.active{background:#3b82f6;transform:scale(1.5)}
+
+/* Canvas 粒子流 */
+canvas{display:block}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1><span>🧠</span>LSTM 交互式动画 · 完整原理讲解</h1>
+  <div class="ctrl-group">
+    <div class="speed-wrap">
+      速度 <input type="range" id="speedSlider" min="0.5" max="3" step="0.5" value="1">
+      <span id="speedVal">1×</span>
+    </div>
+    <button class="ctrl-btn" id="autoBtn" onclick="toggleAuto()">▶ 自动播放</button>
+    <button class="ctrl-btn" onclick="resetAll()">↺ 重置</button>
+  </div>
+</div>
+<div class="progress-track"><div class="progress-fill" id="progFill"></div></div>
+
+<div class="main">
+  <!-- 左侧 Canvas 图示 -->
+  <div class="diagram-col">
+    <canvas id="lstmCanvas"></canvas>
+  </div>
+
+  <!-- 右侧讲解 + 数值 -->
+  <div class="right-col">
+    <div class="step-area" id="stepArea">
+      <div class="step-section-tag" id="sTag">SECTION 0</div>
+      <div class="step-title" id="sTitle">加载中...</div>
+      <div class="step-body" id="sBody"></div>
+    </div>
+    <div class="vals-area" id="valsArea">
+      <!-- 动态注入 -->
+    </div>
+  </div>
+</div>
+
+<div class="nav-bar">
+  <button class="nav-btn prev" id="prevBtn" onclick="go(-1)" disabled>← 上一步</button>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+    <div class="step-counter" id="sCnt">步骤 1 / 35</div>
+    <div class="dot-row" id="dotRow"></div>
+  </div>
+  <button class="nav-btn next" id="nextBtn" onclick="go(1)">下一步 →</button>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+//  CANVAS 绘图引擎
+// ════════════════════════════════════════════════════
+const canvas = document.getElementById('lstmCanvas');
+const ctx = canvas.getContext('2d');
+
+// 响应式
+function resizeCanvas() {
+  const col = canvas.parentElement;
+  const w = Math.min(col.clientWidth - 32, 580);
+  const h = Math.min(col.clientHeight - 32, 520);
+  canvas.width = w;
+  canvas.height = h;
+  draw();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ── 布局坐标（归一化到0-1，运行时×宽高）
+// 坐标系：(cx, cy) 表示组件中心占画布比例
+const LAYOUT = {
+  // 输入
+  xIn:    { cx:.15, cy:.88, type:'node', label:'x_t',    color:'#3b82f6' },
+  hPrev:  { cx:.06, cy:.62, type:'node', label:'h_{t-1}',color:'#8b5cf6' },
+  cPrev:  { cx:.06, cy:.15, type:'pass', label:'C_{t-1}',color:'#10b981' },
+
+  // 三个门
+  gateF:  { cx:.30, cy:.55, type:'gate', label:'σ', title:'遗忘门 f_t', color:'#f59e0b' },
+  gateI:  { cx:.50, cy:.55, type:'gate', label:'σ', title:'输入门 i_t', color:'#ec4899' },
+  gateG:  { cx:.65, cy:.55, type:'gate', label:'tanh',title:'候选值 g_t',color:'#8b5cf6' },
+  gateO:  { cx:.82, cy:.55, type:'gate', label:'σ', title:'输出门 o_t', color:'#06b6d4' },
+
+  // 乘法/加法节点
+  multF:  { cx:.30, cy:.32, type:'op',   label:'×', color:'#f59e0b' },
+  multI:  { cx:.58, cy:.32, type:'op',   label:'×', color:'#ec4899' },
+  addC:   { cx:.72, cy:.15, type:'op',   label:'+', color:'#10b981' },
+  tanhC:  { cx:.82, cy:.32, type:'gate', label:'tanh',title:'tanh(C_t)',color:'#10b981' },
+  multO:  { cx:.90, cy:.62, type:'op',   label:'×', color:'#06b6d4' },
+
+  // 输出
+  cOut:   { cx:.94, cy:.15, type:'pass', label:'C_t',   color:'#10b981' },
+  hOut:   { cx:.94, cy:.75, type:'node', label:'h_t',   color:'#8b5cf6' },
+};
+
+// 边（from, to, color）
+const EDGES = [
+  ['cPrev','multF','#f59e0b'],
+  ['multF','addC','#10b981'],
+  ['gateI','multI','#ec4899'],
+  ['gateG','multI','#8b5cf6'],
+  ['multI','addC','#10b981'],
+  ['addC','cOut','#10b981'],
+  ['addC','tanhC','#10b981'],
+  ['tanhC','multO','#06b6d4'],
+  ['gateO','multO','#06b6d4'],
+  ['multO','hOut','#8b5cf6'],
+  ['gateF','multF','#f59e0b'],
+  // 输入拼接线（简化）
+  ['xIn','gateF','#94a3b830'],
+  ['xIn','gateI','#94a3b830'],
+  ['xIn','gateG','#94a3b830'],
+  ['xIn','gateO','#94a3b830'],
+  ['hPrev','gateF','#94a3b830'],
+  ['hPrev','gateI','#94a3b830'],
+  ['hPrev','gateG','#94a3b830'],
+  ['hPrev','gateO','#94a3b830'],
+];
+
+// 当前高亮节点集合
+let activeNodes = new Set();
+let activeEdges = new Set();
+let particles = [];
+
+function px(node) {
+  return { x: node.cx * canvas.width, y: node.cy * canvas.height };
+}
+
+function drawRoundRect(x, y, w, h, r, fill, stroke, glow) {
+  ctx.save();
+  if (glow) {
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 18;
+  }
+  ctx.beginPath();
+  ctx.roundRect(x - w/2, y - h/2, w, h, r);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = glow ? 2 : 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawCircle(x, y, r, fill, stroke, glow) {
+  ctx.save();
+  if (glow) {
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 18;
+  }
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = glow ? 2 : 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function getNodePos(key) {
+  const n = LAYOUT[key];
+  return { x: n.cx * canvas.width, y: n.cy * canvas.height };
+}
+
+function drawArrow(x1, y1, x2, y2, color, glow) {
+  const alpha = glow ? 1 : 0.25;
+  ctx.save();
+  if (glow) { ctx.shadowColor = color; ctx.shadowBlur = 8; }
+  ctx.strokeStyle = color + Math.round(alpha*255).toString(16).padStart(2,'0');
+  ctx.lineWidth = glow ? 2 : 1;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  // 箭头头
+  const angle = Math.atan2(y2-y1, x2-x1);
+  const al = glow ? 9 : 6;
+  ctx.fillStyle = color + Math.round(alpha*255).toString(16).padStart(2,'0');
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - al*Math.cos(angle-0.4), y2 - al*Math.sin(angle-0.4));
+  ctx.lineTo(x2 - al*Math.cos(angle+0.4), y2 - al*Math.sin(angle+0.4));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// 门的值（用于热力图颜色）
+const gateValues = { gateF:0.5, gateI:0.5, gateG:0, gateO:0.5 };
+// 细胞状态值
+let vecC_prev = [1.2, -0.8, 0.5, 2.1];
+let vecF = [0.5,0.5,0.5,0.5];
+let vecI = [0.5,0.5,0.5,0.5];
+let vecG = [0,0,0,0];
+let vecO = [0.5,0.5,0.5,0.5];
+let vecC = [1.2,-0.8,0.5,2.1];
+let vecH = [0,0,0,0];
+
+function gateColor(val) {
+  // 0=蓝, 0.5=绿, 1=橙红
+  if (val < 0.5) {
+    const t = val * 2;
+    const r = Math.round(30 + t * 16);
+    const g = Math.round(144 + t * (184-144));
+    const b = Math.round(255 - t * (255-88));
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const t = (val - 0.5) * 2;
+    const r = Math.round(46 + t * (251-46));
+    const g = Math.round(200 - t * (200-140));
+    const b = Math.round(100 - t * (100-0));
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
+function draw() {
+  if (!canvas.width || !canvas.height) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const W = canvas.width, H = canvas.height;
+  const nodeR = Math.min(W, H) * 0.048;
+  const gateW = nodeR * 2.2, gateH = nodeR * 1.4;
+
+  // ── 画边
+  EDGES.forEach(([from, to, col]) => {
+    const p1 = getNodePos(from);
+    const p2 = getNodePos(to);
+    const isActive = activeEdges.has(`${from}-${to}`);
+    drawArrow(p1.x, p1.y, p2.x, p2.y, col.slice(0,7), isActive);
+  });
+
+  // ── 细胞状态主线（顶部高速公路）
+  ctx.save();
+  const cLineY = LAYOUT.cPrev.cy * H;
+  const isGreenActive = activeNodes.has('cLine');
+  ctx.shadowColor = '#10b981';
+  ctx.shadowBlur = isGreenActive ? 14 : 0;
+  ctx.strokeStyle = isGreenActive ? '#10b981' : '#10b98150';
+  ctx.lineWidth = isGreenActive ? 2.5 : 1.5;
+  ctx.setLineDash([8, 4]);
+  ctx.beginPath();
+  ctx.moveTo(LAYOUT.cPrev.cx * W, cLineY);
+  ctx.lineTo(LAYOUT.cOut.cx * W, cLineY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // ── 画节点
+  Object.entries(LAYOUT).forEach(([key, n]) => {
+    const p = getNodePos(key);
+    const isActive = activeNodes.has(key);
+    const glow = isActive ? n.color : null;
+
+    if (n.type === 'gate') {
+      // 门：圆角矩形，带热力图填充
+      let fillColor = '#1a1d2e';
+      if ((key === 'gateF' || key === 'gateI' || key === 'gateO') && isActive) {
+        fillColor = gateColor(gateValues[key] || 0.5);
+      } else if (key === 'gateG' && isActive) {
+        const v = (gateValues.gateG + 1) / 2;
+        fillColor = gateColor(v);
+      }
+      drawRoundRect(p.x, p.y, gateW, gateH, 6, fillColor, isActive ? n.color : n.color+'60', glow);
+      ctx.fillStyle = isActive ? '#fff' : '#94a3b8';
+      ctx.font = `bold ${Math.round(gateH*0.52)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(n.label, p.x, p.y - 2);
+      if (n.title) {
+        ctx.font = `${Math.round(gateH*0.33)}px sans-serif`;
+        ctx.fillStyle = isActive ? n.color : '#475569';
+        ctx.fillText(n.title, p.x, p.y + gateH*0.5 + 9);
+      }
+      // 门值标注
+      if (isActive && key !== 'gateG') {
+        ctx.font = `bold ${Math.round(gateH*0.38)}px monospace`;
+        ctx.fillStyle = '#fcd34d';
+        ctx.fillText(gateValues[key]?.toFixed(2) || '', p.x, p.y + gateH*0.28);
+      }
+    } else if (n.type === 'op') {
+      drawCircle(p.x, p.y, nodeR * 0.8, isActive ? '#1e2130' : '#141726', isActive ? n.color : n.color+'50', glow);
+      ctx.fillStyle = isActive ? n.color : '#64748b';
+      ctx.font = `bold ${Math.round(nodeR * 1.2)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(n.label, p.x, p.y + 1);
+    } else {
+      // 普通节点
+      drawCircle(p.x, p.y, nodeR * 0.9, isActive ? '#1e2130' : '#141726', isActive ? n.color : n.color+'60', glow);
+      ctx.fillStyle = isActive ? n.color : '#64748b';
+      ctx.font = `bold ${Math.round(nodeR * 0.7)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(n.label, p.x, p.y);
+    }
+  });
+
+  // ── 粒子
+  particles.forEach(p => {
+    ctx.save();
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.alpha;
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+// ── 粒子动画
+let animId = null;
+function spawnParticles(fromKey, toKey, color, count = 6) {
+  const p1 = getNodePos(fromKey);
+  const p2 = getNodePos(toKey);
+  for (let i = 0; i < count; i++) {
+    const t0 = i / count;
+    particles.push({
+      x: p1.x, y: p1.y,
+      tx: p2.x, ty: p2.y,
+      t: t0 * -1, speed: 0.012 + Math.random() * 0.008,
+      color, r: 3.5, alpha: 1,
+    });
+  }
+}
+
+function tickParticles() {
+  particles = particles.filter(p => p.alpha > 0.05);
+  particles.forEach(p => {
+    p.t += p.speed;
+    if (p.t < 0) return;
+    if (p.t > 1) { p.alpha -= 0.06; return; }
+    p.x = p.x + (p.tx - p.x) * p.speed * 3;
+    p.y = p.y + (p.ty - p.y) * p.speed * 3;
+    // 实际直线插值
+    const prog = Math.min(p.t, 1);
+    const src = getNodePos;
+    p.x = LAYOUT[Object.keys(LAYOUT).find(k => getNodePos(k).x === p.tx && getNodePos(k).y === p.ty) || 'hOut'].cx;
+  });
+}
+
+// 简单线性粒子系统
+class Particle {
+  constructor(x1,y1,x2,y2,color) {
+    this.sx=x1; this.sy=y1; this.ex=x2; this.ey=y2;
+    this.t=0; this.color=color; this.alive=true;
+    this.speed=0.018+Math.random()*0.01;
+  }
+  update() {
+    this.t += this.speed;
+    if(this.t>=1){this.alive=false;return;}
+    this.x = this.sx + (this.ex-this.sx)*this.t;
+    this.y = this.sy + (this.ey-this.sy)*this.t;
+  }
+  draw(ctx) {
+    ctx.save();
+    ctx.shadowColor=this.color; ctx.shadowBlur=14;
+    ctx.globalAlpha=1-this.t*0.5;
+    ctx.beginPath(); ctx.arc(this.x,this.y,4,0,Math.PI*2);
+    ctx.fillStyle=this.color; ctx.fill();
+    ctx.restore();
+  }
+}
+let liveParticles = [];
+function fireParticles(fromKey, toKey, color, n=5) {
+  const p1=getNodePos(fromKey), p2=getNodePos(toKey);
+  for(let i=0;i<n;i++){
+    const p = new Particle(p1.x,p1.y,p2.x,p2.y,color);
+    p.t = i/n * -0.3;
+    liveParticles.push(p);
+  }
+}
+function animLoop() {
+  liveParticles = liveParticles.filter(p=>p.alive);
+  liveParticles.forEach(p=>{ p.update(); });
+  draw();
+  liveParticles.forEach(p=>{ if(p.t>0) p.draw(ctx); });
+  animId = requestAnimationFrame(animLoop);
+}
+
+// ════════════════════════════════════════════════════
+//  步骤数据
+// ════════════════════════════════════════════════════
+const STEPS = [
+{
+  section:'SECTION 0 · 概述',
+  title:'欢迎！LSTM 是什么？',
+  active:[],
+  edges:[],
+  vals:null,
+  particles:[],
+  body:`在开始动画之前，先建立<span class="gr">最重要的直觉</span>：<br><br>
+<span class="hl">普通 RNN 的致命缺陷</span>：梯度在时间轴反向传播时<b>指数级消失</b>，导致网络只能记住最近 10~20 步。<br><br>
+<span class="gr">LSTM 的解决方案</span>：在网络内部建造一条"细胞状态高速公路" C_t，让信息可以几乎无损地沿时间轴传递，同时用三个可学习的"门"精确控制信息流。<br><br>
+接下来，我们通过 <b>35 个步骤</b>把每一个计算细节都可视化讲清楚。<br><br>
+<span class="bl">操作提示</span>：点击"下一步"或按键盘 → 键逐步推进，左侧图示会实时高亮当前正在计算的组件。`,
+},{
+  section:'SECTION 0 · 概述',
+  title:'LSTM 单元的三个输入、两个输出',
+  active:['xIn','hPrev','cPrev','hOut','cOut','cLine'],
+  edges:[],
+  vals:{
+    'C_{t-1}': vecC_prev,
+    'h_{t-1}': [0.3, -0.1, 0.7, 0.2],
+    'x_t': [1.0, 0.0, -0.5, 0.8],
+  },
+  particles:[['cPrev','cOut','#10b981'],['hPrev','hOut','#8b5cf6']],
+  body:`每个 LSTM 时间步接收 <b>3 个输入</b>：<br><br>
+<span class="bl">x_t</span>：当前时间步的输入向量（图示左下蓝色圆圈）<br>
+<span class="vl">h_{t-1}</span>：上一步的隐状态（左侧紫色圆圈）<br>
+<span class="gr">C_{t-1}</span>：上一步的细胞状态（左侧绿色，顶部虚线）<br><br>
+并输出 <b>2 个结果</b>：<br>
+<span class="vl">h_t</span>：本步隐状态（右下，传给下一层或输出层）<br>
+<span class="gr">C_t</span>：本步细胞状态（右上，传给下一个时间步）<br><br>
+右侧下方显示的是当前<b>示例数值</b>（H=4 维度，便于理解）。`,
+},{
+  section:'SECTION 1 · 拼接输入',
+  title:'第一步：拼接 [h_{t-1}; x_t]',
+  active:['xIn','hPrev','gateF','gateI','gateG','gateO'],
+  edges:['xIn-gateF','xIn-gateI','xIn-gateG','xIn-gateO','hPrev-gateF','hPrev-gateI','hPrev-gateG','hPrev-gateO'],
+  vals:{
+    'h_{t-1}': [0.3,-0.1,0.7,0.2],
+    'x_t': [1.0,0.0,-0.5,0.8],
+    '[h;x]': [0.3,-0.1,0.7,0.2,1.0,0.0,-0.5,0.8],
+  },
+  particles:[['xIn','gateF','#3b82f6'],['hPrev','gateF','#8b5cf6'],['xIn','gateI','#3b82f6'],['hPrev','gateI','#8b5cf6']],
+  body:`所有门的计算都以 <span class="hl">[h_{t-1}; x_t]</span> 为输入（拼接向量）：<br><br>
+<div class="formula-box">concat = [h_{t-1}; x_t]<br>若 h 维度=H，x 维度=D → concat 维度=H+D</div>
+• 每个门都有独立的权重矩阵 W（形状 H × (H+D)）<br>
+• 4个门同时看到"历史状态"和"当前输入"<br>
+• 实际实现中，4个门的权重矩阵合并成一个大矩阵（4H × (H+D)），一次矩阵乘完成所有计算，GPU效率更高<br><br>
+<div class="formula-box">gates = W·[h_{t-1}; x_t] + b  ∈ ℝ^{4H}<br>[z_f, z_i, z_g, z_o] = split(gates, 4)</div>`,
+},{
+  section:'SECTION 2 · 遗忘门',
+  title:'遗忘门：决定忘掉什么',
+  active:['gateF'],
+  edges:[],
+  vals:{
+    'h_{t-1}': [0.3,-0.1,0.7,0.2],
+    'x_t': [1.0,0.0,-0.5,0.8],
+    'f_t (遗忘)': [0.95,0.02,0.88,0.70],
+  },
+  particles:[['xIn','gateF','#f59e0b'],['hPrev','gateF','#f59e0b']],
+  body:`<span class="hl">遗忘门 f_t</span>：决定从旧细胞状态 C_{t-1} 中<b>保留多少信息</b>。<br><br>
+<div class="formula-box">f_t = σ(W_f · [h_{t-1}; x_t] + b_f)</div>
+• sigmoid 激活 → 输出范围 (0, 1)<br>
+• <span class="hl">f_t ≈ 0</span>：关门，遗忘该维度<br>
+• <span class="gr">f_t ≈ 1</span>：开门，保留该维度<br><br>
+<b>示例</b>：f_t = [<span class="gr">0.95</span>, <span class="hl">0.02</span>, <span class="gr">0.88</span>, 0.70]<br>
+→ 第2维几乎被遗忘，第1、3维保留<br><br>
+<span class="gr">直觉</span>：读到新段落主语时，遗忘旧主语的性别信息。左侧图示中，遗忘门方框颜色代表当前门值（<span class="bl">蓝</span>=关闭，<span class="or">橙</span>=开启）。`,
+},{
+  section:'SECTION 2 · 遗忘门',
+  title:'遗忘门：与 C_{t-1} 逐元素相乘',
+  active:['gateF','multF','cPrev','cLine'],
+  edges:['cPrev-multF','gateF-multF'],
+  vals:{
+    'C_{t-1}': vecC_prev,
+    'f_t': [0.95,0.02,0.88,0.70],
+    'f⊙C_{t-1}': vecC_prev.map((v,i)=>+(v*[0.95,0.02,0.88,0.70][i]).toFixed(2)),
+  },
+  particles:[['cPrev','multF','#10b981'],['gateF','multF','#f59e0b']],
+  body:`<span class="hl">逐元素相乘（Hadamard 积 ⊙）</span>实现选择性遗忘：<br><br>
+<div class="formula-box">遗忘结果 = f_t ⊙ C_{t-1}</div>
+具体数值：<br>
+C_{t-1} = [1.2, -0.8, 0.5, 2.1]<br>
+f_t &nbsp;&nbsp; = [0.95, 0.02, 0.88, 0.70]<br>
+<div class="formula-box">f⊙C = [<span style="color:#6ee7b7">1.14</span>, <span style="color:#f87171">-0.016</span>, <span style="color:#6ee7b7">0.44</span>, 1.47]</div>
+• 第2维：-0.8 → -0.016（几乎清零！）<br>
+• 第1维：1.2 → 1.14（基本保留）<br><br>
+<span class="gr">关键洞察</span>：⊙ 的梯度中，<b>对 C_{t-1} 的偏导 = f_t</b>，当 f_t ≈ 1 时梯度几乎无损通过 — 这正是 LSTM 解决梯度消失的秘密！`,
+},{
+  section:'SECTION 3 · 输入门',
+  title:'输入门：决定写入什么',
+  active:['gateI','gateG'],
+  edges:[],
+  vals:{
+    'i_t (写多少)': [0.90,0.05,0.80,0.30],
+    'g_t (写什么)': [0.97,-0.46,0.66,-0.86],
+    'i⊙g (写入量)': [0.87,-0.023,0.53,-0.26],
+  },
+  particles:[['xIn','gateI','#ec4899'],['xIn','gateG','#8b5cf6'],['hPrev','gateI','#ec4899'],['hPrev','gateG','#8b5cf6']],
+  body:`输入门由<b>两部分协同工作</b>：<br><br>
+<span class="pk">① 输入门 i_t（sigmoid）</span>：决定"写多少"<br>
+<div class="formula-box">i_t = σ(W_i · [h_{t-1}; x_t] + b_i) ∈ (0,1)^H</div>
+<span class="vl">② 候选值 g_t（tanh）</span>：决定"写什么"（方向和强度）<br>
+<div class="formula-box">g_t = tanh(W_g · [h_{t-1}; x_t] + b_g) ∈ (-1,1)^H</div>
+<span class="gr">为什么要两个门？</span><br>
+i_t 控制"写入量"，g_t 提供"写入内容" — 分离让表达更灵活。<br><br>
+示例：i_t=[0.90, 0.05, ...] → 第2维几乎不写入；<br>
+g_t=[0.97, -0.46, ...] → 方向有正有负`,
+},{
+  section:'SECTION 3 · 输入门',
+  title:'输入门：i_t ⊙ g_t 得到实际写入量',
+  active:['gateI','gateG','multI'],
+  edges:['gateI-multI','gateG-multI'],
+  vals:{
+    'i_t': [0.90,0.05,0.80,0.30],
+    'g_t': [0.97,-0.46,0.66,-0.86],
+    'i⊙g': [0.87,-0.023,0.53,-0.26],
+  },
+  particles:[['gateI','multI','#ec4899'],['gateG','multI','#8b5cf6']],
+  body:`<span class="pk">实际写入量</span> = i_t ⊙ g_t（逐元素相乘）：<br><br>
+<div class="formula-box">写入量 = i_t ⊙ g_t</div>
+数值计算：<br>
+i_t = [0.90, 0.05, 0.80, 0.30]<br>
+g_t = [0.97, -0.46, 0.66, -0.86]<br>
+<div class="formula-box">i⊙g = [0.87, -0.023, 0.53, -0.26]</div>
+• 第2维：0.05 × (-0.46) ≈ -0.023（几乎不写入）<br>
+• 第1维：0.90 × 0.97 ≈ 0.87（大量写入正值）<br>
+• 第4维：0.30 × (-0.86) ≈ -0.26（适量写入负值）<br><br>
+左侧图示中 <span class="pk">× 节点</span>（粉红色）就是这个乘法操作。`,
+},{
+  section:'SECTION 4 · 细胞状态更新',
+  title:'核心公式：C_t = f_t⊙C_{t-1} + i_t⊙g_t',
+  active:['multF','multI','addC','cLine','cOut'],
+  edges:['multF-addC','multI-addC','addC-cOut'],
+  vals:{
+    'f⊙C_{t-1}': [1.14,-0.016,0.44,1.47],
+    'i⊙g': [0.87,-0.023,0.53,-0.26],
+    'C_t (新)': [2.01,-0.039,0.97,1.21],
+  },
+  particles:[['multF','addC','#10b981'],['multI','addC','#10b981'],['addC','cOut','#10b981']],
+  body:`<span class="gr">细胞状态更新公式</span>（LSTM 最核心的一步！）：<br><br>
+<div class="formula-box">C_t = f_t ⊙ C_{t-1} + i_t ⊙ g_t</div>
+图中 <span class="gr">⊕ 圆圈</span>（加法节点）完成这个加法：<br><br>
+f⊙C = [1.14, -0.016, 0.44, 1.47]（保留的旧记忆）<br>
+i⊙g = [0.87, -0.023, 0.53, -0.26]（新写入信息）<br>
+<div class="formula-box">C_t = [2.01, -0.039, 0.97, 1.21]</div>
+<span class="hl">加法节点的梯度 = 1</span>！梯度直接穿过，不衰减。<br>
+这与 ResNet 的残差连接是同样的设计哲学。<br><br>
+C_t 的范围<b>不限于(-1,1)</b>，可以无限累积 — 这是"长期记忆"的基础！`,
+},{
+  section:'SECTION 4 · 细胞状态更新',
+  title:'梯度高速公路：为什么 LSTM 能解决梯度消失',
+  active:['cLine','addC'],
+  edges:[],
+  vals:{
+    'C_{t-1}': vecC_prev,
+    'C_t': [2.01,-0.039,0.97,1.21],
+  },
+  particles:[['cPrev','addC','#10b981'],['addC','cOut','#10b981']],
+  body:`<span class="gr">LSTM 解决梯度消失的数学根本</span>：<br><br>
+对 C_t = f_t ⊙ C_{t-1} + i_t ⊙ g_t 求偏导：<br>
+<div class="formula-box">∂C_t / ∂C_{t-1} = f_t</div>
+• 当遗忘门 f_t ≈ 1（偏置初始化为1时的默认值）<br>
+• 梯度仅乘以接近1的数 → <span class="gr">几乎不衰减！</span><br><br>
+对比普通 RNN：<br>
+<div class="formula-box">∂h_t/∂h_{t-1} = W_h^T × tanh'(·)</div>
+tanh' 最大值 = 1，sigmoid' 最大值 = 0.25<br>
+连乘 100 步 → (0.9)^100 ≈ 0.000027 → <span class="hl">梯度消失</span><br><br>
+LSTM 的 C_t 通道：0.99^100 ≈ 0.37 → <span class="gr">梯度依然显著！</span>`,
+},{
+  section:'SECTION 5 · 输出门',
+  title:'输出门：决定输出什么',
+  active:['gateO'],
+  edges:[],
+  vals:{
+    'o_t (输出门)': [0.85,0.90,0.20,0.75],
+    'C_t': [2.01,-0.039,0.97,1.21],
+    'tanh(C_t)': [0.97,-0.039,0.75,0.84],
+  },
+  particles:[['xIn','gateO','#06b6d4'],['hPrev','gateO','#06b6d4']],
+  body:`<span class="bl">输出门 o_t</span>：C_t 已经更新完毕，现在决定"暴露多少给外部"：<br><br>
+<div class="formula-box">o_t = σ(W_o · [h_{t-1}; x_t] + b_o) ∈ (0,1)^H</div>
+为什么不直接输出 C_t？<br>
+• C_t 可能累积了很大的值（本例最大 2.01）<br>
+• 不同时间步需要"选择性"暴露不同记忆内容<br>
+• 输出门实现<b>内部记忆</b>与<b>外部输出</b>的分离<br><br>
+示例：o_t = [0.85, 0.90, 0.20, 0.75]<br>
+→ 第3维（位置0.20）几乎不输出，其他维度正常输出`,
+},{
+  section:'SECTION 5 · 输出门',
+  title:'tanh(C_t)：压缩细胞状态到(-1,1)',
+  active:['tanhC','addC'],
+  edges:['addC-tanhC'],
+  vals:{
+    'C_t': [2.01,-0.039,0.97,1.21],
+    'tanh(C_t)': [0.97,-0.039,0.75,0.84],
+  },
+  particles:[['addC','tanhC','#10b981']],
+  body:`输出前需要对 C_t 做 tanh 压缩：<br><br>
+<div class="formula-box">tanh(C_t)</div>
+C_t 可能超过 2.0（无界），直接输出会导致后续层数值爆炸。<br><br>
+tanh 将任意实数映射到 (-1, 1)：<br>
+• tanh(2.01) ≈ 0.97<br>
+• tanh(-0.039) ≈ -0.039<br>
+• tanh(0.97) ≈ 0.75<br>
+• tanh(1.21) ≈ 0.84<br><br>
+<span class="or">注意</span>：这里的 tanh 没有额外权重参数，只是激活函数！`,
+},{
+  section:'SECTION 5 · 输出门',
+  title:'最终输出：h_t = o_t ⊙ tanh(C_t)',
+  active:['gateO','tanhC','multO','hOut'],
+  edges:['gateO-multO','tanhC-multO','multO-hOut'],
+  vals:{
+    'o_t': [0.85,0.90,0.20,0.75],
+    'tanh(C_t)': [0.97,-0.039,0.75,0.84],
+    'h_t (输出)': [0.82,-0.035,0.15,0.63],
+  },
+  particles:[['tanhC','multO','#06b6d4'],['gateO','multO','#06b6d4'],['multO','hOut','#8b5cf6']],
+  body:`<span class="vl">隐状态输出公式</span>：<br><br>
+<div class="formula-box">h_t = o_t ⊙ tanh(C_t)</div>
+具体计算：<br>
+o_t &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= [0.85, 0.90, 0.20, 0.75]<br>
+tanh(C_t) = [0.97, -0.039, 0.75, 0.84]<br>
+<div class="formula-box">h_t = [0.82, -0.035, 0.15, 0.63]</div>
+h_t ∈ (-1, 1)^H<br><br>
+h_t 有<b>两个去向</b>：<br>
+① 传给下一个时间步，作为 h_{t-1}<br>
+② 传给输出层（分类、预测等）：<br>
+<div class="formula-box">y_t = softmax(W_y · h_t + b_y)</div>`,
+},{
+  section:'SECTION 6 · 完整公式汇总',
+  title:'LSTM 6条核心公式 — 记住它们！',
+  active:['gateF','gateI','gateG','gateO','addC','tanhC','multO','cOut','hOut'],
+  edges:[],
+  vals:{
+    'f_t': [0.95,0.02,0.88,0.70],
+    'i_t': [0.90,0.05,0.80,0.30],
+    'C_t': [2.01,-0.039,0.97,1.21],
+    'h_t': [0.82,-0.035,0.15,0.63],
+  },
+  particles:[['cPrev','cOut','#10b981'],['hPrev','hOut','#8b5cf6']],
+  body:`<b>完整前向传播（6条公式）</b>：<br><br>
+<div class="formula-box">f_t = σ(W_f·[h_{t-1};x_t] + b_f) &nbsp;&nbsp;← <span style="color:#f59e0b">遗忘</span></div>
+<div class="formula-box">i_t = σ(W_i·[h_{t-1};x_t] + b_i) &nbsp;&nbsp;← <span style="color:#ec4899">输入</span></div>
+<div class="formula-box">g_t = tanh(W_g·[h_{t-1};x_t] + b_g) ← <span style="color:#8b5cf6">候选</span></div>
+<div class="formula-box">o_t = σ(W_o·[h_{t-1};x_t] + b_o) &nbsp;&nbsp;← <span style="color:#06b6d4">输出</span></div>
+<div class="formula-box">C_t = f_t⊙C_{t-1} + i_t⊙g_t &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← <span style="color:#10b981">更新C</span></div>
+<div class="formula-box">h_t = o_t ⊙ tanh(C_t) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← <span style="color:#8b5cf6">输出h</span></div>
+<span class="gr">规律</span>：控制比例的门用 sigmoid（输出0~1），存储信息的用 tanh（输出-1~1）。`,
+},{
+  section:'SECTION 7 · 反向传播',
+  title:'BPTT：从损失到梯度',
+  active:['hOut','multO'],
+  edges:[],
+  vals:{
+    'h_t': [0.82,-0.035,0.15,0.63],
+  },
+  particles:[['hOut','multO','#8b5cf620']],
+  body:`<span class="hl">BPTT（通过时间反向传播）</span>从损失函数开始：<br><br>
+<div class="formula-box">dh_t = ∂L/∂h_t（来自损失或下一步传回的梯度）</div>
+梯度反传路径（从右到左）：<br>
+L → h_t → multO → tanhC → addC → multF / multI → 各门<br><br>
+<span class="gr">关键路径</span>：addC → multF → C_{t-1}<br>
+<div class="formula-box">∂C_t/∂C_{t-1} = f_t ← 不经过 tanh/sigmoid 的导数！</div>
+这条路径的梯度只乘以 f_t（接近1），不会显著衰减，
+允许梯度反传到数百步之前。`,
+},{
+  section:'SECTION 7 · 反向传播',
+  title:'梯度裁剪：防止梯度爆炸',
+  active:[],
+  edges:[],
+  vals:null,
+  particles:[],
+  body:`即使 LSTM 缓解了梯度消失，<span class="hl">梯度爆炸</span>依然可能发生。<br><br>
+<b>解决方案：梯度裁剪（Gradient Clipping）</b><br><br>
+<div class="formula-box">if ||g|| > threshold:<br>&nbsp;&nbsp;&nbsp;&nbsp;g = g × threshold / ||g||</div>
+• 保持梯度<b>方向不变</b>，只压缩幅度<br>
+• 阈值通常设为 <span class="gr">1.0 ~ 5.0</span><br><br>
+PyTorch 实现：<br>
+<div class="formula-box">torch.nn.utils.clip_grad_norm_(<br>&nbsp;&nbsp;&nbsp;&nbsp;model.parameters(), max_norm=1.0<br>)</div>
+<span class="or">⚠️ 训练 LSTM 必须加梯度裁剪，否则极容易发散！</span>`,
+},{
+  section:'SECTION 8 · PyTorch 实现',
+  title:'从零手写 LSTM 单元',
+  active:[],
+  edges:[],
+  vals:null,
+  particles:[],
+  body:`<div class="formula-box">class LSTMCell(nn.Module):<br>
+&nbsp;&nbsp;def __init__(self, input_size, hidden_size):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;super().__init__()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;# 4个门合并成一个大矩阵<br>
+&nbsp;&nbsp;&nbsp;&nbsp;self.W = nn.Linear(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input_size + hidden_size, 4 * hidden_size<br>
+&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+&nbsp;&nbsp;def forward(self, x, h_prev, c_prev):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;combined = torch.cat([h_prev, x], dim=1)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;gates = self.W(combined)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;z_f, z_i, z_g, z_o = gates.chunk(4, dim=1)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;f = torch.sigmoid(z_f)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;i = torch.sigmoid(z_i)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;g = torch.tanh(z_g)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;o = torch.sigmoid(z_o)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;c = f * c_prev + i * g<br>
+&nbsp;&nbsp;&nbsp;&nbsp;h = o * torch.tanh(c)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return h, c</div>`,
+},{
+  section:'SECTION 8 · PyTorch 实现',
+  title:'PyTorch 内置 nn.LSTM 使用',
+  active:[],
+  edges:[],
+  vals:null,
+  particles:[],
+  body:`<div class="formula-box">lstm = nn.LSTM(<br>
+&nbsp;&nbsp;input_size=128,<br>
+&nbsp;&nbsp;hidden_size=256,<br>
+&nbsp;&nbsp;num_layers=2,<br>
+&nbsp;&nbsp;batch_first=True,<br>
+&nbsp;&nbsp;dropout=0.1<br>
+)<br><br>
+x  = torch.randn(32, 100, 128) # (batch, seq, feat)<br>
+h0 = torch.zeros(2, 32, 256)<br>
+c0 = torch.zeros(2, 32, 256)<br>
+output, (hn, cn) = lstm(x, (h0, c0))<br>
+# output: (32, 100, 256) 每步的 h_t<br>
+# hn: (2, 32, 256) 最后一步的 h<br>
+# cn: (2, 32, 256) 最后一步的 C</div>`,
+},{
+  section:'SECTION 9 · LSTM 变体',
+  title:'GRU：LSTM 的简化版',
+  active:[],
+  edges:[],
+  vals:null,
+  particles:[],
+  body:`<span class="gr">GRU（Gated Recurrent Unit）</span> 由 Cho et al. 2014 提出，参数约为 LSTM 的 75%：<br><br>
+<b>简化思路</b>：<br>
+• 合并遗忘门+输入门 → <span class="hl">更新门 z_t</span>（互补：z_t 和 1-z_t）<br>
+• 删除输出门，去掉独立的细胞状态 C_t<br>
+• 引入<span class="pk">重置门 r_t</span><br><br>
+<div class="formula-box">r_t = σ(W_r·[h_{t-1};x_t])<br>z_t = σ(W_z·[h_{t-1};x_t])<br>h̃_t = tanh(W·[r_t⊙h_{t-1};x_t])<br>h_t = z_t⊙h_{t-1} + (1-z_t)⊙h̃_t</div>
+<span class="gr">经验</span>：数据量小时 GRU 常优于 LSTM；数据量大时 LSTM 更强。`,
+},{
+  section:'SECTION 9 · LSTM 变体',
+  title:'双向 LSTM（BiLSTM）',
+  active:[],
+  edges:[],
+  vals:null,
+  particles:[],
+  body:`<span class="gr">BiLSTM</span>：同时利用前后上下文，捕捉更丰富的语义信息。<br><br>
+<b>结构</b>：两个独立的 LSTM，一个从左→右，一个从右→左，输出拼接：<br>
+<div class="formula-box">h_t = [h→_t ; h←_t] ∈ ℝ^{2H}</div>
+<b>适用</b>：NER、关系抽取等需要全句上下文的任务<br>
+<b>不适用</b>：语言模型（生成时无法看未来！）<br><br>
+PyTorch：<div class="formula-box">nn.LSTM(input_size, hidden_size, bidirectional=True)</div>`,
+},{
+  section:'SECTION 10 · 调参',
+  title:'LSTM 调参清单',
+  active:[],
+  edges:[],
+  vals:null,
+  particles:[],
+  body:`<b>LSTM 训练核心调参清单</b>：<br><br>
+<span class="hl">① hidden_size</span>：128~512，任务越复杂越大<br>
+<span class="gr">② num_layers</span>：2~4层，超过4基本无增益<br>
+<span class="pk">③ dropout</span>：0.2~0.5（层间必须加，防过拟合）<br>
+<span class="bl">④ 学习率</span>：1e-3（Adam）或 0.1（SGD+clip）<br>
+<span class="hl">⑤ 梯度裁剪</span>：max_norm=1.0（<b>必须！</b>）<br>
+<span class="or">⑥ b_f 初始化为1</span>：遗忘门偏置设为正值，默认保留记忆，有利于训练初期<br>
+<span class="vl">⑦ 截断BPTT</span>：序列长度>200时，每N步截断梯度，节省内存<br><br>
+<div class="formula-box">optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)<br>torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)</div>`,
+},{
+  section:'SECTION 10 · 调参',
+  title:'🎉 完成！核心6公式再默背一遍',
+  active:['gateF','gateI','gateG','gateO','addC','multF','multI','tanhC','multO','cLine','cOut','hOut'],
+  edges:[],
+  vals:{
+    'f_t': [0.95,0.02,0.88,0.70],
+    'C_t': [2.01,-0.039,0.97,1.21],
+    'h_t': [0.82,-0.035,0.15,0.63],
+  },
+  particles:[['cPrev','cOut','#10b981'],['hPrev','hOut','#8b5cf6'],['xIn','gateF','#f59e0b']],
+  body:`<span class="gr">🎉 恭喜完成 LSTM 完整学习！</span><br><br>
+<div class="formula-box">f_t = σ(W_f·[h_{t-1};x_t] + b_f) &nbsp;&nbsp;← <span style="color:#f59e0b">遗忘门</span></div>
+<div class="formula-box">i_t = σ(W_i·[h_{t-1};x_t] + b_i) &nbsp;&nbsp;← <span style="color:#ec4899">输入门</span></div>
+<div class="formula-box">g_t = tanh(W_g·[h_{t-1};x_t] + b_g) ← <span style="color:#8b5cf6">候选值</span></div>
+<div class="formula-box">o_t = σ(W_o·[h_{t-1};x_t] + b_o) &nbsp;&nbsp;← <span style="color:#06b6d4">输出门</span></div>
+<div class="formula-box">C_t = f_t⊙C_{t-1} + i_t⊙g_t &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← <span style="color:#10b981">细胞状态更新</span></div>
+<div class="formula-box">h_t = o_t ⊙ tanh(C_t) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← <span style="color:#8b5cf6">隐状态输出</span></div>
+<span class="bl">下一步</span>：用 PyTorch 写一个情感分类项目，把今天学的全部用上！`,
+},
+];
+
+// ════════════════════════════════════════════════════
+//  步骤控制逻辑
+// ════════════════════════════════════════════════════
+let cur = 0;
+const total = STEPS.length;
+let autoTimer = null;
+let isAuto = false;
+
+function getSpeed() {
+  return parseFloat(document.getElementById('speedSlider').value);
+}
+
+document.getElementById('speedSlider').addEventListener('input', function() {
+  document.getElementById('speedVal').textContent = this.value + '×';
+  if (isAuto) { clearInterval(autoTimer); startAutoTimer(); }
+});
+
+function startAutoTimer() {
+  autoTimer = setInterval(() => {
+    if (cur < total - 1) go(1);
+    else stopAuto();
+  }, 2800 / getSpeed());
+}
+
+function toggleAuto() {
+  if (isAuto) stopAuto();
+  else { isAuto = true; document.getElementById('autoBtn').textContent = '⏸ 暂停'; startAutoTimer(); }
+}
+function stopAuto() {
+  isAuto = false; clearInterval(autoTimer);
+  document.getElementById('autoBtn').textContent = '▶ 自动播放';
+}
+
+function resetAll() {
+  stopAuto(); cur = 0; render();
+}
+
+function go(dir) {
+  const next = cur + dir;
+  if (next < 0 || next >= total) return;
+  cur = next;
+  render();
+}
+
+function render() {
+  const s = STEPS[cur];
+
+  // 进度
+  document.getElementById('progFill').style.width = `${(cur+1)/total*100}%`;
+  document.getElementById('sCnt').textContent = `步骤 ${cur+1} / ${total}`;
+
+  // 文字
+  document.getElementById('sTag').textContent = s.section;
+  document.getElementById('sTitle').textContent = s.title;
+  document.getElementById('sBody').innerHTML = s.body;
+  document.querySelector('.step-area').scrollTop = 0;
+
+  // 按钮
+  document.getElementById('prevBtn').disabled = cur === 0;
+  document.getElementById('nextBtn').disabled = cur === total - 1;
+  document.getElementById('nextBtn').textContent = cur === total-1 ? '完成 ✓' : '下一步 →';
+
+  // 高亮
+  activeNodes = new Set(s.active || []);
+  activeEdges = new Set(s.edges || []);
+
+  // 粒子
+  liveParticles = [];
+  (s.particles || []).forEach(([f, t, c]) => fireParticles(f, t, c, 8));
+
+  // 数值区
+  renderVals(s.vals);
+
+  // 点
+  updateDots();
+
+  // 门值更新
+  if (s.vals) {
+    if (s.vals['f_t (遗忘)'] || s.vals['f_t']) {
+      const fv = s.vals['f_t (遗忘)'] || s.vals['f_t'];
+      gateValues.gateF = fv.reduce((a,b)=>a+b,0)/fv.length;
+    }
+    if (s.vals['i_t (写多少)'] || s.vals['i_t']) {
+      const iv = s.vals['i_t (写多少)'] || s.vals['i_t'];
+      gateValues.gateI = iv.reduce((a,b)=>a+b,0)/iv.length;
+    }
+    if (s.vals['o_t (输出门)'] || s.vals['o_t']) {
+      const ov = s.vals['o_t (输出门)'] || s.vals['o_t'];
+      gateValues.gateO = ov.reduce((a,b)=>a+b,0)/ov.length;
+    }
+  }
+}
+
+function valToHeight(v, maxH) {
+  const abs = Math.abs(v);
+  return Math.max(4, Math.min(abs * maxH * 0.45, maxH));
+}
+function valToColor(v) {
+  if (v > 0) {
+    const t = Math.min(v / 2, 1);
+    return `rgba(52, ${Math.round(211 - t*70)}, ${Math.round(153 - t*80)}, 0.9)`;
+  } else {
+    const t = Math.min(-v / 2, 1);
+    return `rgba(${Math.round(248)}, ${Math.round(113 - t*30)}, ${Math.round(113)}, 0.9)`;
+  }
+}
+
+function renderVals(valsObj) {
+  const area = document.getElementById('valsArea');
+  area.innerHTML = '';
+  if (!valsObj) return;
+  const maxH = 48;
+  Object.entries(valsObj).forEach(([label, vec]) => {
+    const row = document.createElement('div');
+    row.className = 'val-row';
+    const lbl = document.createElement('div');
+    lbl.className = 'val-label';
+    lbl.textContent = label;
+    row.appendChild(lbl);
+    const bars = document.createElement('div');
+    bars.className = 'vec-bars';
+    // 显示最多8个维度
+    vec.slice(0, 8).forEach(v => {
+      const wrap = document.createElement('div');
+      wrap.className = 'vec-bar-wrap';
+      const bar = document.createElement('div');
+      bar.className = 'vec-bar';
+      bar.style.height = valToHeight(v, maxH) + 'px';
+      bar.style.backgroundColor = valToColor(v);
+      const lv = document.createElement('div');
+      lv.className = 'vec-val';
+      lv.textContent = v.toFixed ? v.toFixed(2) : v;
+      wrap.appendChild(bar);
+      wrap.appendChild(lv);
+      bars.appendChild(wrap);
+    });
+    row.appendChild(bars);
+    area.appendChild(row);
+  });
+}
+
+function buildDots() {
+  const row = document.getElementById('dotRow');
+  row.innerHTML = '';
+  for (let i = 0; i < total; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    d.onclick = () => { cur = i; render(); };
+    row.appendChild(d);
+  }
+}
+
+function updateDots() {
+  document.querySelectorAll('.dot').forEach((d, i) => {
+    d.classList.remove('active', 'done');
+    if (i === cur) d.classList.add('active');
+    else if (i < cur) d.classList.add('done');
+  });
+}
+
+// 键盘
+document.addEventListener('keydown', e => {
+  if (['ArrowRight', 'ArrowDown', ' '].includes(e.key)) { e.preventDefault(); go(1); }
+  if (['ArrowLeft', 'ArrowUp'].includes(e.key)) { e.preventDefault(); go(-1); }
+});
+
+// 初始化
+buildDots();
+resizeCanvas();
+animLoop();
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RNN 文本生成动画</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+.container { max-width: 960px; margin: 0 auto; padding: 30px 20px; }
+h1 { text-align: center; font-size: 1.8em; margin-bottom: 8px; color: #60a5fa; }
+.subtitle { text-align: center; color: #94a3b8; margin-bottom: 30px; font-size: 0.95em; }
+
+/* RNN 展开图 */
+.rnn-unfold { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 20px 0; flex-wrap: wrap; }
+.cell { width: 100px; height: 80px; border: 2px solid #3b82f6; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; background: #1e293b; transition: all 0.4s; }
+.cell.active { border-color: #f59e0b; background: #292524; box-shadow: 0 0 20px rgba(245,158,11,0.3); }
+.cell .label { font-size: 0.75em; color: #94a3b8; }
+.cell .val { font-size: 1em; font-weight: bold; color: #e2e8f0; }
+.cell .token { font-size: 0.8em; color: #60a5fa; margin-top: 2px; }
+.arrow-h { width: 36px; height: 2px; background: #3b82f6; position: relative; }
+.arrow-h::after { content: ''; position: absolute; right: 0; top: -4px; border: 5px solid transparent; border-left: 7px solid #3b82f6; }
+.arrow-h.fading { background: linear-gradient(to right, #3b82f6, #ef4444); }
+.arrow-h.fading::after { border-left-color: #ef4444; }
+.arrow-down { width: 2px; height: 20px; background: #60a5fa; margin: 0 auto; position: relative; }
+.arrow-down::after { content: ''; position: absolute; bottom: 0; left: -4px; border: 5px solid transparent; border-top: 7px solid #60a5fa; }
+
+/* 梯度消失演示 */
+.gradient-section { margin: 30px 0; padding: 20px; background: #1e293b; border-radius: 12px; border: 1px solid #334155; }
+.gradient-section h3 { color: #f59e0b; margin-bottom: 15px; font-size: 1.1em; }
+.gradient-bars { display: flex; align-items: flex-end; gap: 8px; height: 120px; padding: 10px 0; }
+.g-bar { width: 50px; border-radius: 6px 6px 0 0; transition: height 0.5s, background 0.5s; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding-top: 4px; font-size: 0.7em; color: #1e293b; font-weight: bold; }
+.g-bar-label { font-size: 0.65em; color: #94a3b8; margin-top: 4px; text-align: center; }
+
+/* 生成演示 */
+.gen-section { margin: 30px 0; padding: 20px; background: #1e293b; border-radius: 12px; border: 1px solid #334155; }
+.gen-section h3 { color: #34d399; margin-bottom: 15px; font-size: 1.1em; }
+.gen-steps { display: flex; flex-direction: column; gap: 12px; }
+.gen-step { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background: #0f172a; border: 1px solid #334155; transition: all 0.3s; opacity: 0.4; }
+.gen-step.active { opacity: 1; border-color: #34d399; }
+.gen-step .step-num { width: 28px; height: 28px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 0.8em; font-weight: bold; }
+.gen-step.active .step-num { background: #34d399; color: #0f172a; }
+.gen-step .step-content { flex: 1; font-size: 0.85em; }
+.gen-step .input-tokens { color: #94a3b8; }
+.gen-step .output-token { color: #f59e0b; font-weight: bold; font-size: 1em; }
+.gen-step .hidden-state { color: #60a5fa; font-size: 0.75em; }
+
+/* 控制面板 */
+.controls { display: flex; gap: 12px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
+.btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 0.95em; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+.btn-primary { background: #3b82f6; color: white; }
+.btn-primary:hover { background: #2563eb; }
+.btn-warn { background: #f59e0b; color: #0f172a; }
+.btn-warn:hover { background: #d97706; }
+.btn-danger { background: #ef4444; color: white; }
+.btn-danger:hover { background: #dc2626; }
+
+/* 公式 */
+.formula { background: #1e293b; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 3px solid #3b82f6; font-family: 'Courier New', monospace; font-size: 0.9em; overflow-x: auto; }
+.formula .highlight { color: #f59e0b; }
+.formula .comment { color: #64748b; }
+
+.info-box { background: #1e293b; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 3px solid #f59e0b; }
+.info-box h4 { color: #f59e0b; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🔄 RNN 文本生成动画</h1>
+<p class="subtitle">隐藏状态如何沿时间步传递，以及梯度消失问题可视化</p>
+
+<div class="formula">
+h<sub>t</sub> = <span class="highlight">tanh</span>(W<sub>hh</sub> · h<sub>t-1</sub> + W<sub>xh</sub> · x<sub>t</sub> + b)<br>
+<span class="comment">// 每步：新输入 x_t + 上一记忆 h_{t-1} → 新记忆 h_t</span>
+</div>
+
+<div class="controls">
+  <button class="btn btn-primary" onclick="startForward()">▶ 正向传播（生成）</button>
+  <button class="btn btn-danger" onclick="startGradient()">⬅ 反向传播（梯度消失）</button>
+  <button class="btn btn-warn" onclick="resetAll()">↻ 重置</button>
+</div>
+
+<!-- RNN 展开图 -->
+<div class="rnn-unfold" id="rnnUnfold">
+  <!-- JS 动态生成 -->
+</div>
+
+<!-- 梯度消失 -->
+<div class="gradient-section">
+  <h3>📉 梯度消失可视化</h3>
+  <p style="font-size:0.85em;color:#94a3b8;margin-bottom:10px">反向传播时，梯度每经过一步都要乘以 W·tanh'，连乘后趋近于 0</p>
+  <div class="gradient-bars" id="gradientBars"></div>
+  <div style="display:flex;gap:8px;justify-content:center" id="gradientLabels"></div>
+</div>
+
+<!-- 生成过程 -->
+<div class="gen-section">
+  <h3>✍️ 自回归生成过程</h3>
+  <p style="font-size:0.85em;color:#94a3b8;margin-bottom:10px">每步：用当前隐藏状态在词表上选概率最高的词</p>
+  <div class="gen-steps" id="genSteps"></div>
+</div>
+
+<div class="info-box">
+  <h4>💡 关键理解</h4>
+  <p style="font-size:0.85em">RNN 的记忆像"传话游戏"：信息每传一步都会衰减。10步之后只剩约 10% 的原始信息，20步后几乎为零。这就是为什么 RNN 无法生成长文本。</p>
+</div>
+</div>
+
+<script>
+const tokens = ['我', '爱', '中', '国', '，', '她', '爱', '世', '界'];
+const predicted = ['爱', '中', '国', '，', '她', '爱', '世', '界', '<EOS>'];
+const hStates = ['h₁', 'h₂', 'h₃', 'h₄', 'h₅', 'h₆', 'h₇', 'h₈', 'h₉'];
+
+function buildUnfold() {
+  const el = document.getElementById('rnnUnfold');
+  el.innerHTML = '';
+  tokens.forEach((tok, i) => {
+    // 输入箭头 + 输入词
+    const col = document.createElement('div');
+    col.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
+
+    const inputTok = document.createElement('div');
+    inputTok.style.cssText = 'color:#60a5fa;font-size:0.85em;margin-bottom:2px;font-weight:bold;';
+    inputTok.textContent = tok;
+    col.appendChild(inputTok);
+
+    const arrowD = document.createElement('div');
+    arrowD.className = 'arrow-down';
+    col.appendChild(arrowD);
+
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.id = `cell-${i}`;
+    cell.innerHTML = `<div class="label">RNN</div><div class="val" id="hval-${i}">h₀</div>`;
+    col.appendChild(cell);
+
+    el.appendChild(col);
+
+    // 水平箭头（除了最后一个）
+    if (i < tokens.length - 1) {
+      const arrowH = document.createElement('div');
+      arrowH.className = 'arrow-h';
+      arrowH.id = `arrow-${i}`;
+      el.appendChild(arrowH);
+    }
+  });
+}
+
+function buildGradient() {
+  const bars = document.getElementById('gradientBars');
+  const labels = document.getElementById('gradientLabels');
+  bars.innerHTML = '';
+  labels.innerHTML = '';
+  for (let i = 0; i < 9; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'g-bar';
+    bar.id = `gbar-${i}`;
+    bar.style.height = '0px';
+    bar.style.background = '#3b82f6';
+    bars.appendChild(bar);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'g-bar-label';
+    lbl.textContent = `∂h₉/∂h${i+1}`;
+    labels.appendChild(lbl);
+  }
+}
+
+function buildGenSteps() {
+  const el = document.getElementById('genSteps');
+  el.innerHTML = '';
+  const steps = [
+    { input: '[BOS]', out: '我', h: 'h₁' },
+    { input: '我', out: '爱', h: 'h₂' },
+    { input: '爱', out: '中', h: 'h₃' },
+    { input: '中', out: '国', h: 'h₄' },
+    { input: '国', out: '，', h: 'h₅' },
+    { input: '，', out: '她', h: 'h₆' },
+    { input: '她', out: '爱', h: 'h₇' },
+    { input: '爱', out: '世', h: 'h₈' },
+    { input: '世', out: '界', h: 'h₉' },
+  ];
+  steps.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'gen-step';
+    div.id = `gen-${i}`;
+    div.innerHTML = `
+      <div class="step-num">${i+1}</div>
+      <div class="step-content">
+        <span class="input-tokens">输入: ${s.input}</span> →
+        <span class="hidden-state">${s.h} = tanh(W·h + W·x)</span> →
+        <span class="output-token">预测: ${s.out}</span>
+      </div>`;
+    el.appendChild(div);
+  });
+}
+
+let forwardTimer = null;
+function startForward() {
+  resetAll();
+  let step = 0;
+  forwardTimer = setInterval(() => {
+    if (step >= tokens.length) {
+      clearInterval(forwardTimer);
+      return;
+    }
+    const cell = document.getElementById(`cell-${step}`);
+    cell.classList.add('active');
+    document.getElementById(`hval-${step}`).textContent = hStates[step];
+    document.getElementById(`gen-${step}`).classList.add('active');
+
+    if (step > 0) {
+      const arrow = document.getElementById(`arrow-${step-1}`);
+      if (arrow) arrow.style.background = '#f59e0b';
+    }
+    step++;
+  }, 600);
+}
+
+let gradientTimer = null;
+function startGradient() {
+  resetAll();
+  // 先全部点亮
+  tokens.forEach((_, i) => {
+    document.getElementById(`cell-${i}`).classList.add('active');
+    document.getElementById(`hval-${i}`).textContent = hStates[i];
+  });
+  // 梯度从右往左衰减
+  const decay = 0.7;
+  let step = 0;
+  const gradValues = [];
+  for (let i = 0; i < 9; i++) {
+    gradValues.push(Math.pow(decay, 8 - i));
+  }
+  gradientTimer = setInterval(() => {
+    if (step >= 9) {
+      clearInterval(gradientTimer);
+      return;
+    }
+    const val = gradValues[step];
+    const bar = document.getElementById(`gbar-${step}`);
+    const h = Math.round(val * 110);
+    bar.style.height = Math.max(h, 2) + 'px';
+    // 颜色从绿到红
+    const r = Math.round(239 + (34 - 239) * val);
+    const g = Math.round(68 + (197 - 68) * val);
+    const b = Math.round(68 + (94 - 68) * val);
+    bar.style.background = `rgb(${r},${g},${b})`;
+    bar.textContent = (val * 100).toFixed(0) + '%';
+
+    // 箭头变红表示衰减
+    if (step < 8) {
+      const arrow = document.getElementById(`arrow-${8-step}`);
+      if (arrow) {
+        arrow.classList.add('fading');
+      }
+    }
+    step++;
+  }, 500);
+}
+
+function resetAll() {
+  if (forwardTimer) clearInterval(forwardTimer);
+  if (gradientTimer) clearInterval(gradientTimer);
+  tokens.forEach((_, i) => {
+    const cell = document.getElementById(`cell-${i}`);
+    if (cell) { cell.classList.remove('active'); document.getElementById(`hval-${i}`).textContent = 'h₀'; }
+    const gen = document.getElementById(`gen-${i}`);
+    if (gen) gen.classList.remove('active');
+    const arrow = document.getElementById(`arrow-${i}`);
+    if (arrow) { arrow.classList.remove('fading'); arrow.style.background = '#3b82f6'; }
+    const bar = document.getElementById(`gbar-${i}`);
+    if (bar) { bar.style.height = '0px'; bar.textContent = ''; }
+  });
+}
+
+buildUnfold();
+buildGradient();
+buildGenSteps();
+</script>
+</body>
+</html>

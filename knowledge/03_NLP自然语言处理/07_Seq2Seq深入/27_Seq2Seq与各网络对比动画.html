@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seq2Seq 与各网络架构对比动画</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #0f172a; color: #e2e8f0; overflow-x: hidden;
+}
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+/* Header */
+.header { text-align: center; padding: 30px 0 20px; }
+.header h1 { font-size: 28px; background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.header p { color: #94a3b8; margin-top: 8px; font-size: 14px; }
+
+/* Tab navigation */
+.tabs { display: flex; gap: 4px; margin: 20px 0; flex-wrap: wrap; justify-content: center; }
+.tab-btn {
+  padding: 10px 20px; border: 1px solid #334155; border-radius: 8px;
+  background: #1e293b; color: #94a3b8; cursor: pointer;
+  font-size: 14px; transition: all 0.3s; position: relative;
+}
+.tab-btn:hover { border-color: #60a5fa; color: #e2e8f0; }
+.tab-btn.active {
+  background: linear-gradient(135deg, #1e3a5f, #1e293b);
+  border-color: #60a5fa; color: #60a5fa; font-weight: 600;
+}
+.tab-btn .badge {
+  position: absolute; top: -6px; right: -6px;
+  background: #ef4444; color: white; font-size: 10px;
+  padding: 1px 5px; border-radius: 10px;
+}
+
+/* Canvas area */
+.canvas-area {
+  background: #1e293b; border-radius: 12px; border: 1px solid #334155;
+  padding: 20px; margin: 20px 0; min-height: 500px;
+  position: relative; overflow: hidden;
+}
+canvas { display: block; margin: 0 auto; }
+
+/* Info panel */
+.info-panel {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0;
+}
+@media (max-width: 768px) { .info-panel { grid-template-columns: 1fr; } }
+.info-card {
+  background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+  padding: 20px; transition: border-color 0.3s;
+}
+.info-card:hover { border-color: #60a5fa; }
+.info-card h3 { color: #60a5fa; font-size: 16px; margin-bottom: 12px; }
+.info-card p, .info-card li { color: #94a3b8; font-size: 13px; line-height: 1.8; }
+.info-card ul { padding-left: 16px; }
+.info-card .highlight { color: #f59e0b; font-weight: 600; }
+.info-card .problem { color: #ef4444; }
+.info-card .solution { color: #22c55e; }
+
+/* Comparison section */
+.comparison {
+  background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+  padding: 24px; margin: 20px 0;
+}
+.comparison h3 { color: #a78bfa; font-size: 18px; margin-bottom: 16px; text-align: center; }
+.compare-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.compare-table th {
+  background: #0f172a; color: #60a5fa; padding: 10px 8px;
+  border: 1px solid #334155; text-align: center;
+}
+.compare-table td {
+  padding: 8px; border: 1px solid #334155; text-align: center; color: #cbd5e1;
+}
+.compare-table td.yes { color: #22c55e; font-weight: 600; }
+.compare-table td.no { color: #ef4444; }
+.compare-table td.partial { color: #f59e0b; }
+.compare-table tr:hover td { background: #1e293b80; }
+
+/* Evolution chain */
+.evolution {
+  background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+  padding: 24px; margin: 20px 0;
+}
+.evolution h3 { color: #a78bfa; font-size: 18px; margin-bottom: 20px; text-align: center; }
+.evo-chain {
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: 8px;
+}
+.evo-node {
+  padding: 10px 16px; border-radius: 8px; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: all 0.3s;
+  position: relative;
+}
+.evo-node.fc { background: #1e3a5f; border: 1px solid #3b82f6; color: #93c5fd; }
+.evo-node.rnn { background: #1e3f3a; border: 1px solid #22c55e; color: #86efac; }
+.evo-node.lstm { background: #3f1e3a; border: 1px solid #a855f7; color: #d8b4fe; }
+.evo-node.gru { background: #3f2e1e; border: 1px solid #f59e0b; color: #fcd34d; }
+.evo-node.s2s { background: #1e2f3f; border: 1px solid #06b6d4; color: #67e8f9; }
+.evo-node.attn { background: #3f1e2e; border: 1px solid #ec4899; color: #f9a8d4; }
+.evo-node:hover { transform: scale(1.1); }
+.evo-arrow { color: #475569; font-size: 20px; }
+.evo-label {
+  display: block; font-size: 10px; color: #64748b; font-weight: 400;
+  margin-top: 2px; text-align: center;
+}
+
+/* Controls */
+.controls {
+  display: flex; justify-content: center; gap: 12px; margin: 16px 0;
+  flex-wrap: wrap;
+}
+.ctrl-btn {
+  padding: 8px 20px; border-radius: 8px; border: 1px solid #334155;
+  background: #1e293b; color: #e2e8f0; cursor: pointer; font-size: 13px;
+  transition: all 0.3s;
+}
+.ctrl-btn:hover { border-color: #60a5fa; background: #1e3a5f; }
+.ctrl-btn.primary { background: #1e3a5f; border-color: #60a5fa; color: #60a5fa; }
+.ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Step indicator */
+.step-indicator {
+  text-align: center; padding: 12px; color: #64748b; font-size: 13px;
+}
+.step-indicator .current { color: #60a5fa; font-weight: 600; }
+
+/* Animation description */
+.anim-desc {
+  background: #0f172a; border-radius: 8px; padding: 16px;
+  margin: 16px 0; font-size: 13px; line-height: 1.8; color: #94a3b8;
+  border-left: 3px solid #60a5fa;
+}
+.anim-desc strong { color: #e2e8f0; }
+.anim-desc .key { color: #f59e0b; }
+.anim-desc .bad { color: #ef4444; }
+.anim-desc .good { color: #22c55e; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🧠 Seq2Seq 与各网络架构对比动画</h1>
+    <p>从全连接到 Seq2Seq+Attention：每一步演进都在解决上一步解决不了的问题</p>
+  </div>
+
+  <!-- Evolution chain -->
+  <div class="evolution">
+    <h3>🔗 演进链路：每种网络解决了什么，留下了什么</h3>
+    <div class="evo-chain">
+      <div class="evo-node fc" onclick="switchTab('fc')">FC<span class="evo-label">固定映射</span></div>
+      <span class="evo-arrow">→</span>
+      <div class="evo-node rnn" onclick="switchTab('rnn')">RNN<span class="evo-label">序列记忆</span></div>
+      <span class="evo-arrow">→</span>
+      <div class="evo-node lstm" onclick="switchTab('lstm')">LSTM<span class="evo-label">长程记忆</span></div>
+      <span class="evo-arrow">→</span>
+      <div class="evo-node gru" onclick="switchTab('gru')">GRU<span class="evo-label">轻量门控</span></div>
+      <span class="evo-arrow">→</span>
+      <div class="evo-node s2s" onclick="switchTab('s2s')">Seq2Seq<span class="evo-label">编码-解码</span></div>
+      <span class="evo-arrow">→</span>
+      <div class="evo-node attn" onclick="switchTab('attn')">+Attention<span class="evo-label">动态检索</span></div>
+    </div>
+  </div>
+
+  <!-- Tab navigation -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('fc')">📦 FC 全连接</button>
+    <button class="tab-btn" onclick="switchTab('rnn')">🔄 RNN</button>
+    <button class="tab-btn" onclick="switchTab('lstm')">🧪 LSTM</button>
+    <button class="tab-btn" onclick="switchTab('gru')">⚡ GRU</button>
+    <button class="tab-btn" onclick="switchTab('s2s')">🔀 Seq2Seq</button>
+    <button class="tab-btn" onclick="switchTab('attn')">🔍 Seq2Seq+Attention</button>
+    <button class="tab-btn" onclick="switchTab('compare')">⚖️ 全对比</button>
+  </div>
+
+  <!-- Animation description -->
+  <div class="anim-desc" id="animDesc">
+    <strong>FC 全连接网络</strong>：将所有输入拼接成一个大向量，一次性映射到输出。<span class="bad">❌ 无法处理变长序列</span>，<span class="bad">❌ 丢掉顺序信息</span>。这是所有问题的起点——我们需要一种能理解"顺序"的网络。
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-area">
+    <canvas id="mainCanvas" width="1100" height="480"></canvas>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="ctrl-btn primary" onclick="playAnimation()">▶ 播放动画</button>
+    <button class="ctrl-btn" onclick="pauseAnimation()">⏸ 暂停</button>
+    <button class="ctrl-btn" onclick="resetAnimation()">↺ 重置</button>
+    <button class="ctrl-btn" onclick="stepForward()">⏭ 单步</button>
+  </div>
+  <div class="step-indicator">
+    当前步骤: <span class="current" id="stepDisplay">0 / 0</span>
+  </div>
+
+  <!-- Info cards -->
+  <div class="info-panel" id="infoPanel">
+    <div class="info-card">
+      <h3>📦 FC 的结构</h3>
+      <ul>
+        <li>输入: 固定长度向量</li>
+        <li>计算: y = σ(W·x + b)</li>
+        <li>输出: 固定长度向量</li>
+        <li>参数: W 矩阵 + b 偏置</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h3>⚠️ FC 不能做序列任务的原因</h3>
+      <ul>
+        <li class="problem">输入维度写死 → 变长序列无法处理</li>
+        <li class="problem">拼接丢顺序 → "我爱你" ≠ "你爱我"的顺序语义</li>
+        <li class="problem">参数随长度爆炸 → 20词×300维=6000维输入</li>
+        <li class="problem">无法生成序列 → 只有一个固定输出</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Full comparison table -->
+  <div class="comparison">
+    <h3>📊 六种架构能力全对比</h3>
+    <table class="compare-table" id="compareTable">
+      <thead>
+        <tr>
+          <th>能力</th>
+          <th>FC</th>
+          <th>RNN</th>
+          <th>LSTM</th>
+          <th>GRU</th>
+          <th>Seq2Seq</th>
+          <th>+Attention</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>处理变长输入</td>
+          <td class="no">❌</td><td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td>
+        </tr>
+        <tr>
+          <td>保留顺序信息</td>
+          <td class="no">❌</td><td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td>
+        </tr>
+        <tr>
+          <td>长程依赖 (>50步)</td>
+          <td class="no">❌</td><td class="no">❌</td><td class="yes">✅</td><td class="partial">⚠️</td><td class="yes">✅</td><td class="yes">✅</td>
+        </tr>
+        <tr>
+          <td>生成序列输出</td>
+          <td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="yes">✅</td><td class="yes">✅</td>
+        </tr>
+        <tr>
+          <td>不等长输入输出</td>
+          <td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="yes">✅</td><td class="yes">✅</td>
+        </tr>
+        <tr>
+          <td>动态聚焦关键信息</td>
+          <td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="yes">✅</td>
+        </tr>
+        <tr>
+          <td>训练并行性</td>
+          <td class="yes">✅</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="partial">⚠️</td><td class="partial">⚠️</td>
+        </tr>
+        <tr>
+          <td>可解释性(注意力权重)</td>
+          <td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="yes">✅</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+let currentTab = 'fc';
+let animStep = 0;
+let animTimer = null;
+let isPlaying = false;
+const dpr = window.devicePixelRatio || 1;
+canvas.width = 1100 * dpr;
+canvas.height = 480 * dpr;
+canvas.style.width = '1100px';
+canvas.style.height = '480px';
+ctx.scale(dpr, dpr);
+
+// ============ Data definitions ============
+const VOCAB = { '我': 0, '爱': 1, '中': 2, '国': 3, 'I': 4, 'love': 5, 'China': 6 };
+const COLORS = {
+  fc: '#3b82f6', rnn: '#22c55e', lstm: '#a855f7', gru: '#f59e0b',
+  s2s: '#06b6d4', attn: '#ec4899',
+  bg: '#0f172a', card: '#1e293b', border: '#334155',
+  text: '#e2e8f0', subtext: '#94a3b8', dim: '#64748b',
+  good: '#22c55e', bad: '#ef4444', warn: '#f59e0b',
+  input: '#60a5fa', hidden: '#a78bfa', output: '#34d399',
+  cell: '#f472b6', gate: '#fbbf24', context: '#06b6d4',
+  attention: '#ec4899'
+};
+
+// ============ Drawing utilities ============
+function roundRect(x, y, w, h, r, fill, stroke, lineW) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lineW || 1; ctx.stroke(); }
+}
+
+function drawNode(x, y, w, h, label, color, alpha) {
+  alpha = alpha || 1;
+  ctx.globalAlpha = alpha;
+  roundRect(x - w/2, y - h/2, w, h, 8, color + '20', color, 2);
+  ctx.fillStyle = color;
+  ctx.font = 'bold 13px -apple-system, PingFang SC, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x, y);
+  ctx.globalAlpha = 1;
+}
+
+function drawArrow(x1, y1, x2, y2, color, alpha, lineW, dashed) {
+  alpha = alpha || 1; lineW = lineW || 2;
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineW;
+  if (dashed) ctx.setLineDash([5, 3]); else ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  // arrowhead
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const headLen = 8;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - headLen * Math.cos(angle - 0.4), y2 - headLen * Math.sin(angle - 0.4));
+  ctx.lineTo(x2 - headLen * Math.cos(angle + 0.4), y2 - headLen * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fill();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+}
+
+function drawCurvedArrow(x1, y1, x2, y2, curveDir, color, alpha) {
+  alpha = alpha || 1;
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2 + curveDir * 40;
+  ctx.moveTo(x1, y1);
+  ctx.quadraticCurveTo(mx, my, x2, y2);
+  ctx.stroke();
+  // small arrowhead at end
+  const t = 0.95;
+  const px = (1-t)*(1-t)*x1 + 2*(1-t)*t*mx + t*t*x2;
+  const py = (1-t)*(1-t)*y1 + 2*(1-t)*t*my + t*t*y2;
+  const angle = Math.atan2(y2 - py, x2 - px);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - 8 * Math.cos(angle - 0.4), y2 - 8 * Math.sin(angle - 0.4));
+  ctx.lineTo(x2 - 8 * Math.cos(angle + 0.4), y2 - 8 * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawLabel(x, y, text, color, size, align) {
+  ctx.fillStyle = color || COLORS.text;
+  ctx.font = (size || 12) + 'px -apple-system, PingFang SC, sans-serif';
+  ctx.textAlign = align || 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+}
+
+function drawDataFlow(x, y, w, h, label, color, progress) {
+  const fillW = w * Math.min(progress, 1);
+  roundRect(x, y, w, h, 6, COLORS.card, COLORS.border);
+  if (progress > 0) {
+    ctx.save();
+    ctx.beginPath();
+    roundRect(x, y, fillW, h, 6, null, null);
+    ctx.clip();
+    roundRect(x, y, fillW, h, 6, color + '40', null);
+    ctx.restore();
+  }
+  drawLabel(x + w/2, y + h/2, label, color, 12);
+}
+
+function getStepAlpha(stepIdx, currentStep) {
+  if (currentStep < stepIdx) return 0.15;
+  if (currentStep === stepIdx) return 0.7 + 0.3 * Math.sin(Date.now() / 300);
+  return 1;
+}
+
+// ============ FC drawing ============
+function drawFC(step) {
+  drawLabel(550, 30, 'FC 全连接网络：固定映射，无法理解序列', COLORS.fc, 16);
+
+  // Input: all words concatenated
+  const words = ['我', '爱', '中', '国'];
+  const inputX = 100, inputY = 200;
+  const alpha0 = getStepAlpha(0, step);
+
+  drawLabel(100, 160, '输入（拼接向量）', COLORS.input, 12);
+  for (let i = 0; i < words.length; i++) {
+    const a = getStepAlpha(i, step);
+    drawNode(inputX, inputY + i * 55, 120, 40, words[i] + ' → 向量', COLORS.input, a);
+    if (i > 0) drawArrow(inputX, inputY + (i-1) * 55 + 20, inputX, inputY + i * 55 - 20, COLORS.dim, a * 0.5);
+  }
+
+  // Concat bracket
+  const concatAlpha = getStepAlpha(4, step);
+  drawArrow(160, inputY, 280, inputY, COLORS.fc, concatAlpha);
+  drawLabel(220, inputY - 20, '拼接', COLORS.fc, 11);
+  roundRect(280, inputY - 50, 100, 100, 8, COLORS.fc + '15', COLORS.fc, 2);
+  drawLabel(330, inputY, '[v₁;v₂;v₃;v₄]', COLORS.fc, 11);
+  drawLabel(330, inputY + 20, '固定维度', COLORS.dim, 10);
+
+  // FC layer
+  const fcAlpha = getStepAlpha(5, step);
+  drawArrow(380, inputY, 480, inputY - 30, COLORS.fc, fcAlpha);
+  drawArrow(380, inputY, 480, inputY + 30, COLORS.fc, fcAlpha);
+  roundRect(480, inputY - 70, 140, 140, 12, COLORS.fc + '15', COLORS.fc, 2);
+  drawLabel(550, inputY - 30, 'W · x + b', COLORS.fc, 13);
+  drawLabel(550, inputY, 'σ(·)', COLORS.fc, 14);
+  drawLabel(550, inputY + 30, '全连接层', COLORS.dim, 11);
+
+  // Output
+  const outAlpha = getStepAlpha(6, step);
+  drawArrow(620, inputY, 720, inputY, COLORS.output, outAlpha);
+  drawNode(800, inputY, 160, 50, '固定长度输出', COLORS.output, outAlpha);
+
+  // Problem annotations
+  const probAlpha = getStepAlpha(7, step);
+  drawLabel(550, 380, '⚠️ 问题', COLORS.bad, 14, 'center');
+  drawLabel(400, 420, '❌ 输入长度写死 → 变长序列无法处理', COLORS.bad, 12, 'left');
+  drawLabel(400, 445, '❌ 拼接丢顺序 → "我爱你"和"你爱我"无顺序语义', COLORS.bad, 12, 'left');
+
+  // Visual: broken sequence
+  if (step >= 7) {
+    ctx.globalAlpha = 0.6;
+    drawLabel(850, 380, '顺序信息：', COLORS.dim, 11);
+    roundRect(850, 395, 200, 30, 6, COLORS.bad + '15', COLORS.bad, 1);
+    drawLabel(950, 410, '❌ 全部丢失', COLORS.bad, 11);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============ RNN drawing ============
+function drawRNN(step) {
+  drawLabel(550, 30, 'RNN 循环神经网络：引入隐藏状态，保留顺序记忆', COLORS.rnn, 16);
+
+  const words = ['我', '爱', '中', '国'];
+  const baseY = 180;
+  const cellW = 100, cellH = 70;
+  const startX = 120, gap = 180;
+
+  // Hidden state flow
+  for (let i = 0; i < words.length; i++) {
+    const cx = startX + i * gap;
+    const a = getStepAlpha(i, step);
+
+    // Input word
+    drawNode(cx, baseY - 60, 80, 30, 'xₜ = ' + words[i], COLORS.input, a);
+    drawArrow(cx, baseY - 45, cx, baseY - cellH/2, COLORS.input, a);
+
+    // RNN cell
+    roundRect(cx - cellW/2, baseY - cellH/2, cellW, cellH, 10, COLORS.rnn + '20', COLORS.rnn, 2 * a);
+    ctx.globalAlpha = a;
+    drawLabel(cx, baseY - 10, 'RNN', COLORS.rnn, 14);
+    drawLabel(cx, baseY + 12, 'hₜ = tanh(·)', COLORS.dim, 9);
+    ctx.globalAlpha = 1;
+
+    // h_t output
+    drawNode(cx, baseY + cellH/2 + 30, 70, 28, 'h' + (i+1), COLORS.hidden, a);
+    drawArrow(cx, baseY + cellH/2, cx, baseY + cellH/2 + 16, COLORS.hidden, a);
+
+    // Arrow to next cell (hidden state)
+    if (i < words.length - 1) {
+      const nextA = getStepAlpha(i + 0.5, step);
+      drawArrow(cx + cellW/2, baseY, startX + (i+1) * gap - cellW/2, baseY, COLORS.hidden, nextA);
+      drawLabel((cx + startX + (i+1) * gap) / 2, baseY - 15, '记忆传递', COLORS.hidden, 10);
+    }
+  }
+
+  // Initial h0
+  const h0Alpha = getStepAlpha(0, step);
+  drawLabel(startX - 50, baseY, 'h₀=0', COLORS.dim, 11);
+  drawArrow(startX - cellW/2 - 5, baseY, startX - cellW/2, baseY, COLORS.dim, h0Alpha);
+
+  // Problem: gradient vanishing
+  const probAlpha = getStepAlpha(5, step);
+  if (step >= 5) {
+    // Gradient flow visualization
+    drawLabel(550, 320, '📉 梯度消失问题', COLORS.bad, 14);
+    ctx.globalAlpha = probAlpha;
+    // gradient bars
+    for (let i = 0; i < 4; i++) {
+      const w = (4 - i) * 30;
+      const x = 400 + i * 80;
+      roundRect(x, 350, w, 20, 4, COLORS.bad + (Math.floor((4-i)/4*8)*16).toString(16), COLORS.bad, 1);
+      drawLabel(x + w/2, 360, i === 0 ? '梯度强' : i === 3 ? '≈0' : '衰减', COLORS.dim, 9);
+    }
+    drawArrow(400, 395, 720, 395, COLORS.bad, probAlpha);
+    drawLabel(560, 420, '连乘 W × tanh\' × W × tanh\' ... → 指数衰减', COLORS.bad, 12);
+    drawLabel(560, 445, '20步后远处信息传不到 → 长序列记忆崩塌', COLORS.bad, 11);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============ LSTM drawing ============
+function drawLSTM(step) {
+  drawLabel(550, 30, 'LSTM：门控 + 细胞状态，解决梯度消失', COLORS.lstm, 16);
+
+  // Draw one LSTM cell in detail
+  const cx = 550, cy = 220;
+  const cellW = 300, cellH = 180;
+
+  // Cell outline
+  roundRect(cx - cellW/2, cy - cellH/2, cellW, cellH, 12, COLORS.lstm + '10', COLORS.lstm, 2);
+
+  // Input
+  const inputAlpha = getStepAlpha(0, step);
+  drawLabel(cx, cy - cellH/2 - 30, 'xₜ', COLORS.input, 14);
+  drawArrow(cx, cy - cellH/2 - 18, cx, cy - cellH/2 + 5, COLORS.input, inputAlpha);
+
+  // C_{t-1} input
+  const cInAlpha = getStepAlpha(1, step);
+  drawLabel(cx - cellW/2 - 50, cy - 40, 'Cₜ₋₁', COLORS.cell, 13);
+  drawArrow(cx - cellW/2 - 20, cy - 40, cx - cellW/2 + 5, cy - 40, COLORS.cell, cInAlpha);
+
+  // h_{t-1} input
+  const hInAlpha = getStepAlpha(0, step);
+  drawLabel(cx - cellW/2 - 50, cy + 40, 'hₜ₋₁', COLORS.hidden, 13);
+  drawArrow(cx - cellW/2 - 20, cy + 40, cx - cellW/2 + 5, cy + 40, COLORS.hidden, hInAlpha);
+
+  // Gates inside the cell
+  const gateY = cy - 50;
+  const gateGap = 70;
+  const gates = [
+    { name: '遗忘门', sym: 'fₜ', color: COLORS.bad, step: 2 },
+    { name: '输入门', sym: 'iₜ', color: COLORS.good, step: 3 },
+    { name: '候选态', sym: 'C̃ₜ', color: COLORS.warn, step: 3 },
+    { name: '输出门', sym: 'oₜ', color: COLORS.attention, step: 5 },
+  ];
+
+  for (let i = 0; i < gates.length; i++) {
+    const gx = cx - cellW/2 + 50 + i * gateGap;
+    const a = getStepAlpha(gates[i].step, step);
+    roundRect(gx - 25, gateY - 15, 50, 30, 6, gates[i].color + '20', gates[i].color, 1.5 * a);
+    ctx.globalAlpha = a;
+    drawLabel(gx, gateY - 3, gates[i].sym, gates[i].color, 11);
+    drawLabel(gx, gateY + 10, gates[i].name, COLORS.dim, 7);
+    ctx.globalAlpha = 1;
+  }
+
+  // C_t update (the key formula)
+  const cUpdateAlpha = getStepAlpha(4, step);
+  if (step >= 4) {
+    // C_t = f_t ⊙ C_{t-1} + i_t ⊙ C̃_t
+    roundRect(cx - 80, cy + 10, 160, 35, 6, COLORS.cell + '15', COLORS.cell, 2 * cUpdateAlpha);
+    ctx.globalAlpha = cUpdateAlpha;
+    drawLabel(cx, cy + 22, 'Cₜ = fₜ⊙Cₜ₋₁ + iₜ⊙C̃ₜ', COLORS.cell, 12);
+    drawLabel(cx, cy + 38, '⚡ 加法更新 → 梯度不消失', COLORS.good, 10);
+    ctx.globalAlpha = 1;
+  }
+
+  // C_t output
+  const cOutAlpha = getStepAlpha(4, step);
+  drawArrow(cx + cellW/2 - 5, cy - 40, cx + cellW/2 + 30, cy - 40, COLORS.cell, cOutAlpha);
+  drawLabel(cx + cellW/2 + 60, cy - 40, 'Cₜ', COLORS.cell, 13);
+
+  // h_t output
+  const hOutAlpha = getStepAlpha(5, step);
+  if (step >= 5) {
+    roundRect(cx + cellW/2 + 20, cy + 20, 90, 30, 6, COLORS.hidden + '15', COLORS.hidden, 2 * hOutAlpha);
+    ctx.globalAlpha = hOutAlpha;
+    drawLabel(cx + cellW/2 + 65, cy + 30, 'hₜ = oₜ⊙tanh(Cₜ)', COLORS.hidden, 10);
+    ctx.globalAlpha = 1;
+  }
+  drawArrow(cx + cellW/2 - 5, cy + 40, cx + cellW/2 + 20, cy + 35, COLORS.hidden, hOutAlpha);
+  drawLabel(cx + cellW/2 + 65, cy + 55, 'hₜ', COLORS.hidden, 13);
+
+  // Key insight
+  const insightAlpha = getStepAlpha(6, step);
+  if (step >= 6) {
+    roundRect(200, 380, 700, 60, 10, COLORS.good + '10', COLORS.good, 1.5 * insightAlpha);
+    ctx.globalAlpha = insightAlpha;
+    drawLabel(550, 400, '🔑 核心突破：C_t 的更新是加法（不是乘法连乘）', COLORS.good, 14);
+    drawLabel(550, 420, '梯度路径：∂Cₜ/∂Cₜ₋₁ = fₜ → 可控的标量乘法 → 长程记忆', COLORS.text, 11);
+    ctx.globalAlpha = 1;
+  }
+
+  // But still can't do Seq2Seq
+  const limitAlpha = getStepAlpha(7, step);
+  if (step >= 7) {
+    drawLabel(550, 460, '⚠️ 仍然只有一条信息流 → 无法做"不等长序列到序列"映射', COLORS.bad, 12);
+  }
+}
+
+// ============ GRU drawing ============
+function drawGRU(step) {
+  drawLabel(550, 30, 'GRU：LSTM 的轻量替代，两门合一状态', COLORS.gru, 16);
+
+  const cx = 550, cy = 200;
+  const cellW = 260, cellH = 160;
+
+  // Cell outline
+  roundRect(cx - cellW/2, cy - cellH/2, cellW, cellH, 12, COLORS.gru + '10', COLORS.gru, 2);
+
+  // Input
+  const inputAlpha = getStepAlpha(0, step);
+  drawLabel(cx, cy - cellH/2 - 25, 'xₜ', COLORS.input, 14);
+  drawArrow(cx, cy - cellH/2 - 13, cx, cy - cellH/2 + 5, COLORS.input, inputAlpha);
+
+  // h_{t-1} input
+  drawLabel(cx - cellW/2 - 50, cy, 'hₜ₋₁', COLORS.hidden, 13);
+  drawArrow(cx - cellW/2 - 20, cy, cx - cellW/2 + 5, cy, COLORS.hidden, inputAlpha);
+
+  // Reset gate
+  const resetAlpha = getStepAlpha(1, step);
+  roundRect(cx - 70, cy - 50, 60, 35, 6, COLORS.good + '20', COLORS.good, 1.5 * resetAlpha);
+  ctx.globalAlpha = resetAlpha;
+  drawLabel(cx - 40, cy - 40, 'rₜ', COLORS.good, 12);
+  drawLabel(cx - 40, cy - 28, '重置门', COLORS.dim, 8);
+  ctx.globalAlpha = 1;
+
+  // Update gate
+  const updateAlpha = getStepAlpha(2, step);
+  roundRect(cx + 10, cy - 50, 60, 35, 6, COLORS.attention + '20', COLORS.attention, 1.5 * updateAlpha);
+  ctx.globalAlpha = updateAlpha;
+  drawLabel(cx + 40, cy - 40, 'zₜ', COLORS.attention, 12);
+  drawLabel(cx + 40, cy - 28, '更新门', COLORS.dim, 8);
+  ctx.globalAlpha = 1;
+
+  // Candidate
+  const candAlpha = getStepAlpha(3, step);
+  roundRect(cx - 40, cy + 5, 80, 30, 6, COLORS.warn + '20', COLORS.warn, 1.5 * candAlpha);
+  ctx.globalAlpha = candAlpha;
+  drawLabel(cx, cy + 15, 'h̃ₜ = tanh(·)', COLORS.warn, 10);
+  ctx.globalAlpha = 1;
+
+  // h_t update
+  const hUpdateAlpha = getStepAlpha(4, step);
+  if (step >= 4) {
+    roundRect(cx - 70, cy + 45, 140, 30, 6, COLORS.gru + '20', COLORS.gru, 2 * hUpdateAlpha);
+    ctx.globalAlpha = hUpdateAlpha;
+    drawLabel(cx, cy + 55, 'hₜ = zₜ⊙hₜ₋₁ + (1-zₜ)⊙h̃ₜ', COLORS.gru, 11);
+    ctx.globalAlpha = 1;
+  }
+
+  // h_t output
+  const hOutAlpha = getStepAlpha(4, step);
+  drawArrow(cx + cellW/2 - 5, cy, cx + cellW/2 + 30, cy, COLORS.hidden, hOutAlpha);
+  drawLabel(cx + cellW/2 + 55, cy, 'hₜ', COLORS.hidden, 13);
+
+  // Comparison with LSTM
+  const compAlpha = getStepAlpha(5, step);
+  if (step >= 5) {
+    roundRect(150, 340, 800, 120, 10, COLORS.gru + '08', COLORS.gru, 1);
+
+    ctx.globalAlpha = compAlpha;
+    // LSTM side
+    roundRect(170, 355, 350, 90, 8, COLORS.lstm + '10', COLORS.lstm, 1);
+    drawLabel(345, 375, 'LSTM', COLORS.lstm, 14);
+    drawLabel(345, 398, '3 个门 + 2 个状态 (Cₜ, hₜ)', COLORS.text, 11);
+    drawLabel(345, 418, '参数量: 4×(d² + d×emb)', COLORS.dim, 10);
+
+    // GRU side
+    roundRect(580, 355, 350, 90, 8, COLORS.gru + '10', COLORS.gru, 1);
+    drawLabel(755, 375, 'GRU', COLORS.gru, 14);
+    drawLabel(755, 398, '2 个门 + 1 个状态 (hₜ)', COLORS.text, 11);
+    drawLabel(755, 418, '参数量: 3×(d² + d×emb)  ← 少 25%', COLORS.good, 10);
+
+    ctx.globalAlpha = 1;
+  }
+
+  const limitAlpha = getStepAlpha(6, step);
+  if (step >= 6) {
+    drawLabel(550, 475, '⚠️ 和 LSTM 一样：仍然只有一条信息流，无法做 Seq2Seq', COLORS.bad, 12);
+  }
+}
+
+// ============ Seq2Seq drawing ============
+function drawS2S(step) {
+  drawLabel(550, 30, 'Seq2Seq：编码器-解码器分离，处理不等长序列', COLORS.s2s, 16);
+
+  const srcWords = ['我', '爱', '中', '国'];
+  const tgtWords = ['I', 'love', 'China'];
+  const encoderY = 130, decoderY = 300;
+  const encStartX = 100, decStartX = 100;
+  const gap = 130;
+
+  // ===== Encoder =====
+  const encAlpha = getStepAlpha(0, step);
+  drawLabel(550, 65, '编码器（Encoder）— "理解"输入', COLORS.input, 12);
+
+  for (let i = 0; i < srcWords.length; i++) {
+    const cx = encStartX + i * gap;
+    const a = getStepAlpha(i, step);
+
+    // Input
+    drawNode(cx, encoderY - 35, 60, 25, srcWords[i], COLORS.input, a);
+    drawArrow(cx, encoderY - 22, cx, encoderY, COLORS.input, a);
+
+    // LSTM cell
+    roundRect(cx - 40, encoderY, 80, 50, 8, COLORS.lstm + '20', COLORS.lstm, 1.5 * a);
+    ctx.globalAlpha = a;
+    drawLabel(cx, encoderY + 18, 'LSTM', COLORS.lstm, 11);
+    drawLabel(cx, encoderY + 32, 'h' + (i+1), COLORS.dim, 9);
+    ctx.globalAlpha = 1;
+
+    // h arrow to next
+    if (i < srcWords.length - 1) {
+      drawArrow(cx + 40, encoderY + 25, encStartX + (i+1) * gap - 40, encoderY + 25, COLORS.hidden, a);
+    }
+  }
+
+  // ===== Context vector =====
+  const ctxAlpha = getStepAlpha(4, step);
+  const lastEncX = encStartX + 3 * gap;
+  drawArrow(lastEncX, encoderY + 50, 650, 180, COLORS.context, ctxAlpha);
+  drawArrow(650, 180, 650, decoderY - 10, COLORS.context, ctxAlpha);
+
+  roundRect(610, 180, 80, 40, 8, COLORS.context + '20', COLORS.context, 2 * ctxAlpha);
+  ctx.globalAlpha = ctxAlpha;
+  drawLabel(650, 195, 'c = h₄', COLORS.context, 12);
+  drawLabel(650, 210, '上下文', COLORS.context, 9);
+  ctx.globalAlpha = 1;
+
+  // ===== Decoder =====
+  const decLabelAlpha = getStepAlpha(5, step);
+  drawLabel(360, decoderY - 45, '解码器（Decoder）— "表达"输出', COLORS.output, 12 * decLabelAlpha);
+
+  // SOS input
+  const sosAlpha = getStepAlpha(5, step);
+  drawNode(decStartX - 50, decoderY + 25, 50, 25, '<SOS>', COLORS.warn, sosAlpha);
+
+  for (let i = 0; i < tgtWords.length; i++) {
+    const cx = decStartX + i * gap;
+    const a = getStepAlpha(i + 5, step);
+
+    // LSTM cell
+    roundRect(cx - 40, decoderY, 80, 50, 8, COLORS.s2s + '20', COLORS.s2s, 1.5 * a);
+    ctx.globalAlpha = a;
+    drawLabel(cx, decoderY + 18, 'LSTM', COLORS.s2s, 11);
+    drawLabel(cx, decoderY + 32, 's' + (i+1), COLORS.dim, 9);
+    ctx.globalAlpha = 1;
+
+    // Output word
+    drawArrow(cx, decoderY + 50, cx, decoderY + 80, COLORS.output, a);
+    drawNode(cx, decoderY + 95, 70, 28, tgtWords[i], COLORS.output, a);
+
+    // h arrow to next
+    if (i < tgtWords.length - 1) {
+      drawArrow(cx + 40, decoderY + 25, decStartX + (i+1) * gap - 40, decoderY + 25, COLORS.hidden, a);
+    }
+
+    // Self-regressive: output feeds back as input
+    if (i > 0) {
+      drawCurvedArrow(cx, decoderY + 109, cx - gap + 0, decoderY - 5, -1, COLORS.output, a * 0.5);
+    }
+  }
+
+  // EOS
+  const eosAlpha = getStepAlpha(8, step);
+  drawNode(decStartX + 3 * gap, decoderY + 95, 50, 28, '<EOS>', COLORS.warn, eosAlpha);
+
+  // ===== Information bottleneck =====
+  const bottleneckAlpha = getStepAlpha(9, step);
+  if (step >= 9) {
+    roundRect(700, 340, 380, 120, 10, COLORS.bad + '10', COLORS.bad, 1.5 * bottleneckAlpha);
+    ctx.globalAlpha = bottleneckAlpha;
+    drawLabel(890, 365, '⚠️ 编码瓶颈（Information Bottleneck）', COLORS.bad, 13);
+    drawLabel(890, 390, '所有信息压缩到 c = h₄ 一个向量', COLORS.text, 11);
+    drawLabel(890, 410, '短句可以，长句信息丢失严重', COLORS.text, 11);
+    drawLabel(890, 430, '→ 需要 Attention 机制解决', COLORS.warn, 12);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============ Seq2Seq + Attention drawing ============
+function drawAttn(step) {
+  drawLabel(550, 30, 'Seq2Seq + Attention：解码器每步动态回看编码器', COLORS.attn, 16);
+
+  const srcWords = ['我', '爱', '中', '国'];
+  const encY = 100, decY = 300;
+  const gap = 140;
+  const encStartX = 150;
+
+  // ===== Encoder =====
+  drawLabel(550, 55, '编码器', COLORS.input, 11);
+  for (let i = 0; i < srcWords.length; i++) {
+    const cx = encStartX + i * gap;
+    const a = getStepAlpha(i, step);
+    drawNode(cx, encY - 30, 60, 25, srcWords[i], COLORS.input, a);
+    drawArrow(cx, encY - 17, cx, encY, COLORS.input, a);
+    roundRect(cx - 35, encY, 70, 40, 6, COLORS.lstm + '20', COLORS.lstm, 1.5 * a);
+    ctx.globalAlpha = a;
+    drawLabel(cx, encY + 14, 'h' + (i+1), COLORS.lstm, 11);
+    ctx.globalAlpha = 1;
+    if (i < srcWords.length - 1) drawArrow(cx + 35, encY + 20, encStartX + (i+1)*gap - 35, encY + 20, COLORS.hidden, a * 0.6);
+  }
+
+  // enc_outputs label
+  const encOutAlpha = getStepAlpha(4, step);
+  drawLabel(550, encY + 55, 'encoder_outputs = [h₁, h₂, h₃, h₄]  ← 供 Attention 回看', COLORS.attn, 11 * encOutAlpha);
+
+  // ===== Attention visualization =====
+  const attnAlpha = getStepAlpha(5, step);
+
+  // Decode step 1: "I" attends to "我"
+  const decWords = ['I', 'love', 'China'];
+  const attnWeights = [
+    [0.70, 0.20, 0.05, 0.05],  // "I" ← "我"
+    [0.10, 0.75, 0.10, 0.05],  // "love" ← "爱"
+    [0.05, 0.10, 0.40, 0.45],  // "China" ← "中国"
+  ];
+
+  for (let d = 0; d < decWords.length; d++) {
+    const decX = encStartX + d * gap;
+    const a = getStepAlpha(d + 5, step);
+
+    // Decoder cell
+    roundRect(decX - 35, decY, 70, 40, 6, COLORS.s2s + '20', COLORS.s2s, 1.5 * a);
+    ctx.globalAlpha = a;
+    drawLabel(decX, decY + 14, 's' + (d+1), COLORS.s2s, 11);
+    ctx.globalAlpha = 1;
+
+    // Output word
+    drawArrow(decX, decY + 40, decX, decY + 65, COLORS.output, a);
+    drawNode(decX, decY + 78, 65, 25, decWords[d], COLORS.output, a);
+
+    // Attention lines to encoder
+    if (step >= d + 5) {
+      for (let e = 0; e < srcWords.length; e++) {
+        const encX = encStartX + e * gap;
+        const w = attnWeights[d][e];
+        const lineAlpha = w * a;
+        ctx.strokeStyle = COLORS.attn;
+        ctx.lineWidth = w * 5 + 0.5;
+        ctx.globalAlpha = lineAlpha;
+        ctx.beginPath();
+        ctx.moveTo(encX, encY + 40);
+        // Curved line
+        const midY = (encY + 40 + decY) / 2 + 10;
+        ctx.quadraticCurveTo((encX + decX) / 2, midY, decX, decY);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // Attention weight label
+        if (w > 0.15) {
+          const labelX = (encX + decX) / 2 + (e - 1.5) * 8;
+          const labelY = midY - 5;
+          drawLabel(labelX, labelY, (w * 100).toFixed(0) + '%', COLORS.attn, 9);
+        }
+      }
+    }
+
+    // Self-regressive arrow
+    if (d > 0) {
+      drawCurvedArrow(decX, decY + 90, decX - gap, decY - 5, -1, COLORS.output, a * 0.4);
+    }
+  }
+
+  // Context vector explanation
+  const ctxExpAlpha = getStepAlpha(8, step);
+  if (step >= 8) {
+    roundRect(700, 200, 370, 80, 8, COLORS.attn + '10', COLORS.attn, 1.5 * ctxExpAlpha);
+    ctx.globalAlpha = ctxExpAlpha;
+    drawLabel(885, 220, '🔍 Attention 计算过程', COLORS.attn, 13);
+    drawLabel(885, 242, '① 分数: score(sₜ, hᵢ) = sₜᵀ · hᵢ', COLORS.text, 11);
+    drawLabel(885, 260, '② 权重: α = softmax(scores)', COLORS.text, 11);
+    drawLabel(885, 278, '③ 上下文: cₜ = Σ αᵢ · hᵢ', COLORS.text, 11);
+    ctx.globalAlpha = 1;
+  }
+
+  // Key benefits
+  const benefitAlpha = getStepAlpha(9, step);
+  if (step >= 9) {
+    roundRect(100, 400, 900, 60, 10, COLORS.good + '10', COLORS.good, 1.5 * benefitAlpha);
+    ctx.globalAlpha = benefitAlpha;
+    drawLabel(550, 420, '✅ 解决编码瓶颈：解码器不再只看 c=h₄，而是每步动态回看所有编码器位置', COLORS.good, 13);
+    drawLabel(550, 440, '✅ 梯度可通过 Attention 直接流回编码器任意位置，无需穿越整个序列', COLORS.good, 11);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============ Full comparison drawing ============
+function drawCompare(step) {
+  drawLabel(550, 30, '六种架构处理 "我爱你 → I love you" 的方式对比', '#e2e8f0', 16);
+
+  const models = [
+    { name: 'FC', color: COLORS.fc, y: 80, desc: '拼接→映射', problem: '固定长度，丢顺序' },
+    { name: 'RNN', color: COLORS.rnn, y: 140, desc: '逐词读入+记忆', problem: '梯度消失' },
+    { name: 'LSTM', color: COLORS.lstm, y: 200, desc: '门控+长记忆', problem: '单向流' },
+    { name: 'GRU', color: COLORS.gru, y: 260, desc: '轻量门控', problem: '同LSTM' },
+    { name: 'Seq2Seq', color: COLORS.s2s, y: 320, desc: '编码器→解码器', problem: '编码瓶颈' },
+    { name: '+Attention', color: COLORS.attn, y: 380, desc: '动态回看', problem: '→✅ 完整方案' },
+  ];
+
+  for (let i = 0; i < models.length; i++) {
+    const m = models[i];
+    const a = getStepAlpha(i, step);
+    const isGood = i === 5;
+
+    // Model name
+    roundRect(60, m.y - 15, 90, 30, 8, m.color + '20', m.color, 2 * a);
+    ctx.globalAlpha = a;
+    drawLabel(105, m.y, m.name, m.color, 12);
+    ctx.globalAlpha = 1;
+
+    // Flow visualization
+    const flowX = 180;
+    // Input tokens
+    for (let j = 0; j < 3; j++) {
+      const x = flowX + j * 40;
+      ctx.globalAlpha = a * 0.7;
+      roundRect(x, m.y - 8, 30, 16, 4, COLORS.input + '15', COLORS.input, 1);
+      drawLabel(x + 15, m.y, ['我','爱','你'][j], COLORS.input, 8);
+      ctx.globalAlpha = 1;
+    }
+
+    // Processing
+    drawArrow(flowX + 130, m.y, flowX + 170, m.y, m.color, a);
+
+    // Architecture block
+    roundRect(flowX + 175, m.y - 12, 200, 24, 6, m.color + '15', m.color, 1.5 * a);
+    ctx.globalAlpha = a;
+    drawLabel(flowX + 275, m.y, m.desc, m.color, 10);
+    ctx.globalAlpha = 1;
+
+    // Output
+    if (i >= 4) {
+      drawArrow(flowX + 380, m.y, flowX + 420, m.y, COLORS.output, a);
+      for (let j = 0; j < 3; j++) {
+        const x = flowX + 430 + j * 50;
+        ctx.globalAlpha = a * 0.7;
+        roundRect(x, m.y - 8, 35, 16, 4, COLORS.output + '15', COLORS.output, 1);
+        drawLabel(x + 17, m.y, ['I','love','you'][j], COLORS.output, 8);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // Problem / Result
+    drawLabel(flowX + 600, m.y, isGood ? '✅ 完整解决方案' : '⚠️ ' + m.problem, isGood ? COLORS.good : COLORS.bad, 10);
+  }
+
+  // Evolution arrows
+  if (step >= 6) {
+    for (let i = 0; i < 5; i++) {
+      drawArrow(105, models[i].y + 15, 105, models[i+1].y - 15, COLORS.dim, 0.5);
+    }
+  }
+}
+
+// ============ Animation control ============
+const tabSteps = { fc: 8, rnn: 6, lstm: 8, gru: 7, s2s: 10, attn: 10, compare: 7 };
+const tabDescriptions = {
+  fc: '<strong>FC 全连接网络</strong>：将所有输入拼接成一个大向量，一次性映射到输出。<span class="bad">❌ 无法处理变长序列</span>，<span class="bad">❌ 丢掉顺序信息</span>。这是所有问题的起点——我们需要一种能理解"顺序"的网络。',
+  rnn: '<strong>RNN 循环神经网络</strong>：引入隐藏状态 h，让信息沿时间步传递，解决了"变长"和"顺序"的问题。<span class="good">✅ 变长输入</span> <span class="good">✅ 保留顺序</span>。但<span class="bad">梯度消失</span>导致长序列记忆崩塌——20步后远处信息传不到。',
+  lstm: '<strong>LSTM 长短期记忆网络</strong>：引入细胞状态 C_t 和三门（遗忘/输入/输出），C_t 的更新是<span class="good">加法</span>而非乘法连乘，梯度可以长程传播。<span class="good">✅ 长程记忆</span>。但仍然是<span class="bad">单向信息流</span>，无法做"不等长序列到序列"的映射。',
+  gru: '<strong>GRU 门控循环单元</strong>：LSTM 的轻量替代，2个门+1个状态。参数少25%，速度更快，效果接近。<span class="key">本质：可替代LSTM做编码器/解码器的"轻量引擎"</span>。和LSTM一样，<span class="bad">无法做Seq2Seq</span>。',
+  s2s: '<strong>Seq2Seq 编码器-解码器架构</strong>：把网络拆成编码器（理解输入）和解码器（生成输出），解决了<span class="good">不等长序列映射</span>！编码器的 h_T 传给解码器做初始状态，解码器自回归生成。但<span class="bad">编码瓶颈</span>：所有信息压缩到 c=h_T 一个向量，长句翻译崩。',
+  attn: '<strong>Seq2Seq + Attention</strong>：解码器每步都能<span class="good">动态回看编码器所有位置</span>，用注意力权重自动决定"现在该关注哪里"。彻底解决编码瓶颈！<span class="good">✅ 长句翻译</span> <span class="good">✅ 可解释</span> <span class="good">✅ 梯度更丰富</span>。唯一遗留：底层仍用RNN → 训练串行 → 这引出了 Transformer。',
+  compare: '<strong>六种架构全对比</strong>：从 FC 到 Seq2Seq+Attention，每一步都在解决上一步解决不了的问题。FC 无法处理序列 → RNN 梯度消失 → LSTM 长记忆但单向流 → Seq2Seq 编码瓶颈 → Attention 动态检索 → 完整解决方案。'
+};
+
+const tabInfoCards = {
+  fc: [
+    { title: '📦 FC 的结构', items: ['输入: 固定长度向量', '计算: y = σ(W·x + b)', '输出: 固定长度向量', '参数: W 矩阵 + b 偏置'] },
+    { title: '⚠️ FC 不能做序列任务的原因', items: ['输入维度写死 → 变长序列无法处理', '拼接丢顺序 → "我爱你"≠"你爱我"的顺序语义', '参数随长度爆炸 → 20词×300维=6000维输入', '无法生成序列 → 只有一个固定输出'], cls: 'problem' }
+  ],
+  rnn: [
+    { title: '🔄 RNN 的核心创新', items: ['隐藏状态 h 沿时间步传递 → "记忆"', '所有时间步共享参数 → 参数不随序列增长', '逐词输入 → 天然支持变长序列', 'h_t = tanh(W·h_{t-1} + W·x_t + b)'] },
+    { title: '📉 梯度消失问题', items: ['连乘 W × tanh\' → 指数衰减', '20步后梯度≈0 → 远处信息传不到', '长序列生成: 前10词连贯，后面混乱', '→ 需要 LSTM 的门控机制解决'], cls: 'problem' }
+  ],
+  lstm: [
+    { title: '🧪 LSTM 的三门一细胞', items: ['遗忘门 f_t: 决定忘掉旧记忆中的哪些', '输入门 i_t: 决定写入哪些新信息', '候选 C̃_t: 新信息的候选内容', '输出门 o_t: 决定从记忆中读出哪些'] },
+    { title: '⚡ 关键突破：加法更新', items: ['C_t = f_t⊙C_{t-1} + i_t⊙C̃_t', '梯度: ∂C_t/∂C_{t-1} = f_t (标量)', '没有矩阵连乘 → 梯度不消失', '但: 仍然只有单向信息流 → 无法做Seq2Seq'], cls: 'solution' }
+  ],
+  gru: [
+    { title: '⚡ GRU 的简化设计', items: ['重置门 r_t: 决定忽略多少过去信息', '更新门 z_t: 决定保留多少旧 vs 采多少新', 'h_t = z_t⊙h_{t-1} + (1-z_t)⊙h̃_t', '参数量比 LSTM 少 25%'] },
+    { title: '⚖️ GRU vs LSTM 选择', items: ['大数据 + 超长序列 → LSTM 略优', '小数据 + 速度优先 → GRU 更好', '效果: 中等长度上几乎等价', '两者都可以做 Seq2Seq 的"引擎"'], cls: '' }
+  ],
+  s2s: [
+    { title: '🔀 Seq2Seq 的架构', items: ['编码器: 读入源序列，输出隐状态', '上下文 c = h_T: 语义压缩传递', '解码器: 从 c 开始自回归生成', 'Teacher Forcing: 训练稳定性的关键'] },
+    { title: '⚠️ 编码瓶颈问题', items: ['所有信息压缩到 c = h_T 一个向量', '短句可以，长句信息丢失严重', 'c 的维度固定 (如256)，不管输入多长', '→ 需要 Attention 机制解决'], cls: 'problem' }
+  ],
+  attn: [
+    { title: '🔍 Attention 的计算', items: ['① 分数: score(s_t, h_i) = s_t^T · h_i', '② 权重: α = softmax(scores)', '③ 上下文: c_t = Σ α_i · h_i', '④ 生成: cat([emb, c_t]) → LSTM → 预测'] },
+    { title: '✅ Attention 解决了什么', items: ['编码瓶颈: 每步动态检索所有编码器位置', '梯度路径: 可直接流回编码器任意位置', '可解释性: 注意力权重 = 对齐可视化', '翻译质量: 长句翻译飞跃式提升'], cls: 'solution' }
+  ],
+  compare: [
+    { title: '📊 演进总结', items: ['FC: 固定映射，无法处理序列', 'RNN: 引入记忆，但梯度消失', 'LSTM/GRU: 解决长程依赖', 'Seq2Seq: 编码-解码分离，不等长映射', '+Attention: 动态检索，完整方案'] },
+    { title: '🔑 每步的核心问题驱动', items: ['FC → RNN: "如何处理变长序列？"', 'RNN → LSTM: "如何记住远处的信息？"', 'LSTM → Seq2Seq: "如何做序列到序列映射？"', 'Seq2Seq → +Attention: "如何打破编码瓶颈？"', '+Attention → Transformer: "如何训练并行化？"'], cls: '' }
+  ]
+};
+
+function switchTab(tab) {
+  currentTab = tab;
+  animStep = 0;
+  isPlaying = false;
+  if (animTimer) clearInterval(animTimer);
+
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.evo-node').forEach(n => n.style.transform = '');
+  event.target.classList.add('active');
+
+  // Update description
+  document.getElementById('animDesc').innerHTML = tabDescriptions[tab] || '';
+
+  // Update info cards
+  const cards = tabInfoCards[tab] || tabInfoCards.fc;
+  const panel = document.getElementById('infoPanel');
+  panel.innerHTML = cards.map(c => `
+    <div class="info-card">
+      <h3>${c.title}</h3>
+      <ul>${c.items.map(i => `<li class="${c.cls || ''}">${i}</li>`).join('')}</ul>
+    </div>
+  `).join('');
+
+  updateStepDisplay();
+  draw();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, 1100, 480);
+
+  switch (currentTab) {
+    case 'fc': drawFC(animStep); break;
+    case 'rnn': drawRNN(animStep); break;
+    case 'lstm': drawLSTM(animStep); break;
+    case 'gru': drawGRU(animStep); break;
+    case 's2s': drawS2S(animStep); break;
+    case 'attn': drawAttn(animStep); break;
+    case 'compare': drawCompare(animStep); break;
+  }
+}
+
+function updateStepDisplay() {
+  const max = tabSteps[currentTab] || 0;
+  document.getElementById('stepDisplay').textContent = animStep + ' / ' + max;
+}
+
+function playAnimation() {
+  if (isPlaying) return;
+  isPlaying = true;
+  animTimer = setInterval(() => {
+    const max = tabSteps[currentTab] || 0;
+    if (animStep >= max) {
+      pauseAnimation();
+      return;
+    }
+    animStep++;
+    updateStepDisplay();
+    draw();
+  }, 800);
+}
+
+function pauseAnimation() {
+  isPlaying = false;
+  if (animTimer) clearInterval(animTimer);
+}
+
+function resetAnimation() {
+  pauseAnimation();
+  animStep = 0;
+  updateStepDisplay();
+  draw();
+}
+
+function stepForward() {
+  const max = tabSteps[currentTab] || 0;
+  if (animStep < max) {
+    animStep++;
+    updateStepDisplay();
+    draw();
+  }
+}
+
+// ============ Initial draw ============
+updateStepDisplay();
+draw();
+
+// ============ Animate pulsing ============
+let pulseFrame;
+function animatePulse() {
+  if (isPlaying) { pulseFrame = requestAnimationFrame(animatePulse); return; }
+  draw();
+  pulseFrame = requestAnimationFrame(animatePulse);
+}
+animatePulse();
+</script>
+</body>
+</html>

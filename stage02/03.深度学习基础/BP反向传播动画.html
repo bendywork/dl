@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BP 反向传播过程可视化</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg2: #1e293b;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --accent: #38bdf8;
+    --accent2: #818cf8;
+    --green: #34d399;
+    --red: #f87171;
+    --orange: #fb923c;
+    --yellow: #fbbf24;
+    --input-color: #38bdf8;
+    --hidden-color: #a78bfa;
+    --output-color: #34d399;
+    --loss-color: #f87171;
+    --grad-color: #fb923c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .header {
+    text-align: center;
+    padding: 20px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 { font-size: 22px; color: var(--accent); }
+  .header p { font-size: 13px; color: var(--text2); margin-top: 4px; }
+  .main {
+    display: flex;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 16px;
+    gap: 16px;
+  }
+  .canvas-wrap {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg2);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 12px;
+    position: relative;
+  }
+  canvas { width: 100%; height: 100%; display: block; border-radius: 8px; }
+  .sidebar {
+    width: 420px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel {
+    background: var(--bg2);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 16px;
+  }
+  .panel-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .panel-title .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .btn {
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .step-indicator {
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .step-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .step-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .formula-box {
+    background: rgba(56, 189, 248, 0.06);
+    border: 1px solid rgba(56, 189, 248, 0.15);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text);
+    min-height: 80px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .formula-box .label {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  .formula-box .val { color: var(--green); }
+  .formula-box .grad { color: var(--orange); }
+  .formula-box .loss { color: var(--red); }
+  .formula-box .hl { color: var(--yellow); }
+  .values-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .val-item {
+    background: rgba(255,255,255,0.03);
+    border-radius: 4px;
+    padding: 4px 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .val-item .k { color: var(--text2); }
+  .val-item .v { color: var(--green); font-weight: 600; }
+  .val-item .v.g { color: var(--orange); }
+  .val-item .v.l { color: var(--red); }
+  .phase-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .phase-fwd { background: rgba(56,189,248,0.15); color: var(--accent); }
+  .phase-loss { background: rgba(248,113,113,0.15); color: var(--red); }
+  .phase-bwd { background: rgba(251,146,60,0.15); color: var(--orange); }
+  .phase-upd { background: rgba(52,211,153,0.15); color: var(--green); }
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text2);
+  }
+  .speed-control input[type=range] {
+    flex: 1;
+    accent-color: var(--accent);
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 11px;
+    padding: 8px 0;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .legend-item .swatch {
+    width: 12px; height: 3px; border-radius: 2px;
+  }
+  @media (max-width: 1100px) {
+    .main { flex-direction: column; }
+    .sidebar { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🧠 BP 反向传播过程可视化</h1>
+  <p>2 输入 → 3 隐藏 → 2 输出 | Sigmoid 激活 | MSE 损失 | 逐步推导动画</p>
+</div>
+
+<div class="main">
+  <div class="canvas-wrap">
+    <canvas id="netCanvas"></canvas>
+  </div>
+  <div class="sidebar">
+    <!-- 控制面板 -->
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--accent)"></span> 控制台</div>
+      <div class="step-indicator">
+        <span id="stepLabel">步骤 0 / 0</span>
+        <div class="step-bar"><div class="step-bar-fill" id="stepBarFill" style="width:0%"></div></div>
+        <span id="phaseBadge" class="phase-badge phase-fwd">准备</span>
+      </div>
+      <div class="controls">
+        <button class="btn" id="btnReset" onclick="resetAll()">⟲ 重置</button>
+        <button class="btn" id="btnPrev" onclick="prevStep()">◀ 上一步</button>
+        <button class="btn" id="btnNext" onclick="nextStep()">下一步 ▶</button>
+        <button class="btn" id="btnPlay" onclick="togglePlay()">▶ 自动播放</button>
+      </div>
+      <div class="speed-control">
+        <span>速度</span>
+        <input type="range" id="speedSlider" min="500" max="3000" value="1200" step="100">
+        <span id="speedLabel">1.2s</span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:var(--accent)"></span>前向传播</div>
+        <div class="legend-item"><span class="swatch" style="background:var(--red)"></span>损失计算</div>
+        <div class="legend-item"><span class="swatch" style="background:var(--orange)"></span>反向传播</div>
+        <div class="legend-item"><span class="swatch" style="background:var(--green)"></span>权重更新</div>
+      </div>
+    </div>
+
+    <!-- 公式面板 -->
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--accent2)"></span> 当前步骤 · 数学推导</div>
+      <div class="formula-box" id="formulaBox">
+        <div class="label">准备开始</div>
+        点击「下一步」开始前向传播过程
+      </div>
+    </div>
+
+    <!-- 数值面板 -->
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--green)"></span> 实时数值</div>
+      <div class="values-grid" id="valuesGrid">
+        <!-- 动态填充 -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== 网络参数 ====================
+const alpha = 0.5; // 学习率
+let _w = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65];
+const _b = [0.35, 0.65];
+const _x = [5.0, 10.0];
+const _y = [0.01, 0.99];
+
+const sigmoid = z => 1.0 / (1.0 + Math.exp(-z));
+
+// 权重索引：w1..w12 → _w[0..11]
+function wi(i) { return _w[i - 1]; }
+function bi(i) { return _b[i - 1]; }
+
+// ==================== Canvas 设置 ====================
+const canvas = document.getElementById('netCanvas');
+const ctx = canvas.getContext('2d');
+let W, H, dpr;
+
+function resizeCanvas() {
+  const wrap = canvas.parentElement;
+  dpr = window.devicePixelRatio || 1;
+  W = wrap.clientWidth - 24;
+  H = Math.max(500, wrap.clientHeight - 24);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+resizeCanvas();
+
+// ==================== 网络拓扑位置 ====================
+// 层位置 X
+const layerX = [0.12, 0.45, 0.78, 0.92];
+// 节点 Y 位置
+function nodePositions() {
+  const inputY  = [0.35, 0.65];
+  const hiddenY = [0.2, 0.5, 0.8];
+  const outputY = [0.3, 0.7];
+  const lossY   = [0.5];
+  return { inputY, hiddenY, outputY, lossY };
+}
+
+// 节点坐标
+function nodeXY(layer, idx) {
+  const pos = nodePositions();
+  const x = layerX[layer] * W;
+  let ys;
+  if (layer === 0) ys = pos.inputY;
+  else if (layer === 1) ys = pos.hiddenY;
+  else if (layer === 2) ys = pos.outputY;
+  else ys = pos.lossY;
+  return { x, y: ys[idx] * H };
+}
+
+// ==================== 连线定义 ====================
+// connections[layerPair] = [{from, to, weightIdx, label}]
+const connections = {
+  '01': [
+    { from: 0, to: 0, wi: 1, label: 'w₁' },
+    { from: 1, to: 0, wi: 2, label: 'w₂' },
+    { from: 0, to: 1, wi: 3, label: 'w₃' },
+    { from: 1, to: 1, wi: 4, label: 'w₄' },
+    { from: 0, to: 2, wi: 5, label: 'w₅' },
+    { from: 1, to: 2, wi: 6, label: 'w₆' },
+  ],
+  '12': [
+    { from: 0, to: 0, wi: 7,  label: 'w₇' },
+    { from: 0, to: 1, wi: 8,  label: 'w₈' },
+    { from: 1, to: 0, wi: 9,  label: 'w₉' },
+    { from: 1, to: 1, wi: 10, label: 'w₁₀' },
+    { from: 2, to: 0, wi: 11, label: 'w₁₁' },
+    { from: 2, to: 1, wi: 12, label: 'w₁₂' },
+  ]
+};
+
+// ==================== 前向计算 ====================
+function forward() {
+  const x1 = _x[0], x2 = _x[1];
+  // Hidden layer
+  const net_h1 = wi(1)*x1 + wi(2)*x2 + bi(1);
+  const out_h1 = sigmoid(net_h1);
+  const net_h2 = wi(3)*x1 + wi(4)*x2 + bi(1);
+  const out_h2 = sigmoid(net_h2);
+  const net_h3 = wi(5)*x1 + wi(6)*x2 + bi(1);
+  const out_h3 = sigmoid(net_h3);
+  // Output layer
+  const net_o1 = out_h1*wi(7) + out_h2*wi(9) + out_h3*wi(11) + bi(2);
+  const out_o1 = sigmoid(net_o1);
+  const net_o2 = out_h1*wi(8) + out_h2*wi(10) + out_h3*wi(12) + bi(2);
+  const out_o2 = sigmoid(net_o2);
+  // Loss
+  const loss1 = 0.5 * (out_o1 - _y[0]) ** 2;
+  const loss2 = 0.5 * (out_o2 - _y[1]) ** 2;
+  const loss  = loss1 + loss2;
+
+  return {
+    x1, x2,
+    net_h1, out_h1, net_h2, out_h2, net_h3, out_h3,
+    net_o1, out_o1, net_o2, out_o2,
+    loss1, loss2, loss
+  };
+}
+
+// ==================== 反向计算 ====================
+function backward(fwd) {
+  const { out_h1, out_h2, out_h3, out_o1, out_o2 } = fwd;
+  // Output layer gradients
+  const dL_do1 = out_o1 - _y[0];
+  const dL_do2 = out_o2 - _y[1];
+  const do1_dnet1 = out_o1 * (1 - out_o1);
+  const do2_dnet2 = out_o2 * (1 - out_o2);
+  const delta_o1 = dL_do1 * do1_dnet1;
+  const delta_o2 = dL_do2 * do2_dnet2;
+
+  // Weight gradients output layer
+  const gd = {};
+  gd[7]  = delta_o1 * out_h1;
+  gd[8]  = delta_o2 * out_h1;
+  gd[9]  = delta_o1 * out_h2;
+  gd[10] = delta_o2 * out_h2;
+  gd[11] = delta_o1 * out_h3;
+  gd[12] = delta_o2 * out_h3;
+
+  // Hidden layer gradients
+  const dh1_dnet = out_h1 * (1 - out_h1);
+  const dh2_dnet = out_h2 * (1 - out_h2);
+  const dh3_dnet = out_h3 * (1 - out_h3);
+
+  const delta_h1 = (delta_o1 * wi(7) + delta_o2 * wi(8)) * dh1_dnet;
+  const delta_h2 = (delta_o1 * wi(9) + delta_o2 * wi(10)) * dh2_dnet;
+  const delta_h3 = (delta_o1 * wi(11) + delta_o2 * wi(12)) * dh3_dnet;
+
+  gd[1] = delta_h1 * _x[0];
+  gd[2] = delta_h1 * _x[1];
+  gd[3] = delta_h2 * _x[0];
+  gd[4] = delta_h2 * _x[1];
+  gd[5] = delta_h3 * _x[0];
+  gd[6] = delta_h3 * _x[1];
+
+  return {
+    dL_do1, dL_do2, do1_dnet1, do2_dnet2,
+    delta_o1, delta_o2,
+    delta_h1, delta_h2, delta_h3,
+    dh1_dnet, dh2_dnet, dh3_dnet,
+    gd
+  };
+}
+
+// ==================== 动画步骤定义 ====================
+function buildSteps() {
+  const fwd = forward();
+  const bwd = backward(fwd);
+  const steps = [];
+  const f = (v) => v.toFixed(6);
+
+  // ---- 前向传播 ----
+  steps.push({
+    phase: 'fwd',
+    title: '前向传播 · 输入层',
+    formula: `<div class="label">📥 输入层初始化</div>
+输入样本：<br>
+x₁ = <span class="val">${f(fwd.x1)}</span> &nbsp; x₂ = <span class="val">${f(fwd.x2)}</span><br>
+目标值：<br>
+y₁ = <span class="val">${f(_y[0])}</span> &nbsp; y₂ = <span class="val">${f(_y[1])}</span><br>
+偏置：b₁ = <span class="val">${f(bi(1))}</span> &nbsp; b₂ = <span class="val">${f(bi(2))}</span>`,
+    highlight: { nodes: [[0,0],[0,1]], conns: [] }
+  });
+
+  steps.push({
+    phase: 'fwd',
+    title: '前向传播 · 隐藏层 h₁',
+    formula: `<div class="label">🔬 隐藏层神经元 h₁</div>
+net<sub>h1</sub> = w₁·x₁ + w₂·x₂ + b₁<br>
+= ${f(wi(1))}×${f(fwd.x1)} + ${f(wi(2))}×${f(fwd.x2)} + ${f(bi(1))}<br>
+= <span class="hl">${f(fwd.net_h1)}</span><br><br>
+out<sub>h1</sub> = σ(net<sub>h1</sub>) = 1/(1+e<sup>-net</sup>)<br>
+= <span class="val">${f(fwd.out_h1)}</span>`,
+    highlight: { nodes: [[0,0],[0,1],[1,0]], conns: ['01-0','01-1'] }
+  });
+
+  steps.push({
+    phase: 'fwd',
+    title: '前向传播 · 隐藏层 h₂',
+    formula: `<div class="label">🔬 隐藏层神经元 h₂</div>
+net<sub>h2</sub> = w₃·x₁ + w₄·x₂ + b₁<br>
+= ${f(wi(3))}×${f(fwd.x1)} + ${f(wi(4))}×${f(fwd.x2)} + ${f(bi(1))}<br>
+= <span class="hl">${f(fwd.net_h2)}</span><br><br>
+out<sub>h2</sub> = σ(net<sub>h2</sub>)<br>
+= <span class="val">${f(fwd.out_h2)}</span>`,
+    highlight: { nodes: [[0,0],[0,1],[1,1]], conns: ['01-2','01-3'] }
+  });
+
+  steps.push({
+    phase: 'fwd',
+    title: '前向传播 · 隐藏层 h₃',
+    formula: `<div class="label">🔬 隐藏层神经元 h₃</div>
+net<sub>h3</sub> = w₅·x₁ + w₆·x₂ + b₁<br>
+= ${f(wi(5))}×${f(fwd.x1)} + ${f(wi(6))}×${f(fwd.x2)} + ${f(bi(1))}<br>
+= <span class="hl">${f(fwd.net_h3)}</span><br><br>
+out<sub>h3</sub> = σ(net<sub>h3</sub>)<br>
+= <span class="val">${f(fwd.out_h3)}</span>`,
+    highlight: { nodes: [[0,0],[0,1],[1,2]], conns: ['01-4','01-5'] }
+  });
+
+  steps.push({
+    phase: 'fwd',
+    title: '前向传播 · 输出层 o₁',
+    formula: `<div class="label">🎯 输出层神经元 o₁</div>
+net<sub>o1</sub> = w₇·out<sub>h1</sub> + w₉·out<sub>h2</sub> + w₁₁·out<sub>h3</sub> + b₂<br>
+= ${f(wi(7))}×${f(fwd.out_h1)} + ${f(wi(9))}×${f(fwd.out_h2)} + ${f(wi(11))}×${f(fwd.out_h3)} + ${f(bi(2))}<br>
+= <span class="hl">${f(fwd.net_o1)}</span><br><br>
+out<sub>o1</sub> = σ(net<sub>o1</sub>)<br>
+= <span class="val">${f(fwd.out_o1)}</span> &nbsp; (目标 y₁ = ${f(_y[0])})`,
+    highlight: { nodes: [[1,0],[1,1],[1,2],[2,0]], conns: ['12-0','12-2','12-4'] }
+  });
+
+  steps.push({
+    phase: 'fwd',
+    title: '前向传播 · 输出层 o₂',
+    formula: `<div class="label">🎯 输出层神经元 o₂</div>
+net<sub>o2</sub> = w₈·out<sub>h1</sub> + w₁₀·out<sub>h2</sub> + w₁₂·out<sub>h3</sub> + b₂<br>
+= ${f(wi(8))}×${f(fwd.out_h1)} + ${f(wi(10))}×${f(fwd.out_h2)} + ${f(wi(12))}×${f(fwd.out_h3)} + ${f(bi(2))}<br>
+= <span class="hl">${f(fwd.net_o2)}</span><br><br>
+out<sub>o2</sub> = σ(net<sub>o2</sub>)<br>
+= <span class="val">${f(fwd.out_o2)}</span> &nbsp; (目标 y₂ = ${f(_y[1])})`,
+    highlight: { nodes: [[1,0],[1,1],[1,2],[2,1]], conns: ['12-1','12-3','12-5'] }
+  });
+
+  // ---- 损失计算 ----
+  steps.push({
+    phase: 'loss',
+    title: '损失计算',
+    formula: `<div class="label">📐 MSE 损失函数</div>
+L₁ = ½(out<sub>o1</sub> - y₁)² = ½(${f(fwd.out_o1)} - ${f(_y[0])})²<br>
+= <span class="loss">${f(fwd.loss1)}</span><br><br>
+L₂ = ½(out<sub>o2</sub> - y₂)² = ½(${f(fwd.out_o2)} - ${f(_y[1])})²<br>
+= <span class="loss">${f(fwd.loss2)}</span><br><br>
+<b>Total Loss = L₁ + L₂ = <span class="loss">${f(fwd.loss)}</span></b>`,
+    highlight: { nodes: [[2,0],[2,1],[3,0]], conns: [] }
+  });
+
+  // ---- 反向传播 ----
+  steps.push({
+    phase: 'bwd',
+    title: '反向传播 · 输出层误差项 δ',
+    formula: `<div class="label">🔁 输出层误差信号</div>
+∂L/∂out<sub>o1</sub> = out<sub>o1</sub> - y₁ = <span class="grad">${f(bwd.dL_do1)}</span><br>
+∂L/∂out<sub>o2</sub> = out<sub>o2</sub> - y₂ = <span class="grad">${f(bwd.dL_do2)}</span><br><br>
+σ'(net<sub>o1</sub>) = out<sub>o1</sub>·(1-out<sub>o1</sub>) = <span class="grad">${f(bwd.do1_dnet1)}</span><br>
+σ'(net<sub>o2</sub>) = out<sub>o2</sub>·(1-out<sub>o2</sub>) = <span class="grad">${f(bwd.do2_dnet2)}</span><br><br>
+<b>δ<sub>o1</sub> = ∂L/∂net<sub>o1</sub> = <span class="grad">${f(bwd.delta_o1)}</span></b><br>
+<b>δ<sub>o2</sub> = ∂L/∂net<sub>o2</sub> = <span class="grad">${f(bwd.delta_o2)}</span></b>`,
+    highlight: { nodes: [[2,0],[2,1]], conns: [] }
+  });
+
+  steps.push({
+    phase: 'bwd',
+    title: '反向传播 · 输出层权重梯度 w₇~w₁₂',
+    formula: `<div class="label">🔁 ∂L/∂w（输出层权重）</div>
+∂L/∂w₇  = δ<sub>o1</sub>·out<sub>h1</sub> = <span class="grad">${f(bwd.gd[7])}</span><br>
+∂L/∂w₈  = δ<sub>o2</sub>·out<sub>h1</sub> = <span class="grad">${f(bwd.gd[8])}</span><br>
+∂L/∂w₉  = δ<sub>o1</sub>·out<sub>h2</sub> = <span class="grad">${f(bwd.gd[9])}</span><br>
+∂L/∂w₁₀ = δ<sub>o2</sub>·out<sub>h2</sub> = <span class="grad">${f(bwd.gd[10])}</span><br>
+∂L/∂w₁₁ = δ<sub>o1</sub>·out<sub>h3</sub> = <span class="grad">${f(bwd.gd[11])}</span><br>
+∂L/∂w₁₂ = δ<sub>o2</sub>·out<sub>h3</sub> = <span class="grad">${f(bwd.gd[12])}</span>`,
+    highlight: { nodes: [[1,0],[1,1],[1,2],[2,0],[2,1]], conns: ['12-0','12-1','12-2','12-3','12-4','12-5'] }
+  });
+
+  steps.push({
+    phase: 'bwd',
+    title: '反向传播 · 隐藏层误差项 δ',
+    formula: `<div class="label">🔁 隐藏层误差信号（链式法则）</div>
+δ<sub>h1</sub> = (δ<sub>o1</sub>·w₇ + δ<sub>o2</sub>·w₈) · σ'(net<sub>h1</sub>)<br>
+= (${f(bwd.delta_o1)}×${f(wi(7))} + ${f(bwd.delta_o2)}×${f(wi(8))}) × ${f(bwd.dh1_dnet)}<br>
+= <span class="grad"><b>${f(bwd.delta_h1)}</b></span><br><br>
+δ<sub>h2</sub> = (δ<sub>o1</sub>·w₉ + δ<sub>o2</sub>·w₁₀) · σ'(net<sub>h2</sub>)<br>
+= <span class="grad"><b>${f(bwd.delta_h2)}</b></span><br><br>
+δ<sub>h3</sub> = (δ<sub>o1</sub>·w₁₁ + δ<sub>o2</sub>·w₁₂) · σ'(net<sub>h3</sub>)<br>
+= <span class="grad"><b>${f(bwd.delta_h3)}</b></span>`,
+    highlight: { nodes: [[1,0],[1,1],[1,2]], conns: ['12-0','12-1','12-2','12-3','12-4','12-5'] }
+  });
+
+  steps.push({
+    phase: 'bwd',
+    title: '反向传播 · 隐藏层权重梯度 w₁~w₆',
+    formula: `<div class="label">🔁 ∂L/∂w（隐藏层权重）</div>
+∂L/∂w₁ = δ<sub>h1</sub>·x₁ = <span class="grad">${f(bwd.gd[1])}</span><br>
+∂L/∂w₂ = δ<sub>h1</sub>·x₂ = <span class="grad">${f(bwd.gd[2])}</span><br>
+∂L/∂w₃ = δ<sub>h2</sub>·x₁ = <span class="grad">${f(bwd.gd[3])}</span><br>
+∂L/∂w₄ = δ<sub>h2</sub>·x₂ = <span class="grad">${f(bwd.gd[4])}</span><br>
+∂L/∂w₅ = δ<sub>h3</sub>·x₁ = <span class="grad">${f(bwd.gd[5])}</span><br>
+∂L/∂w₆ = δ<sub>h3</sub>·x₂ = <span class="grad">${f(bwd.gd[6])}</span>`,
+    highlight: { nodes: [[0,0],[0,1],[1,0],[1,1],[1,2]], conns: ['01-0','01-1','01-2','01-3','01-4','01-5'] }
+  });
+
+  // ---- 权重更新 ----
+  steps.push({
+    phase: 'upd',
+    title: '权重更新 w₇~w₁₂',
+    formula: `<div class="label">✏️ 梯度下降更新（输出层）</div>
+w ← w - α·∂L/∂w &nbsp; (α = ${alpha})<br><br>
+w₇  : ${f(wi(7))}  - ${alpha}×${f(bwd.gd[7])}  = <span class="val">${f(wi(7)  - alpha*bwd.gd[7])}</span><br>
+w₈  : ${f(wi(8))}  - ${alpha}×${f(bwd.gd[8])}  = <span class="val">${f(wi(8)  - alpha*bwd.gd[8])}</span><br>
+w₉  : ${f(wi(9))}  - ${alpha}×${f(bwd.gd[9])}  = <span class="val">${f(wi(9)  - alpha*bwd.gd[9])}</span><br>
+w₁₀ : ${f(wi(10))} - ${alpha}×${f(bwd.gd[10])} = <span class="val">${f(wi(10) - alpha*bwd.gd[10])}</span><br>
+w₁₁ : ${f(wi(11))} - ${alpha}×${f(bwd.gd[11])} = <span class="val">${f(wi(11) - alpha*bwd.gd[11])}</span><br>
+w₁₂ : ${f(wi(12))} - ${alpha}×${f(bwd.gd[12])} = <span class="val">${f(wi(12) - alpha*bwd.gd[12])}</span>`,
+    highlight: { nodes: [[1,0],[1,1],[1,2],[2,0],[2,1]], conns: ['12-0','12-1','12-2','12-3','12-4','12-5'] }
+  });
+
+  steps.push({
+    phase: 'upd',
+    title: '权重更新 w₁~w₆',
+    formula: `<div class="label">✏️ 梯度下降更新（隐藏层）</div>
+w ← w - α·∂L/∂w &nbsp; (α = ${alpha})<br><br>
+w₁ : ${f(wi(1))} - ${alpha}×${f(bwd.gd[1])} = <span class="val">${f(wi(1) - alpha*bwd.gd[1])}</span><br>
+w₂ : ${f(wi(2))} - ${alpha}×${f(bwd.gd[2])} = <span class="val">${f(wi(2) - alpha*bwd.gd[2])}</span><br>
+w₃ : ${f(wi(3))} - ${alpha}×${f(bwd.gd[3])} = <span class="val">${f(wi(3) - alpha*bwd.gd[3])}</span><br>
+w₄ : ${f(wi(4))} - ${alpha}×${f(bwd.gd[4])} = <span class="val">${f(wi(4) - alpha*bwd.gd[4])}</span><br>
+w₅ : ${f(wi(5))} - ${alpha}×${f(bwd.gd[5])} = <span class="val">${f(wi(5) - alpha*bwd.gd[5])}</span><br>
+w₆ : ${f(wi(6))} - ${alpha}×${f(bwd.gd[6])} = <span class="val">${f(wi(6) - alpha*bwd.gd[6])}</span>`,
+    highlight: { nodes: [[0,0],[0,1],[1,0],[1,1],[1,2]], conns: ['01-0','01-1','01-2','01-3','01-4','01-5'] }
+  });
+
+  // 完成
+  steps.push({
+    phase: 'done',
+    title: '一轮迭代完成 ✅',
+    formula: `<div class="label">🎉 一轮前向+反向传播完成</div>
+当前 Loss = <span class="loss">${f(fwd.loss)}</span><br><br>
+权重已更新，可点击「重置」重新开始，<br>或修改参数后重新推导。<br><br>
+<b>关键要点：</b><br>
+① 前向：逐层计算 net → sigmoid → 输出<br>
+② 损失：MSE = ½(预测-目标)²<br>
+③ 反向：链式法则求 ∂L/∂w<br>
+④ 更新：w ← w - α·∂L/∂w`,
+    highlight: { nodes: [], conns: [] }
+  });
+
+  return steps;
+}
+
+let steps = buildSteps();
+let currentStep = -1;
+let isPlaying = false;
+let playTimer = null;
+
+// ==================== 绘图 ====================
+const nodeColors = ['var(--input-color)', 'var(--hidden-color)', 'var(--output-color)', 'var(--loss-color)'];
+const nodeColorsRaw = ['#38bdf8', '#a78bfa', '#34d399', '#f87171'];
+const nodeLabels = [
+  ['x₁', 'x₂'],
+  ['h₁', 'h₂', 'h₃'],
+  ['o₁', 'o₂'],
+  ['Loss']
+];
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  const fwd = forward();
+  const step = currentStep >= 0 && currentStep < steps.length ? steps[currentStep] : null;
+  const hl = step ? step.highlight : { nodes: [], conns: [] };
+
+  // 创建节点高亮集合
+  const hlNodes = new Set((hl.nodes || []).map(n => n[0]+','+n[1]));
+  const hlConns = new Set(hl.conns || []);
+
+  // ---- 绘制连线 ----
+  for (const [lp, conns] of Object.entries(connections)) {
+    const fromLayer = parseInt(lp[0]);
+    const toLayer = parseInt(lp[1]);
+    conns.forEach((c, ci) => {
+      const from = nodeXY(fromLayer, c.from);
+      const to = nodeXY(toLayer, c.to);
+      const key = lp + '-' + ci;
+      const isHL = hlConns.has(key);
+      const phase = step ? step.phase : '';
+
+      // 连线颜色
+      let lineColor = '#334155';
+      let lineWidth = 1.5;
+      let alpha = 0.4;
+
+      if (isHL) {
+        if (phase === 'fwd') { lineColor = '#38bdf8'; alpha = 0.9; lineWidth = 2.5; }
+        else if (phase === 'bwd') { lineColor = '#fb923c'; alpha = 0.9; lineWidth = 2.5; }
+        else if (phase === 'upd') { lineColor = '#34d399'; alpha = 0.9; lineWidth = 2.5; }
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      // 贝塞尔曲线
+      const cpx1 = from.x + (to.x - from.x) * 0.4;
+      const cpx2 = from.x + (to.x - from.x) * 0.6;
+      ctx.bezierCurveTo(cpx1, from.y, cpx2, to.y, to.x, to.y);
+      ctx.strokeStyle = lineColor;
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // 权重标签
+      const midX = (from.x + to.x) / 2;
+      const midY = (from.y + to.y) / 2 + (ci % 2 === 0 ? -8 : 8);
+      ctx.font = '11px SF Mono, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = isHL ? lineColor : '#64748b';
+      const wVal = wi(c.wi);
+      ctx.fillText(`${c.label}=${wVal.toFixed(2)}`, midX, midY);
+    });
+  }
+
+  // ---- 绘制节点 ----
+  for (let layer = 0; layer <= 3; layer++) {
+    const labels = nodeLabels[layer];
+    for (let i = 0; i < labels.length; i++) {
+      const { x, y } = nodeXY(layer, i);
+      const isHL = hlNodes.has(layer+','+i);
+      const r = layer === 3 ? 22 : 26;
+
+      // 节点底色
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = isHL ? nodeColorsRaw[layer] + '30' : '#1e293b';
+      ctx.fill();
+      ctx.strokeStyle = isHL ? nodeColorsRaw[layer] : '#475569';
+      ctx.lineWidth = isHL ? 2.5 : 1.5;
+      ctx.stroke();
+
+      // 发光效果
+      if (isHL) {
+        ctx.beginPath();
+        ctx.arc(x, y, r + 6, 0, Math.PI * 2);
+        ctx.strokeStyle = nodeColorsRaw[layer] + '40';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+      }
+
+      // 节点名称
+      ctx.font = 'bold 13px SF Mono, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = isHL ? nodeColorsRaw[layer] : '#94a3b8';
+      ctx.fillText(labels[i], x, y - 2);
+
+      // 节点数值
+      ctx.font = '10px SF Mono, Menlo, monospace';
+      ctx.fillStyle = '#64748b';
+      let valText = '';
+      if (layer === 0) valText = _x[i].toFixed(1);
+      else if (layer === 1) valText = [fwd.out_h1, fwd.out_h2, fwd.out_h3][i].toFixed(4);
+      else if (layer === 2) valText = [fwd.out_o1, fwd.out_o2][i].toFixed(4);
+      else valText = fwd.loss.toFixed(4);
+      ctx.fillText(valText, x, y + 12);
+    }
+  }
+
+  // ---- 绘制层标签 ----
+  const layerLabels = ['输入层', '隐藏层', '输出层', '损失'];
+  ctx.font = '12px SF Mono, Menlo, monospace';
+  ctx.textAlign = 'center';
+  for (let l = 0; l <= 3; l++) {
+    const x = layerX[l] * W;
+    ctx.fillStyle = '#64748b';
+    ctx.fillText(layerLabels[l], x, 20);
+  }
+
+  // ---- 损失到输出的连线 ----
+  for (let oi = 0; oi < 2; oi++) {
+    const from = nodeXY(2, oi);
+    const to = nodeXY(3, 0);
+    const isHL = hlNodes.has('3,0') && hlNodes.has('2,'+oi);
+    ctx.beginPath();
+    ctx.setLineDash([4, 4]);
+    ctx.moveTo(from.x + 26, from.y);
+    ctx.lineTo(to.x - 22, to.y);
+    ctx.strokeStyle = isHL ? '#f8717180' : '#33415540';
+    ctx.lineWidth = isHL ? 2 : 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ---- 反向传播箭头（如果当前步骤是反向传播阶段）----
+  if (step && (step.phase === 'bwd' || step.phase === 'upd')) {
+    drawBackwardArrows(hlConns, step.phase);
+  }
+}
+
+function drawBackwardArrows(hlConns, phase) {
+  const arrowColor = phase === 'bwd' ? '#fb923c' : '#34d399';
+  // 在高亮的连线上画反向箭头
+  for (const [lp, conns] of Object.entries(connections)) {
+    conns.forEach((c, ci) => {
+      const key = lp + '-' + ci;
+      if (!hlConns.has(key)) return;
+      const fromLayer = parseInt(lp[0]);
+      const toLayer = parseInt(lp[1]);
+      const from = nodeXY(fromLayer, c.from);
+      const to = nodeXY(toLayer, c.to);
+
+      // 在线段 1/3 处画箭头
+      const t = 0.65;
+      const cpx1 = from.x + (to.x - from.x) * 0.4;
+      const cpx2 = from.x + (to.x - from.x) * 0.6;
+      // 近似贝塞尔曲线上的点
+      const ax = (1-t)*(1-t)*(1-t)*from.x + 3*(1-t)*(1-t)*t*cpx1 + 3*(1-t)*t*t*cpx2 + t*t*t*to.x;
+      const ay = (1-t)*(1-t)*(1-t)*from.y + 3*(1-t)*(1-t)*t*from.y + 3*(1-t)*t*t*to.y + t*t*t*to.y;
+
+      // 画小箭头
+      ctx.save();
+      ctx.translate(ax, ay);
+      // 计算切线方向（反向）
+      const dt = 0.02;
+      const t2 = t + dt;
+      const ax2 = (1-t2)*(1-t2)*(1-t2)*from.x + 3*(1-t2)*(1-t2)*t2*cpx1 + 3*(1-t2)*t2*t2*cpx2 + t2*t2*t2*to.x;
+      const ay2 = (1-t2)*(1-t2)*(1-t2)*from.y + 3*(1-t2)*(1-t2)*t2*from.y + 3*(1-t2)*t2*t2*to.y + t2*t2*t2*to.y;
+      const angle = Math.atan2(ay2 - ay, ax2 - ax) + Math.PI; // 反向
+
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(8, 0);
+      ctx.lineTo(-4, -5);
+      ctx.lineTo(-4, 5);
+      ctx.closePath();
+      ctx.fillStyle = arrowColor;
+      ctx.globalAlpha = 0.8;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    });
+  }
+}
+
+// ==================== UI 更新 ====================
+function updateUI() {
+  const step = currentStep >= 0 && currentStep < steps.length ? steps[currentStep] : null;
+  const total = steps.length;
+
+  // 步骤指示器
+  document.getElementById('stepLabel').textContent = `步骤 ${Math.max(0, currentStep+1)} / ${total}`;
+  document.getElementById('stepBarFill').style.width = `${((currentStep+1)/total)*100}%`;
+
+  // 阶段徽章
+  const badge = document.getElementById('phaseBadge');
+  if (!step) {
+    badge.textContent = '准备';
+    badge.className = 'phase-badge phase-fwd';
+  } else if (step.phase === 'fwd') {
+    badge.textContent = '前向传播';
+    badge.className = 'phase-badge phase-fwd';
+  } else if (step.phase === 'loss') {
+    badge.textContent = '损失计算';
+    badge.className = 'phase-badge phase-loss';
+  } else if (step.phase === 'bwd') {
+    badge.textContent = '反向传播';
+    badge.className = 'phase-badge phase-bwd';
+  } else if (step.phase === 'upd') {
+    badge.textContent = '权重更新';
+    badge.className = 'phase-badge phase-upd';
+  } else {
+    badge.textContent = '完成';
+    badge.className = 'phase-badge phase-upd';
+  }
+
+  // 公式
+  document.getElementById('formulaBox').innerHTML = step ? step.formula : '<div class="label">准备开始</div>点击「下一步」开始前向传播过程';
+
+  // 数值面板
+  const fwd = forward();
+  const bwd = backward(fwd);
+  const f = v => v.toFixed(4);
+  const grid = document.getElementById('valuesGrid');
+  grid.innerHTML = `
+    <div class="val-item"><span class="k">out_h1</span><span class="v">${f(fwd.out_h1)}</span></div>
+    <div class="val-item"><span class="k">out_h2</span><span class="v">${f(fwd.out_h2)}</span></div>
+    <div class="val-item"><span class="k">out_h3</span><span class="v">${f(fwd.out_h3)}</span></div>
+    <div class="val-item"><span class="k">out_o1</span><span class="v">${f(fwd.out_o1)}</span></div>
+    <div class="val-item"><span class="k">out_o2</span><span class="v">${f(fwd.out_o2)}</span></div>
+    <div class="val-item"><span class="k">Loss</span><span class="v l">${f(fwd.loss)}</span></div>
+    <div class="val-item"><span class="k">δ_o1</span><span class="v g">${f(bwd.delta_o1)}</span></div>
+    <div class="val-item"><span class="k">δ_o2</span><span class="v g">${f(bwd.delta_o2)}</span></div>
+    <div class="val-item"><span class="k">δ_h1</span><span class="v g">${f(bwd.delta_h1)}</span></div>
+    <div class="val-item"><span class="k">δ_h2</span><span class="v g">${f(bwd.delta_h2)}</span></div>
+    <div class="val-item"><span class="k">δ_h3</span><span class="v g">${f(bwd.delta_h3)}</span></div>
+    <div class="val-item"><span class="k">α</span><span class="v">${alpha}</span></div>
+  `;
+
+  // 按钮状态
+  document.getElementById('btnPrev').disabled = currentStep <= -1;
+  document.getElementById('btnNext').disabled = currentStep >= steps.length - 1;
+}
+
+function nextStep() {
+  if (currentStep < steps.length - 1) {
+    currentStep++;
+    updateUI();
+    draw();
+  }
+}
+
+function prevStep() {
+  if (currentStep > -1) {
+    currentStep--;
+    updateUI();
+    draw();
+  }
+}
+
+function resetAll() {
+  _w = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65];
+  currentStep = -1;
+  stopPlay();
+  steps = buildSteps();
+  updateUI();
+  draw();
+}
+
+function togglePlay() {
+  if (isPlaying) {
+    stopPlay();
+  } else {
+    isPlaying = true;
+    document.getElementById('btnPlay').textContent = '⏸ 暂停';
+    document.getElementById('btnPlay').classList.add('active');
+    autoStep();
+  }
+}
+
+function stopPlay() {
+  isPlaying = false;
+  document.getElementById('btnPlay').textContent = '▶ 自动播放';
+  document.getElementById('btnPlay').classList.remove('active');
+  if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+}
+
+function autoStep() {
+  if (!isPlaying) return;
+  if (currentStep >= steps.length - 1) {
+    stopPlay();
+    return;
+  }
+  nextStep();
+  const speed = parseInt(document.getElementById('speedSlider').value);
+  playTimer = setTimeout(autoStep, speed);
+}
+
+document.getElementById('speedSlider').addEventListener('input', function() {
+  document.getElementById('speedLabel').textContent = (this.value / 1000).toFixed(1) + 's';
+});
+
+// 键盘快捷键
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextStep(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prevStep(); }
+  if (e.key === 'r') { resetAll(); }
+  if (e.key === 'p') { togglePlay(); }
+});
+
+// 初始化
+updateUI();
+draw();
+</script>
+</body>
+</html>

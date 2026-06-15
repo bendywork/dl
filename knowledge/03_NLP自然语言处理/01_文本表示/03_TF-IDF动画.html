@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TF-IDF 动画演示</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#0f1117;
+    color:#e0e0e0;
+    font-family:'PingFang SC','Microsoft YaHei',sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  h1 {
+    text-align:center;
+    padding:28px 20px 8px;
+    font-size:1.5rem;
+    color:#f0a060;
+    letter-spacing:2px;
+  }
+  .subtitle { text-align:center; color:#8a8f9e; font-size:.85rem; margin-bottom:20px; }
+
+  .tabs {
+    display:flex; justify-content:center; gap:8px; flex-wrap:wrap;
+    margin-bottom:24px; padding:0 16px;
+  }
+  .tab-btn {
+    padding:6px 14px; border-radius:20px; border:1px solid #2a2f3e;
+    background:#1a1f2e; color:#8a8f9e; font-size:.78rem; cursor:pointer; transition:all .25s;
+  }
+  .tab-btn.active { background:#f0a060; color:#0f1117; border-color:#f0a060; font-weight:600; }
+
+  .panel { display:none; max-width:920px; margin:0 auto; padding:0 20px; animation:fadeIn .4s ease; }
+  .panel.active { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  .controls {
+    display:flex; gap:10px; justify-content:center; margin:20px 0; flex-wrap:wrap;
+  }
+  .btn {
+    padding:9px 22px; border-radius:8px; border:none; cursor:pointer;
+    font-size:.88rem; font-family:inherit; transition:all .2s; font-weight:500;
+  }
+  .btn-primary { background:#f0a060; color:#0f1117; }
+  .btn-primary:hover { background:#f8c090; transform:translateY(-1px); }
+  .btn-secondary { background:#1e2535; color:#f0a060; border:1px solid #f0a060; }
+  .btn-secondary:hover { background:#283040; }
+  .btn:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+
+  .info-box {
+    background:#161b2a; border-left:3px solid #f0a060; border-radius:0 8px 8px 0;
+    padding:12px 16px; font-size:.85rem; line-height:1.7; color:#c8d0e0;
+    margin-bottom:20px; transition:all .3s;
+  }
+  .hi { color:#f0a060; font-weight:600; }
+  .hi2 { color:#7ee8a2; font-weight:600; }
+  .warn { color:#f05050; font-weight:600; }
+
+  /* ===== Bar Chart ===== */
+  .bar-chart {
+    background:#161b2a;
+    border-radius:12px;
+    padding:20px;
+    border:1px solid #2a3048;
+    margin:12px 0;
+  }
+  .bar-chart-title {
+    font-size:.85rem; color:#8a8f9e; margin-bottom:16px; text-align:center;
+  }
+  .bar-row {
+    display:flex; align-items:center; margin-bottom:10px; gap:10px;
+  }
+  .bar-label {
+    width:60px; text-align:right; font-size:.82rem; color:#c8d0e0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    flex-shrink:0;
+  }
+  .bar-track {
+    flex:1; height:28px; background:#1a1f2e; border-radius:6px; overflow:hidden;
+    border:1px solid #2a3048;
+  }
+  .bar-fill {
+    height:100%; border-radius:6px; transition:width 1s ease;
+    display:flex; align-items:center; padding-left:8px;
+    font-size:.75rem; font-weight:600; color:#0f1117; white-space:nowrap;
+  }
+  .bar-fill.orange { background: linear-gradient(90deg, #f0a060, #e87030); }
+  .bar-fill.green { background: linear-gradient(90deg, #7ee8a2, #40c060); }
+  .bar-fill.blue { background: linear-gradient(90deg, #60aaff, #4080e0); }
+  .bar-fill.red { background: linear-gradient(90deg, #f05050, #c03030); }
+  .bar-val {
+    width:56px; text-align:left; font-size:.78rem; color:#8a8f9e; flex-shrink:0;
+  }
+
+  /* ===== Formula Card ===== */
+  .formula-card {
+    background:#161b2a; border-radius:12px; padding:16px 20px;
+    border:1px solid #2a3048; margin:12px 0; text-align:center;
+  }
+  .formula {
+    font-size:1.05rem; color:#f0a060; font-family:monospace;
+    letter-spacing:1px; margin:10px 0;
+  }
+  .formula sub { font-size:.7em; }
+  .formula-desc { font-size:.8rem; color:#8a8f9e; line-height:1.7; }
+
+  /* ===== Doc Cards ===== */
+  .doc-cards {
+    display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin:12px 0;
+  }
+  .doc-card {
+    flex:1; min-width:200px; background:#161b2a; border-radius:10px;
+    padding:14px; border:1px solid #2a3048; transition:all .3s;
+  }
+  .doc-card.active-doc { border-color:#f0a060; box-shadow:0 0 12px rgba(240,160,96,.25); }
+  .doc-card h4 { color:#f0a060; font-size:.88rem; margin-bottom:8px; }
+  .doc-words { display:flex; flex-wrap:wrap; gap:4px; }
+  .doc-word {
+    padding:3px 9px; border-radius:5px; background:#1e2535;
+    font-size:.8rem; color:#a0aacc; border:1px solid #2a3048; transition:all .3s;
+  }
+  .doc-word.hi-word { background:#2a1e0e; border-color:#f0a060; color:#f0a060; }
+  .doc-word.dim-word { color:#3a4060; background:#161b2a; border-color:#1e2535; }
+
+  /* ===== Heatmap ===== */
+  .heatmap-wrap { overflow-x:auto; margin:16px 0; }
+  .heatmap-table {
+    border-collapse:collapse; margin:0 auto; font-size:.82rem;
+  }
+  .heatmap-table th {
+    background:#1e2535; color:#f0a060; padding:8px 12px;
+    border:1px solid #2a3048; text-align:center; white-space:nowrap;
+  }
+  .heatmap-table td {
+    padding:8px 12px; border:1px solid #2a3048; text-align:center;
+    transition:all .5s; font-size:.78rem; white-space:nowrap;
+  }
+  .heatmap-table td.doc-label {
+    background:#181d2a; color:#8a9abf; text-align:right;
+    font-size:.78rem; min-width:120px;
+  }
+  .heatmap-legend {
+    display:flex; gap:6px; justify-content:center; margin-top:8px; flex-wrap:wrap;
+  }
+  .legend-item { display:flex; align-items:center; gap:4px; font-size:.75rem; color:#8a8f9e; }
+  .legend-box { width:14px; height:14px; border-radius:3px; }
+
+  /* ===== TF calc ===== */
+  .tf-step {
+    background:#161b2a; border-radius:10px; padding:14px; border:1px solid #2a3048;
+    margin:8px 0; opacity:0; transition:opacity .4s; font-size:.85rem; line-height:1.8;
+  }
+  .tf-step.show { opacity:1; }
+  .tf-eq { color:#f0a060; font-family:monospace; font-size:.95rem; }
+</style>
+</head>
+<body>
+
+<h1>TF-IDF：词项频率 × 逆文档频率</h1>
+<p class="subtitle">从词频问题到 TF-IDF 的完整推导 · 交互式动画</p>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab(0)">① 高频词问题</button>
+  <button class="tab-btn" onclick="switchTab(1)">② TF 计算</button>
+  <button class="tab-btn" onclick="switchTab(2)">③ IDF 计算</button>
+  <button class="tab-btn" onclick="switchTab(3)">④ TF-IDF 得分</button>
+  <button class="tab-btn" onclick="switchTab(4)">⑤ 热力图矩阵</button>
+</div>
+
+<!-- ===== PANEL 0: High Freq Problem ===== -->
+<div class="panel active" id="panel-0">
+  <div class="info-box" id="info0">
+    BoW 的问题：<span class="hi">"的/了/是"</span>这类虚词频率极高，但对语义<span class="warn">毫无贡献</span>。纯词频排行会被这些词"污染"，我们需要更好的权重方案。
+  </div>
+  <div class="bar-chart">
+    <div class="bar-chart-title">📊 某文档的词频 TOP 12（点击「展示」查看问题）</div>
+    <div id="freqBars"></div>
+  </div>
+  <div class="formula-card" id="formulaP0" style="display:none">
+    <div style="color:#f05050;font-size:.9rem;font-weight:600;margin-bottom:8px">❌ 纯词频的问题</div>
+    <div class="formula-desc">
+      "的/了/是/在/有" 等虚词在所有文档中都高频出现，<br>
+      但它们对<span class="hi">区分文档主题</span>毫无帮助。<br>
+      需要一个机制来<span class="hi2">降低常见词权重，提升稀有词权重</span>。
+    </div>
+  </div>
+  <div class="controls">
+    <button class="btn btn-primary" onclick="showFreqBars()">展示词频分布</button>
+    <button class="btn btn-secondary" onclick="highlightStopwords()">高亮虚词</button>
+    <button class="btn btn-secondary" onclick="resetP0()">重置</button>
+  </div>
+</div>
+
+<!-- ===== PANEL 1: TF ===== -->
+<div class="panel" id="panel-1">
+  <div class="info-box" id="info1">
+    <span class="hi">TF（词项频率）</span>= 词在文档中出现次数 / 文档总词数。归一化处理使不同长度文档可比较。
+  </div>
+  <div class="formula-card">
+    <div class="formula">TF(t, d) = count(t in d) / |d|</div>
+    <div class="formula-desc">t = 目标词，d = 文档，|d| = 文档总词数</div>
+  </div>
+  <div class="doc-cards" id="tfDocCards"></div>
+  <div id="tfSteps"></div>
+  <div class="bar-chart" style="margin-top:12px" id="tfBarChart" style="display:none">
+    <div class="bar-chart-title">词频 TF 值（文档1）</div>
+    <div id="tfBars"></div>
+  </div>
+  <div class="controls">
+    <button class="btn btn-primary" id="btnTF" onclick="stepTF()">计算下一词 TF</button>
+    <button class="btn btn-secondary" onclick="autoTF()">自动计算</button>
+    <button class="btn btn-secondary" onclick="resetTF()">重置</button>
+  </div>
+</div>
+
+<!-- ===== PANEL 2: IDF ===== -->
+<div class="panel" id="panel-2">
+  <div class="info-box" id="info2">
+    <span class="hi">IDF（逆文档频率）</span>：一个词越罕见，IDF 越高。出现在所有文档的词 IDF 趋近 0，只在少数文档出现的词 IDF 高。
+  </div>
+  <div class="formula-card">
+    <div class="formula">IDF(t) = log( N / (1 + df<sub>t</sub>) )</div>
+    <div class="formula-desc">N = 总文档数，df<sub>t</sub> = 包含词 t 的文档数</div>
+  </div>
+  <div class="doc-cards" id="idfDocCards"></div>
+  <div class="bar-chart" style="margin-top:16px">
+    <div class="bar-chart-title" id="idfBarTitle">IDF 值对比（点击「展示对比」）</div>
+    <div id="idfBars"></div>
+  </div>
+  <div class="controls">
+    <button class="btn btn-primary" onclick="showIDFBars()">展示 IDF 对比</button>
+    <button class="btn btn-secondary" onclick="highlightIDFWord('北京')">突出"北京"</button>
+    <button class="btn btn-secondary" onclick="resetIDF()">重置</button>
+  </div>
+</div>
+
+<!-- ===== PANEL 3: TF-IDF Score ===== -->
+<div class="panel" id="panel-3">
+  <div class="info-box" id="info3">
+    <span class="hi">TF-IDF = TF × IDF</span>：同时考虑词的本文档频率和全局稀有度，综合得出词的"重要性分数"。
+  </div>
+  <div class="formula-card">
+    <div class="formula">TF-IDF(t, d) = TF(t, d) × IDF(t)</div>
+    <div class="formula-desc">"北京"在文章中频繁出现(TF高) 且 在其他文档不常见(IDF高) → TF-IDF 高 ✅<br>"的"到处高频出现(TF高) 但 IDF极低 → TF-IDF 低 ✅</div>
+  </div>
+  <div class="bar-chart">
+    <div class="bar-chart-title">TF-IDF 得分对比（点击「计算得分」）</div>
+    <div id="tfidfBars"></div>
+  </div>
+  <div class="controls">
+    <button class="btn btn-primary" onclick="showTFIDF()">计算 TF-IDF 得分</button>
+    <button class="btn btn-secondary" onclick="resetTFIDF()">重置</button>
+  </div>
+</div>
+
+<!-- ===== PANEL 4: Heatmap ===== -->
+<div class="panel" id="panel-4">
+  <div class="info-box" id="info4">
+    <span class="hi">TF-IDF 矩阵</span>：行=文档，列=词汇，格子颜色深浅表示 TF-IDF 值高低。专有词（北京、太阳）颜色深，虚词（的/在）几乎为空。
+  </div>
+  <div class="heatmap-wrap">
+    <table class="heatmap-table" id="heatmapTable"></table>
+  </div>
+  <div class="heatmap-legend">
+    <div class="legend-item"><div class="legend-box" style="background:#f0a060"></div>高 TF-IDF</div>
+    <div class="legend-item"><div class="legend-box" style="background:#6a3a10"></div>中 TF-IDF</div>
+    <div class="legend-item"><div class="legend-box" style="background:#1e2535"></div>低/零 TF-IDF</div>
+  </div>
+  <div class="controls">
+    <button class="btn btn-primary" onclick="buildHeatmap()">生成热力图</button>
+    <button class="btn btn-secondary" onclick="resetHeatmap()">重置</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  Data
+// ============================================================
+const DOCS = [
+  { label:'文档1：北京旅游攻略', words:['北京','的','景点','北京','天安门','北京','故宫','旅游','北京','的','的','在'] },
+  { label:'文档2：北京美食推荐', words:['北京','烤鸭','美食','北京','的','豆汁','北京','小吃','推荐','的','在','美食'] },
+  { label:'文档3：太阳能发电技术', words:['太阳','能','发电','太阳','的','技术','太阳','光伏','效率','在','能','的'] },
+];
+const N_DOCS = DOCS.length;
+const ALL_VOCAB = ['北京','太阳','旅游','故宫','烤鸭','美食','技术','发电','的','在','是','景点'];
+
+function tf(word, doc){ return doc.words.filter(w=>w===word).length / doc.words.length; }
+function df(word){ return DOCS.filter(d=>d.words.includes(word)).length; }
+function idf(word){ return Math.log(N_DOCS / (1 + df(word))); }
+function tfidf(word, doc){ return tf(word,doc) * idf(word); }
+
+// ============================================================
+//  TAB
+// ============================================================
+function switchTab(idx){
+  document.querySelectorAll('.panel').forEach((p,i)=>p.classList.toggle('active',i===idx));
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+}
+
+// ============================================================
+//  PANEL 0 — High Freq Problem
+// ============================================================
+const FREQ_DATA = [
+  {word:'的',count:28,isStop:true},{word:'在',count:22,isStop:true},{word:'了',count:19,isStop:true},
+  {word:'是',count:17,isStop:true},{word:'有',count:15,isStop:true},{word:'和',count:13,isStop:true},
+  {word:'北京',count:11,isStop:false},{word:'太阳',count:9,isStop:false},
+  {word:'技术',count:7,isStop:false},{word:'美食',count:6,isStop:false},
+  {word:'旅游',count:5,isStop:false},{word:'发电',count:4,isStop:false},
+];
+const maxFreq = Math.max(...FREQ_DATA.map(d=>d.count));
+
+function showFreqBars(){
+  const cont = document.getElementById('freqBars');
+  cont.innerHTML='';
+  FREQ_DATA.forEach((d,i)=>{
+    const row=document.createElement('div'); row.className='bar-row';
+    row.innerHTML=`
+      <div class="bar-label" id="fl_${i}">${d.word}</div>
+      <div class="bar-track">
+        <div class="bar-fill orange" id="fb_${i}" style="width:0%">${d.count}</div>
+      </div>
+      <div class="bar-val">${d.count}次</div>`;
+    cont.appendChild(row);
+    setTimeout(()=>{
+      document.getElementById(`fb_${i}`).style.width=(d.count/maxFreq*100)+'%';
+    },i*80);
+  });
+}
+
+function highlightStopwords(){
+  FREQ_DATA.forEach((d,i)=>{
+    const lbl=document.getElementById('fl_'+i);
+    const bar=document.getElementById('fb_'+i);
+    if(lbl&&bar){
+      if(d.isStop){
+        lbl.style.color='#f05050';
+        bar.style.background='linear-gradient(90deg,#f05050,#c03030)';
+      } else {
+        lbl.style.color='#7ee8a2';
+        bar.style.background='linear-gradient(90deg,#7ee8a2,#40c060)';
+      }
+    }
+  });
+  document.getElementById('formulaP0').style.display='block';
+  document.getElementById('info0').innerHTML='<span class="warn">红色=虚词</span>（无语义）占据了词频 TOP 6！<span class="hi2">绿色=实词</span>（有语义）排在后面。TF-IDF 的目标是"压低"红色、"提升"绿色。';
+}
+
+function resetP0(){
+  document.getElementById('freqBars').innerHTML='';
+  document.getElementById('formulaP0').style.display='none';
+  document.getElementById('info0').innerHTML='BoW 的问题：<span class="hi">"的/了/是"</span>这类虚词频率极高，但对语义<span class="warn">毫无贡献</span>。纯词频排行会被这些词"污染"，我们需要更好的权重方案。';
+}
+
+// ============================================================
+//  PANEL 1 — TF
+// ============================================================
+let tfState=0, tfInited=false;
+const TF_WORDS=['北京','旅游','故宫','的','在'];
+const TF_DOC = DOCS[0];
+
+function initTF(){
+  if(tfInited) return;
+  tfInited=true;
+  // Doc cards
+  const cont=document.getElementById('tfDocCards');
+  cont.innerHTML='';
+  DOCS.forEach((doc,i)=>{
+    const card=document.createElement('div');
+    card.className='doc-card'+(i===0?' active-doc':'');
+    card.id='tfdoc'+i;
+    card.innerHTML=`<h4>${doc.label}</h4><div class="doc-words">${doc.words.map(w=>`<span class="doc-word" id="tw${i}_${w}">${w}</span>`).join('')}</div>`;
+    cont.appendChild(card);
+  });
+  document.getElementById('tfSteps').innerHTML='';
+  document.getElementById('tfBars').innerHTML='';
+}
+
+function stepTF(){
+  initTF();
+  if(tfState>=TF_WORDS.length){ document.getElementById('btnTF').disabled=true; return; }
+  const word=TF_WORDS[tfState++];
+  const tfVal=tf(word,TF_DOC);
+  const count=TF_DOC.words.filter(w=>w===word).length;
+  const total=TF_DOC.words.length;
+  // Highlight word in doc0
+  document.querySelectorAll(`[id^="tw0_"]`).forEach(el=>el.classList.remove('hi-word','dim-word'));
+  TF_DOC.words.forEach((w,i)=>{
+    const els=document.querySelectorAll(`#tfdoc0 .doc-word`);
+    els.forEach(el=>{ if(el.textContent===word) el.classList.add('hi-word'); });
+  });
+  // Add step
+  const step=document.createElement('div');
+  step.className='tf-step';
+  step.innerHTML=`TF(<span class="hi">${word}</span>, 文档1) = ${count}/${total} = <span class="tf-eq">${tfVal.toFixed(4)}</span>`;
+  document.getElementById('tfSteps').appendChild(step);
+  setTimeout(()=>step.classList.add('show'),50);
+  // Add bar
+  const barsEl=document.getElementById('tfBars');
+  const maxTF=0.35;
+  const row=document.createElement('div'); row.className='bar-row';
+  row.innerHTML=`
+    <div class="bar-label">${word}</div>
+    <div class="bar-track"><div class="bar-fill orange" id="tfb_${word}" style="width:0%"></div></div>
+    <div class="bar-val">${tfVal.toFixed(4)}</div>`;
+  barsEl.appendChild(row);
+  setTimeout(()=>{ document.getElementById(`tfb_${word}`).style.width=(tfVal/maxTF*100)+'%'; },50);
+  document.getElementById('tfBarChart').style.display='block';
+  document.getElementById('info1').innerHTML=`<span class="hi">"${word}"</span> 在文档1中出现 ${count} 次，文档总词数 ${total}，TF = <span class="hi">${tfVal.toFixed(4)}</span>`;
+}
+
+let tfAutoTimer=null;
+function autoTF(){ resetTF(); tfAutoTimer=setInterval(()=>{ if(tfState>=TF_WORDS.length){clearInterval(tfAutoTimer);return;} stepTF(); },700); }
+function resetTF(){
+  if(tfAutoTimer) clearInterval(tfAutoTimer);
+  tfState=0; tfInited=false;
+  initTF();
+  document.getElementById('btnTF').disabled=false;
+  document.getElementById('info1').innerHTML='<span class="hi">TF（词项频率）</span>= 词在文档中出现次数 / 文档总词数。归一化处理使不同长度文档可比较。';
+}
+
+// ============================================================
+//  PANEL 2 — IDF
+// ============================================================
+let idfInited=false;
+const IDF_WORDS=['北京','太阳','的','旅游','技术','故宫'];
+
+function initIDF(){
+  if(idfInited) return;
+  idfInited=true;
+  const cont=document.getElementById('idfDocCards');
+  cont.innerHTML='';
+  DOCS.forEach((doc,i)=>{
+    const card=document.createElement('div');
+    card.className='doc-card';
+    card.id='idfdoc'+i;
+    card.innerHTML=`<h4>${doc.label}</h4><div class="doc-words">${[...new Set(doc.words)].map(w=>`<span class="doc-word" id="iw${i}_${w}">${w}</span>`).join('')}</div>`;
+    cont.appendChild(card);
+  });
+}
+
+function showIDFBars(){
+  initIDF();
+  const barsEl=document.getElementById('idfBars');
+  barsEl.innerHTML='';
+  const maxIDF=Math.max(...IDF_WORDS.map(w=>Math.abs(idf(w))),0.1);
+  IDF_WORDS.forEach((word,i)=>{
+    const idfVal=idf(word);
+    const dfVal=df(word);
+    const pct=Math.max(Math.abs(idfVal)/maxIDF*100,2);
+    const color=idfVal>0?'orange':'red';
+    const row=document.createElement('div'); row.className='bar-row';
+    row.innerHTML=`
+      <div class="bar-label">${word}</div>
+      <div class="bar-track"><div class="bar-fill ${color}" id="idfb_${word}" style="width:0%"></div></div>
+      <div class="bar-val">${idfVal.toFixed(3)}</div>`;
+    barsEl.appendChild(row);
+    setTimeout(()=>{ document.getElementById(`idfb_${word}`).style.width=pct+'%'; },i*150);
+  });
+  document.getElementById('idfBarTitle').textContent='IDF 值对比（出现文档数越多 → IDF 越低）';
+  document.getElementById('info2').innerHTML=`
+    IDF 计算：N=${N_DOCS} 篇文档。<br>
+    "的"出现在全部3篇 → IDF = log(3/4) = <span class="warn">${idf('的').toFixed(3)}</span>（极低！）<br>
+    "北京"出现在2篇 → IDF = log(3/3) = <span class="hi">${idf('北京').toFixed(3)}</span><br>
+    "故宫"只出现在1篇 → IDF = log(3/2) = <span class="hi2">${idf('故宫').toFixed(3)}</span>（最高！）`;
+}
+
+function highlightIDFWord(word){
+  initIDF();
+  DOCS.forEach((doc,i)=>{
+    const card=document.getElementById('idfdoc'+i);
+    if(doc.words.includes(word)){
+      card.classList.add('active-doc');
+      card.querySelectorAll('.doc-word').forEach(el=>{
+        if(el.textContent===word) el.classList.add('hi-word');
+        else el.classList.add('dim-word');
+      });
+    } else {
+      card.classList.remove('active-doc');
+      card.querySelectorAll('.doc-word').forEach(el=>el.classList.add('dim-word'));
+    }
+  });
+  document.getElementById('info2').innerHTML=`"<span class="hi">${word}</span>" 出现在 <span class="hi">${df(word)}</span> 篇文档中，IDF = log(${N_DOCS}/(1+${df(word)})) = <span class="hi">${idf(word).toFixed(4)}</span>`;
+}
+
+function resetIDF(){
+  idfInited=false;
+  document.getElementById('idfBars').innerHTML='';
+  initIDF();
+  document.getElementById('info2').innerHTML='<span class="hi">IDF（逆文档频率）</span>：一个词越罕见，IDF 越高。出现在所有文档的词 IDF 趋近 0，只在少数文档出现的词 IDF 高。';
+}
+
+// ============================================================
+//  PANEL 3 — TF-IDF Scores
+// ============================================================
+const TFIDF_WORDS=['北京','旅游','故宫','的','在','太阳','烤鸭'];
+const TFIDF_DOC=DOCS[0];
+
+function showTFIDF(){
+  const barsEl=document.getElementById('tfidfBars');
+  barsEl.innerHTML='';
+  const scores=TFIDF_WORDS.map(w=>({ word:w, score:tfidf(w,TFIDF_DOC), tf:tf(w,TFIDF_DOC), idf:idf(w) }));
+  const maxScore=Math.max(...scores.map(s=>Math.abs(s.score)),0.001);
+  scores.forEach((s,i)=>{
+    const pct=Math.max(Math.abs(s.score)/maxScore*100,1);
+    const color=s.score>0.01?'orange':(s.score<0?'red':'blue');
+    const row=document.createElement('div'); row.className='bar-row';
+    row.innerHTML=`
+      <div class="bar-label">${s.word}</div>
+      <div class="bar-track"><div class="bar-fill ${color}" id="tfidfb_${i}" style="width:0%">${s.score.toFixed(4)}</div></div>
+      <div class="bar-val" style="font-size:.72rem;color:#8a8f9e">${s.score.toFixed(4)}</div>`;
+    barsEl.appendChild(row);
+    setTimeout(()=>{ document.getElementById(`tfidfb_${i}`).style.width=pct+'%'; },i*150);
+  });
+  document.getElementById('info3').innerHTML=
+    `文档1 中各词 TF-IDF：<br>
+    <span class="hi">"北京"</span>：TF=${tf('北京',TFIDF_DOC).toFixed(3)} × IDF=${idf('北京').toFixed(3)} = <span class="hi">${tfidf('北京',TFIDF_DOC).toFixed(4)}</span><br>
+    <span class="warn">"的"</span>：TF=${tf('的',TFIDF_DOC).toFixed(3)} × IDF=${idf('的',TFIDF_DOC).toFixed(3)} = <span class="warn">${tfidf('的',TFIDF_DOC).toFixed(4)}</span> ← 虚词被压低 ✅`;
+}
+
+function resetTFIDF(){
+  document.getElementById('tfidfBars').innerHTML='';
+  document.getElementById('info3').innerHTML='<span class="hi">TF-IDF = TF × IDF</span>：同时考虑词的本文档频率和全局稀有度，综合得出词的"重要性分数"。';
+}
+
+// ============================================================
+//  PANEL 4 — Heatmap
+// ============================================================
+const HM_WORDS=['北京','太阳','旅游','烤鸭','技术','发电','的','在'];
+
+function heatColor(val, maxVal){
+  if(val<=0) return '#1e2535';
+  const ratio=val/maxVal;
+  const r=Math.round(240*ratio+30*(1-ratio));
+  const g=Math.round(160*ratio+37*(1-ratio));
+  const b=Math.round(96*ratio+53*(1-ratio));
+  return `rgb(${r},${g},${b})`;
+}
+
+function buildHeatmap(){
+  const tbl=document.getElementById('heatmapTable');
+  tbl.innerHTML='';
+  // compute max
+  let maxVal=0;
+  DOCS.forEach(doc=>HM_WORDS.forEach(w=>{ maxVal=Math.max(maxVal,tfidf(w,doc)); }));
+  // Header
+  const hr=document.createElement('tr');
+  const th0=document.createElement('th'); th0.textContent=''; hr.appendChild(th0);
+  HM_WORDS.forEach(w=>{
+    const th=document.createElement('th'); th.textContent=w; hr.appendChild(th);
+  });
+  tbl.appendChild(hr);
+  // Data
+  DOCS.forEach((doc,di)=>{
+    const tr=document.createElement('tr');
+    const tdl=document.createElement('td'); tdl.className='doc-label';
+    tdl.textContent=doc.label; tr.appendChild(tdl);
+    HM_WORDS.forEach((w,wi)=>{
+      const val=tfidf(w,doc);
+      const td=document.createElement('td');
+      td.id=`hm_${di}_${wi}`;
+      td.textContent='...';
+      tr.appendChild(td);
+      setTimeout(()=>{
+        td.textContent=val.toFixed(4);
+        td.style.background=heatColor(val,maxVal);
+        td.style.color=val>maxVal*0.5?'#0f1117':'#8a9abf';
+        td.style.fontWeight=val>maxVal*0.5?'700':'400';
+      },(di*HM_WORDS.length+wi)*80);
+    });
+    tbl.appendChild(tr);
+  });
+  document.getElementById('info4').innerHTML='<span class="hi">颜色越深 = TF-IDF 值越高</span>。可以看到"北京"在文档1/2中颜色深，"太阳"在文档3深，"的/在"等虚词全行几乎为空。这就是 TF-IDF 的魔力！';
+}
+
+function resetHeatmap(){
+  document.getElementById('heatmapTable').innerHTML='';
+  document.getElementById('info4').innerHTML='<span class="hi">TF-IDF 矩阵</span>：行=文档，列=词汇，格子颜色深浅表示 TF-IDF 值高低。专有词（北京、太阳）颜色深，虚词（的/在）几乎为空。';
+}
+</script>
+</body>
+</html>

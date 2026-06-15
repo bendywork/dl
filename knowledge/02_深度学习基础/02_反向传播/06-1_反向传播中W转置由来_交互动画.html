@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>反向传播中 Wᵀ 的由来 — 交互式动画演示</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e4e4e7;
+    --muted: #71717a;
+    --accent: #f97316;
+    --blue: #3b82f6;
+    --green: #22c55e;
+    --purple: #a855f7;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    margin-bottom: 8px;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  .phase-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    background: var(--card);
+    border-radius: 12px;
+    padding: 4px;
+    border: 1px solid var(--border);
+  }
+  .phase-tab {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+  }
+  .phase-tab:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+  .phase-tab.active {
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+  }
+  .canvas-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    margin: 0 auto;
+  }
+  .explain-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    min-height: 120px;
+  }
+  .explain-panel h3 {
+    color: var(--accent);
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+  .explain-panel p {
+    line-height: 1.8;
+    font-size: 14px;
+    color: #b0b0b8;
+  }
+  .highlight { color: var(--accent); font-weight: 700; }
+  .highlight-blue { color: var(--blue); font-weight: 700; }
+  .highlight-green { color: var(--green); font-weight: 700; }
+  .highlight-purple { color: var(--purple); font-weight: 700; }
+  .highlight-red { color: var(--red); font-weight: 700; }
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .btn {
+    padding: 10px 24px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+  .btn.primary:hover { opacity: 0.85; }
+  .step-indicator {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .matrix-display {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .matrix-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .matrix-box h4 {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .matrix-grid {
+    display: inline-grid;
+    gap: 4px;
+  }
+  .matrix-cell {
+    width: 56px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.4s;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid transparent;
+  }
+  .matrix-cell.active-row {
+    background: rgba(59,130,246,0.2);
+    border-color: var(--blue);
+    color: var(--blue);
+  }
+  .matrix-cell.active-col {
+    background: rgba(249,115,22,0.2);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .matrix-cell.active-both {
+    background: rgba(168,85,247,0.3);
+    border-color: var(--purple);
+    color: var(--purple);
+  }
+  .equation-bar {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 24px;
+    text-align: center;
+    font-size: 16px;
+    margin-bottom: 24px;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.6;
+  }
+  .dim-annotation {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>反向传播中 Wᵀ 的由来</h1>
+  <p class="subtitle">交互式动画 · 标量展开 → 矩阵形式 → 维度论证</p>
+
+  <div class="phase-tabs">
+    <button class="phase-tab active" onclick="switchPhase(0)">1. 前向传播</button>
+    <button class="phase-tab" onclick="switchPhase(1)">2. 标量展开</button>
+    <button class="phase-tab" onclick="switchPhase(2)">3. 矩阵转置</button>
+    <button class="phase-tab" onclick="switchPhase(3)">4. 维度论证</button>
+  </div>
+
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div class="equation-bar" id="equationBar">y = W · x</div>
+
+  <div class="canvas-wrap">
+    <canvas id="mainCanvas" width="900" height="420"></canvas>
+  </div>
+
+  <div class="matrix-display" id="matrixDisplay">
+    <div class="matrix-box">
+      <h4>W (2×2)</h4>
+      <div class="matrix-grid" id="wGrid" style="grid-template-columns: repeat(2, 56px);"></div>
+      <div class="dim-annotation">m=2 行, n=2 列</div>
+    </div>
+    <div class="matrix-box">
+      <h4>Wᵀ (2×2)</h4>
+      <div class="matrix-grid" id="wtGrid" style="grid-template-columns: repeat(2, 56px);"></div>
+      <div class="dim-annotation">n=2 行, m=2 列</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" onclick="prevStep()">◀ 上一步</button>
+    <button class="btn primary" onclick="nextStep()">下一步 ▶</button>
+    <button class="btn" onclick="autoPlay()">⏵ 自动播放</button>
+    <span class="step-indicator" id="stepIndicator">步骤 0 / 0</span>
+  </div>
+
+  <div class="explain-panel">
+    <h3 id="explainTitle">前向传播</h3>
+    <p id="explainText">数据从 x 流向 y，W 控制每条连接的权重。点击"下一步"开始演示。</p>
+  </div>
+</div>
+
+<script>
+const W = [[1, 2], [3, 4]];
+const Wt = [[1, 3], [2, 4]];
+const xVals = [5, 6];
+const yVals = [W[0][0]*xVals[0]+W[0][1]*xVals[1], W[1][0]*xVals[0]+W[1][1]*xVals[1]];
+const dL_dy = [0.1, 0.2];
+
+const phases = [
+  { name: "前向传播", steps: 4 },
+  { name: "标量展开", steps: 6 },
+  { name: "矩阵转置", steps: 5 },
+  { name: "维度论证", steps: 4 },
+];
+
+let currentPhase = 0;
+let currentStep = 0;
+let autoPlayTimer = null;
+
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+canvas.width = 900 * dpr;
+canvas.height = 420 * dpr;
+canvas.style.width = '900px';
+canvas.style.height = '420px';
+ctx.scale(dpr, dpr);
+
+const xNodes = [
+  { x: 120, y: 140, label: 'x₁', val: 5, color: '#22c55e' },
+  { x: 120, y: 290, label: 'x₂', val: 6, color: '#22c55e' },
+];
+const yNodes = [
+  { x: 780, y: 140, label: 'y₁', val: 17, color: '#3b82f6' },
+  { x: 780, y: 290, label: 'y₂', val: 39, color: '#3b82f6' },
+];
+
+const edges = [
+  { from: 0, to: 0, w: W[0][0], row: 0, col: 0, label: 'w₁₁' },
+  { from: 1, to: 0, w: W[0][1], row: 0, col: 1, label: 'w₁₂' },
+  { from: 0, to: 1, w: W[1][0], row: 1, col: 0, label: 'w₂₁' },
+  { from: 1, to: 1, w: W[1][1], row: 1, col: 1, label: 'w₂₂' },
+];
+
+function drawNode(x, y, label, val, color, highlight) {
+  ctx.save();
+  const r = 36;
+  if (highlight) { ctx.shadowColor = color; ctx.shadowBlur = 20; }
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = highlight ? color + '30' : '#1a1d27';
+  ctx.fill();
+  ctx.strokeStyle = highlight ? color : '#2a2d3a';
+  ctx.lineWidth = highlight ? 2.5 : 1.5;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = color;
+  ctx.font = '700 15px "SF Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x, y - 6);
+  ctx.fillStyle = highlight ? '#fff' : '#8a8a9a';
+  ctx.font = '600 12px "SF Mono", monospace';
+  ctx.fillText(val !== null ? String(val) : '', x, y + 12);
+  ctx.restore();
+}
+
+function drawEdge(from, to, w, label, color, alpha, width, flowing, flowOffset) {
+  ctx.save();
+  const x1 = from.x + 36, y1 = from.y;
+  const x2 = to.x - 36, y2 = to.y;
+  const cpx1 = x1 + 180, cpy1 = y1;
+  const cpx2 = x2 - 180, cpy2 = y2;
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, x2, y2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.stroke();
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - 12;
+  ctx.globalAlpha = Math.min(alpha * 1.5, 1);
+  ctx.fillStyle = color;
+  ctx.font = '600 12px "SF Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(label + '=' + w, mx, my);
+  if (flowing) {
+    for (let i = 0; i < 3; i++) {
+      const t = ((flowOffset / 100 + i * 0.33) % 1);
+      const it = 1 - t;
+      const px = it*it*it*x1 + 3*it*it*t*cpx1 + 3*it*t*t*cpx2 + t*t*t*x2;
+      const py = it*it*it*y1 + 3*it*it*t*cpy1 + 3*it*t*t*cpy2 + t*t*t*y2;
+      ctx.globalAlpha = alpha * (1 - Math.abs(t - 0.5) * 2);
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawLabel(x, y, text, color, size) {
+  ctx.save();
+  ctx.fillStyle = color || '#71717a';
+  ctx.font = (size || 13) + 'px "SF Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function drawArrow(x1, y1, x2, y2, color, width) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width || 2;
+  ctx.stroke();
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const len = 10;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - len * Math.cos(angle - 0.4), y2 - len * Math.sin(angle - 0.4));
+  ctx.lineTo(x2 - len * Math.cos(angle + 0.4), y2 - len * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
+}
+
+function buildMatrixGrid(containerId, data, id) {
+  const grid = document.getElementById(containerId);
+  grid.innerHTML = '';
+  for (let i = 0; i < data.length; i++) {
+    for (let j = 0; j < data[i].length; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'matrix-cell';
+      cell.id = `${id}_${i}_${j}`;
+      cell.textContent = data[i][j];
+      grid.appendChild(cell);
+    }
+  }
+}
+buildMatrixGrid('wGrid', W, 'w');
+buildMatrixGrid('wtGrid', Wt, 'wt');
+
+function highlightMatrixCell(prefix, i, j, cls) {
+  document.getElementById(`${prefix}_${i}_${j}`).className = 'matrix-cell ' + cls;
+}
+function clearMatrixHighlights(prefix) {
+  for (let i = 0; i < 2; i++)
+    for (let j = 0; j < 2; j++)
+      document.getElementById(`${prefix}_${i}_${j}`).className = 'matrix-cell';
+}
+
+let flowOffset = 0;
+let animFrame = null;
+
+function render() {
+  ctx.clearRect(0, 0, 900, 420);
+  flowOffset += 1.5;
+  switch (currentPhase) {
+    case 0: renderPhase0(); break;
+    case 1: renderPhase1(); break;
+    case 2: renderPhase2(); break;
+    case 3: renderPhase3(); break;
+  }
+  animFrame = requestAnimationFrame(render);
+}
+
+function renderPhase0() {
+  const s = currentStep;
+  drawLabel(120, 70, '输入 x', '#22c55e', 14);
+  drawLabel(780, 70, '输出 y', '#3b82f6', 14);
+  drawLabel(450, 35, '权重 W', '#f97316', 14);
+  edges.forEach((e, idx) => {
+    const visible = s >= idx + 1;
+    const flowing = s >= 4;
+    const color = e.row === 0 ? '#3b82f6' : '#a855f7';
+    drawEdge(xNodes[e.from], yNodes[e.to], e.w, e.label,
+      visible ? color : '#2a2d3a', visible ? 0.9 : 0.15, visible ? 2.5 : 1, flowing && visible, flowOffset);
+  });
+  const xHl = [s >= 1, s >= 1];
+  const yHl = [s >= 2, s >= 3];
+  xNodes.forEach((n, i) => drawNode(n.x, n.y, n.label, n.val, n.color, xHl[i]));
+  yNodes.forEach((n, i) => drawNode(n.x, n.y, n.label, n.val, n.color, yHl[i]));
+  if (s >= 1) { drawArrow(380, 390, 520, 390, '#22c55e', 2); drawLabel(450, 385, '前向', '#22c55e', 12); }
+}
+
+function renderPhase1() {
+  const s = currentStep;
+  drawLabel(120, 70, '输入 x', '#22c55e', 14);
+  drawLabel(780, 70, '输出 y', '#3b82f6', 14);
+  drawLabel(450, 35, '∂L/∂x₁ 的两条路径', '#f97316', 14);
+  edges.forEach(e => { drawEdge(xNodes[e.from], yNodes[e.to], e.w, e.label, '#2a2d3a', 0.15, 1, false, 0); });
+  if (s >= 1) { const e = edges[0]; drawEdge(xNodes[e.from], yNodes[e.to], e.w, e.label, '#3b82f6', 0.9, 3, true, flowOffset); highlightMatrixCell('w', 0, 0, 'active-row'); }
+  if (s >= 2) { const e = edges[2]; drawEdge(xNodes[e.from], yNodes[e.to], e.w, e.label, '#a855f7', 0.9, 3, true, flowOffset); highlightMatrixCell('w', 1, 0, 'active-row'); }
+  if (s >= 3) { drawNode(xNodes[0].x, xNodes[0].y, 'x₁', '?', '#f97316', true); }
+  else { drawNode(xNodes[0].x, xNodes[0].y, 'x₁', 5, '#22c55e', s >= 1); }
+  drawNode(xNodes[1].x, xNodes[1].y, 'x₂', 6, '#22c55e', false);
+  drawNode(yNodes[0].x, yNodes[0].y, 'y₁', 17, '#3b82f6', s >= 1);
+  drawNode(yNodes[1].x, yNodes[1].y, 'y₂', 39, '#a855f7', s >= 2);
+  if (s >= 4) { const e1 = edges[1]; drawEdge(xNodes[e1.from], yNodes[e1.to], e1.w, e1.label, '#3b82f6', 0.9, 3, true, flowOffset); highlightMatrixCell('w', 0, 1, 'active-col'); }
+  if (s >= 5) { const e2 = edges[3]; drawEdge(xNodes[e2.from], yNodes[e2.to], e2.w, e2.label, '#a855f7', 0.9, 3, true, flowOffset); highlightMatrixCell('w', 1, 1, 'active-col'); drawNode(xNodes[1].x, xNodes[1].y, 'x₂', '?', '#f97316', true); }
+  if (s >= 1) { drawArrow(520, 390, 380, 390, '#ef4444', 2); drawLabel(450, 385, '反向', '#ef4444', 12); }
+  if (s >= 2) { highlightMatrixCell('wt', 0, 0, 'active-row'); highlightMatrixCell('wt', 0, 1, 'active-row'); }
+  if (s >= 5) { highlightMatrixCell('wt', 1, 0, 'active-col'); highlightMatrixCell('wt', 1, 1, 'active-col'); }
+}
+
+function renderPhase2() {
+  const s = currentStep;
+  drawLabel(120, 70, '输入 x', '#22c55e', 14);
+  drawLabel(780, 70, '输出 y', '#3b82f6', 14);
+  drawLabel(450, 35, '从标量展开到矩阵形式', '#f97316', 14);
+  edges.forEach(e => {
+    const col0 = e.col === 0;
+    const active = s >= 2 ? (col0 ? s >= 2 : s >= 4) : false;
+    const color = col0 ? '#3b82f6' : '#a855f7';
+    drawEdge(xNodes[e.from], yNodes[e.to], e.w, e.label, active ? color : '#2a2d3a', active ? 0.8 : 0.12, active ? 2.5 : 1, active, flowOffset);
+  });
+  drawNode(xNodes[0].x, xNodes[0].y, 'x₁', '∂L/∂x₁', '#f97316', s >= 2);
+  drawNode(xNodes[1].x, xNodes[1].y, 'x₂', '∂L/∂x₂', '#f97316', s >= 4);
+  drawNode(yNodes[0].x, yNodes[0].y, 'y₁', '∂L/∂y₁', '#3b82f6', true);
+  drawNode(yNodes[1].x, yNodes[1].y, 'y₂', '∂L/∂y₂', '#a855f7', true);
+  drawArrow(520, 390, 380, 390, '#ef4444', 2);
+  drawLabel(450, 385, '反向', '#ef4444', 12);
+  if (s >= 2) { highlightMatrixCell('w', 0, 0, 'active-row'); highlightMatrixCell('w', 1, 0, 'active-row'); highlightMatrixCell('wt', 0, 0, 'active-row'); highlightMatrixCell('wt', 0, 1, 'active-row'); }
+  if (s >= 4) { highlightMatrixCell('w', 0, 1, 'active-col'); highlightMatrixCell('w', 1, 1, 'active-col'); highlightMatrixCell('wt', 1, 0, 'active-col'); highlightMatrixCell('wt', 1, 1, 'active-col'); }
+  if (s >= 5) { for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) highlightMatrixCell('wt', i, j, 'active-both'); }
+}
+
+function renderPhase3() {
+  const s = currentStep;
+  drawLabel(450, 30, '维度论证：为什么只能是 Wᵀ', '#f97316', 16);
+  if (s >= 1) {
+    drawDimBox(150, 160, 'x', '(n,)', '#22c55e', s >= 1);
+    drawDimBox(400, 160, 'W', '(m×n)', '#f97316', s >= 1);
+    drawDimBox(650, 160, 'y', '(m,)', '#3b82f6', s >= 1);
+    drawArrow(255, 185, 395, 185, '#71717a', 2);
+    drawArrow(505, 185, 645, 185, '#71717a', 2);
+    drawLabel(325, 180, '@', '#71717a', 14);
+    drawLabel(575, 180, '=', '#71717a', 14);
+    drawLabel(450, 120, '前向传播', '#22c55e', 14);
+  }
+  if (s >= 2) {
+    drawDimBox(150, 280, '∂L/∂x', '(n,)', '#f97316', s >= 2);
+    drawDimBox(400, 280, 'Wᵀ', '(n×m)', '#a855f7', s >= 3);
+    drawDimBox(650, 280, '∂L/∂y', '(m,)', '#3b82f6', s >= 2);
+    drawArrow(255, 305, 395, 305, '#71717a', 2);
+    drawArrow(505, 305, 645, 305, '#71717a', 2);
+    drawLabel(325, 300, '=', '#71717a', 14);
+    drawLabel(575, 300, '@', '#71717a', 14);
+    drawLabel(450, 240, '反向传播', '#ef4444', 14);
+  }
+  if (s >= 3) { drawLabel(400, 370, '(n,)  =  (n×m)  @  (m,)', '#22c55e', 16); drawLabel(400, 395, '维度完全吻合！只有 Wᵀ 满足', '#a855f7', 14); }
+  if (s >= 4) { drawLabel(400, 280, '❌ W(m×n) @ ∂L/∂y(m,) 维度不匹配！', '#ef4444', 13); }
+}
+
+function drawDimBox(x, y, label, dim, color, active) {
+  ctx.save();
+  const bw = 100, bh = 50;
+  ctx.beginPath();
+  ctx.roundRect(x - bw/2, y - bh/2, bw, bh, 8);
+  ctx.fillStyle = active ? color + '20' : '#1a1d27';
+  ctx.fill();
+  ctx.strokeStyle = active ? color : '#2a2d3a';
+  ctx.lineWidth = active ? 2 : 1;
+  ctx.stroke();
+  ctx.fillStyle = active ? color : '#71717a';
+  ctx.font = '700 14px "SF Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x, y - 4);
+  ctx.fillStyle = '#8a8a9a';
+  ctx.font = '12px "SF Mono", monospace';
+  ctx.fillText(dim, x, y + 14);
+  ctx.restore();
+}
+
+const phaseData = [
+  { steps: [
+    { eq: 'y = W · x', title: '前向传播 — 起点', text: '网络结构：x(2维) → W(2×2) → y(2维)。数据从左向右流动。' },
+    { eq: 'y₁ = w₁₁·x₁ + w₁₂·x₂', title: 'y₁ 的计算', text: 'x₁ 通过 w₁₁、x₂ 通过 w₁₂ 共同决定了 y₁。这两条路径用<span class="highlight-blue">蓝色</span>表示。' },
+    { eq: 'y₂ = w₂₁·x₁ + w₂₂·x₂', title: 'y₂ 的计算', text: '同样，x₁ 通过 w₂₁、x₂ 通过 w₂₂ 决定了 y₂。用<span class="highlight-purple">紫色</span>表示。' },
+    { eq: 'y = [17, 39]ᵀ = W · [5, 6]ᵀ', title: '前向传播完成', text: '所有连接同时工作，数据粒子沿路径流动。每条路径的权重不同，贡献也不同。' },
+  ]},
+  { steps: [
+    { eq: '∂L/∂x₁ = ?（x₁ 影响了哪些 y？）', title: '问题：∂L/∂x₁ 怎么算？', text: '反向传播时，x₁ 不是只影响一个 y，它<span class="highlight-red">同时影响 y₁ 和 y₂</span>！' },
+    { eq: '路径1：∂L/∂y₁ · ∂y₁/∂x₁ = ∂L/∂y₁ · <span class="highlight-blue">w₁₁</span>', title: 'x₁ → y₁ 的路径', text: 'x₁ 通过 <span class="highlight-blue">w₁₁=1</span> 影响了 y₁。这是第一条路径。注意我们用的是 W 的<span class="highlight-blue">第0列</span>。' },
+    { eq: '路径2：∂L/∂y₂ · ∂y₂/∂x₁ = ∂L/∂y₂ · <span class="highlight-purple">w₂₁</span>', title: 'x₁ → y₂ 的路径', text: 'x₁ 还通过 <span class="highlight-purple">w₂₁=3</span> 影响了 y₂！这是第二条路径。用的还是 W 的<span class="highlight-blue">第0列</span>。两条路径对应 W 的同一列！' },
+    { eq: '∂L/∂x₁ = ∂L/∂y₁·<span class="highlight-blue">w₁₁</span> + ∂L/∂y₂·<span class="highlight-purple">w₂₁</span>', title: '链式法则：两条路径相加', text: '<span class="highlight">关键！</span>两条路径的权重下标是 w₁₁ 和 w₂₁——第二个下标相同（都是1），第一个下标不同。这就是<span class="highlight">沿列求和</span>！' },
+    { eq: '∂L/∂x₂：沿 W 的第1列展开', title: '同理：∂L/∂x₂', text: 'x₂ 通过 w₁₂ 和 w₂₂ 影响了 y₁ 和 y₂。这次沿 W 的<span class="highlight">第1列</span>求和。' },
+    { eq: '∂L/∂x₂ = ∂L/∂y₁·<span class="highlight-blue">w₁₂</span> + ∂L/∂y₂·<span class="highlight-purple">w₂₂</span>', title: '列方向求和 = 转置！', text: '<span class="highlight">核心洞察</span>：前向传播沿 W 的<span class="highlight-blue">行</span>计算（每行一个y），反向传播沿 W 的<span class="highlight">列</span>求和（每列一个x）。沿列操作 = 用 Wᵀ 沿行操作！' },
+  ]},
+  { steps: [
+    { eq: '∂L/∂x₁ = w₁₁·∂L/∂y₁ + w₂₁·∂L/∂y₂', title: 'x₁ 的梯度展开式', text: '把刚才的标量结果写出来。系数是 <span class="highlight-blue">w₁₁, w₂₁</span>——这是 W 的第0列。' },
+    { eq: '∂L/∂x₂ = w₁₂·∂L/∂y₁ + w₂₂·∂L/∂y₂', title: 'x₂ 的梯度展开式', text: '系数是 <span class="highlight-purple">w₁₂, w₂₂</span>——这是 W 的第1列。' },
+    { eq: '⎡∂L/∂x₁⎤ = ⎡w₁₁  w₂₁⎤ ⎡∂L/∂y₁⎤', title: '写成矩阵形式', text: '把两个展开式拼起来。右边的矩阵 <span class="highlight">[w₁₁ w₂₁; w₁₂ w₂₂]</span>，和 W 比较——行和列交换了！' },
+    { eq: '⎣∂L/∂x₂⎦   ⎣w₁₂  w₂₂⎦ ⎣∂L/∂y₂⎦', title: '这就是 Wᵀ！', text: '右边那个矩阵就是 W 的转置 Wᵀ。这不是巧合，是标量展开的<span class="highlight">必然结果</span>。' },
+    { eq: '<span class="highlight">∂L/∂x = Wᵀ · ∂L/∂y</span>', title: '最终结论', text: '<span class="highlight">Wᵀ 的出现不是约定，而是数学必然。</span>因为链式法则沿"列"求和，而矩阵乘法沿"行"计算，两者方向相反，所以必须转置。' },
+  ]},
+  { steps: [
+    { eq: '前向：y(m,) = W(m,n) @ x(n,)', title: '前向传播的维度', text: 'W 把 n 维输入映射到 m 维输出。矩阵乘法的维度规则：(m,n)·(n,) → (m,)' },
+    { eq: '反向：∂L/∂x(n,) = ? @ ∂L/∂y(m,)', title: '反向传播的维度约束', text: '我们需要把 m 维梯度映射回 n 维。问号处的矩阵必须是什么形状？' },
+    { eq: '(n,) = (n,m) @ (m,) ✓  →  ? = Wᵀ(n,m)', title: '只有 Wᵀ 满足维度', text: '<span class="highlight-green">(n,) = (n,m)·(m,) ✓</span> 维度完全吻合！Wᵀ 的形状 (n,m) 恰好是唯一能配对的。' },
+    { eq: '❌ W(m,n) @ ∂L/∂y(m,) → 维度不匹配！', title: '用 W 行不通', text: '<span class="highlight-red">如果用 W 本身</span>：(m,n)·(m,) 无法相乘。所以<span class="highlight">转置不是可选的，是唯一的</span>。' },
+  ]},
+];
+
+function updateUI() {
+  const pd = phaseData[currentPhase];
+  const stepData = pd.steps[currentStep];
+  const totalSteps = pd.steps.length;
+  document.getElementById('equationBar').innerHTML = stepData.eq;
+  document.getElementById('explainTitle').textContent = stepData.title;
+  document.getElementById('explainText').innerHTML = stepData.text;
+  document.getElementById('stepIndicator').textContent = `步骤 ${currentStep + 1} / ${totalSteps}`;
+  const totalAllSteps = phaseData.reduce((s, p) => s + p.steps.length, 0);
+  const doneSteps = phaseData.slice(0, currentPhase).reduce((s, p) => s + p.steps.length, 0) + currentStep + 1;
+  document.getElementById('progressFill').style.width = (doneSteps / totalAllSteps * 100) + '%';
+  document.querySelectorAll('.phase-tab').forEach((tab, i) => { tab.classList.toggle('active', i === currentPhase); });
+  clearMatrixHighlights('w');
+  clearMatrixHighlights('wt');
+}
+
+function switchPhase(p) { stopAutoPlay(); currentPhase = p; currentStep = 0; updateUI(); }
+function nextStep() {
+  const pd = phaseData[currentPhase];
+  if (currentStep < pd.steps.length - 1) { currentStep++; }
+  else if (currentPhase < phaseData.length - 1) { currentPhase++; currentStep = 0; }
+  updateUI();
+}
+function prevStep() {
+  stopAutoPlay();
+  if (currentStep > 0) { currentStep--; }
+  else if (currentPhase > 0) { currentPhase--; currentStep = phaseData[currentPhase].steps.length - 1; }
+  updateUI();
+}
+function autoPlay() {
+  if (autoPlayTimer) { stopAutoPlay(); return; }
+  autoPlayTimer = setInterval(() => {
+    const pd = phaseData[currentPhase];
+    if (currentStep < pd.steps.length - 1) { currentStep++; }
+    else if (currentPhase < phaseData.length - 1) { currentPhase++; currentStep = 0; }
+    else { stopAutoPlay(); return; }
+    updateUI();
+  }, 2500);
+}
+function stopAutoPlay() { if (autoPlayTimer) { clearInterval(autoPlayTimer); autoPlayTimer = null; } }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextStep(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prevStep(); }
+});
+
+updateUI();
+render();
+</script>
+</body>
+</html>

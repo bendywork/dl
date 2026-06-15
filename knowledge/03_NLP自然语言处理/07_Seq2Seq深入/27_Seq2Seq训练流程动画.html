@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seq2Seq 训练流程动画</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #0f172a; color: #e2e8f0; }
+.container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+.header { text-align: center; padding: 16px 0; }
+.header h1 { font-size: 22px; background: linear-gradient(135deg, #06b6d4, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.header p { color: #94a3b8; margin-top: 4px; font-size: 13px; }
+.canvas-wrap { background: #1e293b; border-radius: 12px; border: 1px solid #334155; padding: 16px; margin: 16px 0; }
+canvas { display: block; margin: 0 auto; }
+.controls { display: flex; justify-content: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+.btn { padding: 8px 18px; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; cursor: pointer; font-size: 13px; transition: all 0.3s; }
+.btn:hover { border-color: #60a5fa; }
+.step-info { text-align: center; color: #64748b; font-size: 13px; margin: 8px 0; }
+.step-info .cur { color: #60a5fa; font-weight: 600; }
+.explain-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin: 16px 0; font-size: 13px; line-height: 2; color: #94a3b8; }
+.explain-box h3 { color: #a78bfa; font-size: 16px; margin-bottom: 8px; }
+.explain-box .key { color: #f59e0b; font-weight: 600; }
+.explain-box .good { color: #22c55e; }
+.explain-box .bad { color: #ef4444; }
+.explain-box .enc { color: #60a5fa; }
+.explain-box .dec { color: #06b6d4; }
+.explain-box .loss { color: #ef4444; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🔄 Seq2Seq 训练流程：编码器和解码器怎么配合？</h1>
+    <p>一个训练样本 = 一个双语配对，一个 forward，一个 loss，同时更新两边参数</p>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="C" width="1060" height="520"></canvas>
+  </div>
+  <div class="controls">
+    <button class="btn" onclick="play()">▶ 播放</button>
+    <button class="btn" onclick="pause()">⏸ 暂停</button>
+    <button class="btn" onclick="reset()">↺ 重置</button>
+    <button class="btn" onclick="stepFwd()">⏭ 单步</button>
+  </div>
+  <div class="step-info">步骤: <span class="cur" id="sDisp">0 / 10</span></div>
+  <div class="explain-box" id="expBox">
+    <h3>📦 准备：训练数据长什么样？</h3>
+    <span class="key">一条训练样本 = 一个双语配对</span><br>
+    英文 <span class="enc">"I love you"</span> + 法文 <span class="dec">"Je t'aime"</span><br>
+    编码器吃英文，解码器吃法文——<span class="good">不是两个语料库，是同一条数据的两半</span>
+  </div>
+</div>
+
+<script>
+const cv = document.getElementById('C');
+const c = cv.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+cv.width = 1060 * dpr; cv.height = 520 * dpr;
+cv.style.width = '1060px'; cv.style.height = '520px';
+c.scale(dpr, dpr);
+
+let step = 0, max = 10, playing = false, timer = null;
+
+const STEPS = [
+  { title: '📦 准备：训练数据长什么样？',
+    html: '<h3>📦 准备：训练数据长什么样？</h3><span class="key">一条训练样本 = 一个双语配对</span><br>英文 <span class="enc">"I love you"</span> + 法文 <span class="dec">"Je t\'aime"</span><br>编码器吃英文，解码器吃法文——<span class="good">不是两个语料库，是同一条数据的两半</span>' },
+  { title: '📥 编码器读入源语言',
+    html: '<h3>📥 第1步：编码器读入源语言</h3>英文 <span class="enc">"I love you"</span> 逐词送入编码器 LSTM<br>每个词变成 embedding 向量 → shape=(1, 3, 128)<br><span class="key">注意：编码器只读不输出，没有选词操作</span>' },
+  { title: '🧠 编码器逐步更新隐状态',
+    html: '<h3>🧠 第2步：编码器逐步更新 (h, c)</h3>t=0: 读 "I" → h₁, c₁<br>t=1: 读 "love" → h₂, c₂<br>t=2: 读 "you" → h₃, c₃<br>每步用 <span class="key">W_x(新输入) + W_h(旧记忆)</span> 算四个门，更新状态' },
+  { title: '📦 编码器输出 context vector',
+    html: '<h3>📦 第3步：编码器输出 context vector</h3>循环结束后，最终的 (h₃, c₃) 就是 <span class="key">context vector</span><br>shape: (1, 256) —— 整句英文被压缩成 256 个数字<br><span class="bad">⚠️ 这就是编码瓶颈：不管输入多长，都压缩成固定维度</span>' },
+  { title: '🔗 context 传给解码器',
+    html: '<h3>🔗 第4步：context 传给解码器</h3>解码器的初始状态 = 编码器的最终状态：<br>h₀ = context_h, c₀ = context_c<br><span class="good">这就像翻译员读完了原文，脑子里有了理解，开始动笔翻译</span>' },
+  { title: '📤 解码器第1步生成',
+    html: '<h3>📤 第5步：解码器开始生成</h3>输入 <span class="dec">&lt;SOS&gt;</span> + (h₀, c₀) → LSTM → h₁<br>h₁ → Linear(256, 100) → logits → softmax → 选词<br>训练时用 <span class="key">Teacher Forcing</span>：下一步输入用真实词，不是预测词' },
+  { title: '📤 解码器第2、3步生成',
+    html: '<h3>📤 第6步：解码器继续生成</h3>输入上一步的真实目标词 → LSTM → 选词 → 重复<br>t=1: 输入 "Je" → 输出 "t\'aime"<br>t=2: 输入 "t\'aime" → 输出 <span class="dec">&lt;EOS&gt;</span><br><span class="key">Teacher Forcing 保证训练稳定：即使预测错了，下一步还是用正确答案</span>' },
+  { title: '📊 计算 Loss',
+    html: '<h3>📊 第7步：计算 Loss</h3>解码器每步的 logits vs 真实目标词 → <span class="loss">CrossEntropyLoss</span><br>总损失 = 每步损失之和<br><span class="key">这个 loss 是编码器+解码器共同的损失</span>' },
+  { title: '🔄 反向传播：同时更新两边',
+    html: '<h3>🔄 第8步：反向传播</h3>一个 loss → 一次反向传播<br>梯度从 loss 倒流：<span class="dec">解码器参数</span> ← ← <span class="enc">编码器参数</span><br><span class="good">编码器和解码器的权重同时更新！不是分开训练的！</span><br>编码器学"怎么压缩更准"，解码器学"怎么生成更好"' },
+  { title: '✅ 一次训练完成',
+    html: '<h3>✅ 一次训练完成</h3>总结：<br>1. <span class="key">一条训练数据 = 双语配对</span>（不是两个语料库）<br>2. 编码器吃源语言，解码器吃目标语言（同一条数据的两半）<br>3. <span class="good">一个 forward → 一个 loss → 一次 backward → 同时更新两边</span><br>4. 不需要分开训练，整个模型是一个整体' },
+  { title: '🔁 重复所有训练样本',
+    html: '<h3>🔁 第10步：重复所有训练样本</h3>对训练集中每一条双语配对重复以上过程：<br>英文+法文 → forward → loss → backward → 更新<br>遍历完所有数据 = 1 个 epoch<br>训练 10~30 个 epoch → 模型学会翻译<br><span class="key">整个过程编码器和解码器始终是同一个模型，一起训练</span>' }
+];
+
+function a(s) {
+  if (step < s) return 0.1;
+  if (step === s) return 0.55 + 0.45 * Math.sin(Date.now() / 250);
+  return 1;
+}
+
+function rr(x,y,w,h,r,f,s,lw) {
+  c.beginPath(); c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r); c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h); c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y); c.closePath();
+  if(f){c.fillStyle=f;c.fill();} if(s){c.strokeStyle=s;c.lineWidth=lw||1;c.stroke();}
+}
+
+function ar(x1,y1,x2,y2,col,al,lw,dash) {
+  c.globalAlpha=al||1; c.strokeStyle=col; c.lineWidth=lw||2;
+  c.setLineDash(dash?[5,3]:[]);
+  c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+  const ang=Math.atan2(y2-y1,x2-x1),hl=8;
+  c.fillStyle=col; c.beginPath(); c.moveTo(x2,y2);
+  c.lineTo(x2-hl*Math.cos(ang-0.4),y2-hl*Math.sin(ang-0.4));
+  c.lineTo(x2-hl*Math.cos(ang+0.4),y2-hl*Math.sin(ang+0.4));
+  c.closePath(); c.fill();
+  c.setLineDash([]); c.globalAlpha=1;
+}
+
+function lb(x,y,t,col,sz,al) {
+  c.globalAlpha=al||1; c.fillStyle=col||'#e2e8f0';
+  c.font=(sz||12)+'px -apple-system,PingFang SC,sans-serif';
+  c.textAlign='center'; c.textBaseline='middle'; c.fillText(t,x,y); c.globalAlpha=1;
+}
+
+function draw() {
+  c.clearRect(0,0,1060,520);
+  const EN='#60a5fa', DE='#06b6d4', CTX='#a78bfa', LO='#ef4444', GO='#22c55e', WA='#f59e0b';
+
+  // ===== Training data pair =====
+  const dA = a(0);
+  rr(60,20,440,60,10,EN+'10',EN,1.5*dA);
+  lb(280,42,'英文 (源语言): "I love you"',EN,13,dA);
+  lb(280,62,'编码器的输入 → encoder_input',EN+'80',10,dA);
+
+  rr(560,20,440,60,10,DE+'10',DE,1.5*dA);
+  lb(780,42,'法文 (目标语言): "Je t\'aime"',DE,13,dA);
+  lb(780,62,'解码器的输入（Teacher Forcing）→ decoder_input',DE+'80',10,dA);
+
+  // Bracket showing "same training sample"
+  if (step >= 0) {
+    lb(530,50,'同一条训练数据',WA,10,a(0)*0.6);
+  }
+
+  // ===== Encoder section =====
+  const encY = 140;
+  const encA = a(1);
+
+  // Title
+  lb(250,encY-25,'编码器（Encoder）',EN,14,encA);
+
+  // LSTM cells
+  const words = ['I','love','you'];
+  const gap = 120;
+  const sx = 100;
+  for (let i=0; i<3; i++) {
+    const cx = sx + i*gap;
+    const tA = a(i+1 < 3 ? i+1 : 2);
+
+    // Input word
+    rr(cx-25,encY-5,50,22,6,EN+'15',EN,1*tA);
+    lb(cx,encY+6,words[i],EN,11,tA);
+    ar(cx,encY+17,cx,encY+32,EN,tA);
+
+    // LSTM cell
+    rr(cx-35,encY+32,70,36,8,EN+'12',EN,1.5*tA);
+    lb(cx,encY+50,'LSTM',EN,11,tA);
+
+    // h arrow
+    if (i<2) ar(cx+35,encY+50,cx+gap-35,encY+50,CTX,tA*0.5);
+  }
+
+  // h0 initial
+  lb(sx-45,encY+50,'h₀=0',CTX+'80',9,a(1));
+
+  // Context vector output
+  const ctxA = a(3);
+  ar(sx+2*gap+35,encY+50,sx+2*gap+90,encY+50,CTX,ctxA);
+  rr(sx+2*gap+90,encY+32,110,36,8,CTX+'15',CTX,2*ctxA);
+  lb(sx+2*gap+145,encY+50,'context',CTX,12,ctxA);
+  lb(sx+2*gap+145,encY+64,'(h,c)',CTX+'80',9,ctxA);
+
+  // Encoder description
+  if (step >= 2) {
+    rr(400,encY+85,200,30,6,EN+'08',EN,1*a(2));
+    lb(500,encY+100,'逐步更新 h 和 c',EN,10,a(2));
+  }
+
+  // ===== Context transfer =====
+  const trA = a(4);
+  ar(530+60,encY+50,530+60,encY+90,CTX,trA);
+  ar(530+60,encY+90,530+60,230,CTX,trA);
+  lb(530+80,190,'传给解码器做初始状态',CTX,10,trA);
+
+  // ===== Decoder section =====
+  const decY = 240;
+  const decA = a(5);
+  lb(250,decY-25,'解码器（Decoder）',DE,14,decA);
+
+  const decWords = ['<SOS>','Je',"t'aime",'<EOS>'];
+  const dGap = 110;
+  const dsx = 80;
+
+  for (let i=0; i<4; i++) {
+    const cx = dsx + i*dGap;
+    const tA = a(i+5 < 4 ? i+5 : 5);
+
+    // Input word (Teacher Forcing)
+    rr(cx-30,decY-5,60,22,6,DE+'15',DE,1*tA);
+    lb(cx,decY+6,decWords[i],DE,10,tA);
+    ar(cx,decY+17,cx,decY+32,DE,tA);
+
+    // LSTM cell
+    rr(cx-30,decY+32,60,36,8,DE+'12',DE,1.5*tA);
+    lb(cx,decY+50,'LSTM',DE,11,tA);
+
+    // Linear → logits
+    ar(cx,decY+68,cx,decY+85,GO,tA);
+    rr(cx-25,decY+85,50,22,6,GO+'10',GO,1*tA);
+    lb(cx,decY+96,'logits',GO,9,tA);
+
+    // Predicted word
+    const predWords = ['Je',"t'aime",'<EOS>','—'];
+    ar(cx,decY+107,cx,decY+122,GO,tA*0.7);
+    rr(cx-25,decY+122,50,22,6,GO+'08',GO+'60',1*tA);
+    lb(cx,decY+133,predWords[i],GO,9,tA*0.7);
+
+    // h arrow
+    if (i<3) ar(cx+30,decY+50,dsx+(i+1)*dGap-30,decY+50,CTX,tA*0.4);
+
+    // Teacher forcing label
+    if (i>0 && i<3) {
+      lb(cx-dGap/2,decY+70,'真实词',WA,8,tA*0.4);
+    }
+  }
+
+  // ===== Loss section =====
+  const lossA = a(7);
+  if (step >= 7) {
+    rr(730,300,300,50,10,LO+'10',LO,2*lossA);
+    lb(880,318,'CrossEntropyLoss',LO,14,lossA);
+    lb(880,338,'logits vs 真实法文',LO+'80',10,lossA);
+
+    // arrows from decoder logits to loss
+    for (let i=0; i<4; i++) {
+      ar(dsx+i*dGap,decY+96,730,320,LO,lossA*0.3,1,true);
+    }
+  }
+
+  // ===== Backward section =====
+  const bwA = a(8);
+  if (step >= 8) {
+    rr(100,370,860,50,10,GO+'08',GO,1.5*bwA);
+    lb(530,385,'反向传播：梯度同时流向编码器和解码器',GO,13,bwA);
+    lb(530,405,'一个 loss → 一次 backward → 两边参数同时更新',GO+'80',10,bwA);
+
+    // Backward arrows
+    ar(250,370,250,decY+68,LO,bwA*0.5,1.5,true);
+    lb(230,300,'∂L/∂W_dec',LO,9,bwA*0.5);
+    ar(400,370,400,encY+68,LO,bwA*0.5,1.5,true);
+    lb(380,260,'∂L/∂W_enc',LO,9,bwA*0.5);
+  }
+
+  // ===== Summary =====
+  const sumA = a(9);
+  if (step >= 9) {
+    rr(100,440,860,60,10,WA+'08',WA,1.5*sumA);
+    lb(530,458,'✅ 一次训练完成：同一个样本 → 同一个 loss → 同时更新两边参数',GO,13,sumA);
+    lb(530,478,'编码器和解码器是同一个模型的两部分，不是分开训练的！',WA,11,sumA);
+  }
+
+  // Step indicator
+  lb(530,510,STEPS[Math.min(step,max)].title,WA,11,a(step));
+}
+
+function play() {
+  if(playing) return; playing=true;
+  timer=setInterval(()=>{
+    if(step>=max){pause();return;} step++;update();draw();
+  },1200);
+}
+function pause(){playing=false;if(timer)clearInterval(timer);}
+function reset(){pause();step=0;update();draw();}
+function stepFwd(){if(step<max){step++;update();draw();}}
+function update(){
+  document.getElementById('sDisp').textContent=step+' / '+max;
+  document.getElementById('expBox').innerHTML=STEPS[Math.min(step,max)].html;
+}
+update(); draw();
+function pulse(){if(!playing)draw();requestAnimationFrame(pulse);}pulse();
+</script>
+</body>
+</html>

@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CBOW 完整流程演示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ===== Header ===== */
+  .header {
+    text-align: center;
+    padding: 28px 20px 16px;
+    border-bottom: 1px solid #21262d;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #58a6ff, #bc8cff, #ff7b72);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 2px;
+  }
+  .header p {
+    color: #8b949e;
+    font-size: 14px;
+    margin-top: 6px;
+  }
+
+  /* ===== Layout ===== */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr 280px;
+    gap: 0;
+    height: calc(100vh - 110px);
+  }
+
+  /* ===== Left Panel ===== */
+  .left-panel {
+    border-right: 1px solid #21262d;
+    padding: 20px 16px;
+    overflow-y: auto;
+  }
+  .left-panel h3 {
+    color: #58a6ff;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .step-list { list-style: none; }
+  .step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    cursor: default;
+    transition: background 0.3s;
+  }
+  .step-item.active {
+    background: #161b22;
+    border: 1px solid #58a6ff44;
+  }
+  .step-item.done {
+    background: #0d1f0d;
+    border: 1px solid #3fb95044;
+  }
+  .step-item.pending {
+    opacity: 0.4;
+  }
+  .step-num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: bold;
+    flex-shrink: 0;
+  }
+  .step-item.active .step-num { background: #58a6ff; color: #0d1117; }
+  .step-item.done .step-num { background: #3fb950; color: #0d1117; }
+  .step-item.pending .step-num { background: #30363d; color: #8b949e; }
+  .step-title { font-size: 13px; line-height: 1.5; color: #c9d1d9; }
+  .step-item.active .step-title { color: #fff; font-weight: 600; }
+  .step-item.done .step-title { color: #3fb950; }
+
+  /* ===== Center Panel ===== */
+  .center-panel {
+    padding: 20px 24px;
+    overflow-y: auto;
+    position: relative;
+  }
+  .scene { display: none; animation: fadeIn 0.5s ease; }
+  .scene.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ===== Right Panel ===== */
+  .right-panel {
+    border-left: 1px solid #21262d;
+    padding: 20px 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .formula-box {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .formula-box h4 {
+    color: #58a6ff;
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+  .formula {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: #e6edf3;
+    line-height: 1.8;
+  }
+  .formula .highlight { color: #ff7b72; font-weight: bold; }
+  .formula .green { color: #3fb950; }
+  .formula .blue { color: #58a6ff; }
+  .formula .purple { color: #bc8cff; }
+  .formula .orange { color: #e3b341; }
+
+  /* ===== Progress Bar ===== */
+  .progress-section {
+    padding: 12px 20px;
+    border-top: 1px solid #21262d;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #0d1117;
+  }
+  .progress-bar-wrap {
+    flex: 1;
+    height: 6px;
+    background: #21262d;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #58a6ff, #bc8cff);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+  .progress-text { color: #8b949e; font-size: 13px; white-space: nowrap; }
+  .btn-group { display: flex; gap: 10px; }
+  .btn {
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .btn-prev {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+  }
+  .btn-prev:hover { background: #30363d; }
+  .btn-next {
+    background: linear-gradient(90deg, #1f6feb, #bc8cff44);
+    color: #fff;
+    border: 1px solid #58a6ff55;
+  }
+  .btn-next:hover { background: linear-gradient(90deg, #388bfd, #a371f7); transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
+
+  /* ===== Scene Components ===== */
+  .scene-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #e6edf3;
+    margin-bottom: 8px;
+  }
+  .scene-desc {
+    color: #8b949e;
+    font-size: 14px;
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  /* Scene 1 - Sentence */
+  .sentence-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 30px 0;
+  }
+  .word-chip {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 20px;
+    font-weight: 700;
+    border: 2px solid transparent;
+    transition: all 0.4s ease;
+    position: relative;
+  }
+  .word-chip.center {
+    background: linear-gradient(135deg, #1f6feb44, #bc8cff44);
+    border-color: #bc8cff;
+    color: #e0c8ff;
+    box-shadow: 0 0 20px #bc8cff55;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 20px #bc8cff55; }
+    50% { box-shadow: 0 0 35px #bc8cffaa; }
+  }
+  .word-chip.context-left {
+    background: #1f6feb22;
+    border-color: #58a6ff;
+    color: #79c0ff;
+    animation: slideIn 0.5s ease forwards;
+  }
+  .word-chip.context-right {
+    background: #1f6feb22;
+    border-color: #58a6ff;
+    color: #79c0ff;
+    animation: slideIn 0.5s ease forwards;
+  }
+  .word-chip.normal {
+    background: #161b22;
+    border-color: #30363d;
+    color: #8b949e;
+  }
+  @keyframes slideIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+
+  .window-label {
+    text-align: center;
+    color: #8b949e;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .window-bracket {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 8px 0;
+  }
+  .bracket-line {
+    height: 2px;
+    width: 80px;
+    background: linear-gradient(90deg, transparent, #58a6ff55, #58a6ff, #58a6ff55, transparent);
+  }
+  .bracket-label { color: #58a6ff; font-size: 12px; }
+
+  /* One-Hot Grid */
+  .onehot-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-top: 10px;
+  }
+  .onehot-word {
+    text-align: center;
+  }
+  .onehot-label {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-block;
+  }
+  .onehot-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 3px;
+  }
+  .onehot-cell {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 4px;
+    background: #161b22;
+    border: 1px solid #21262d;
+    transition: all 0.4s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #30363d;
+  }
+  .onehot-cell.lit {
+    background: var(--color);
+    border-color: var(--color);
+    color: #fff;
+    box-shadow: 0 0 8px var(--color);
+    font-size: 11px;
+    font-weight: bold;
+  }
+  .word-colors {
+    --w0: #58a6ff;
+    --w1: #3fb950;
+    --w2: #f0883e;
+    --w3: #ff7b72;
+  }
+
+  /* Embedding Matrix */
+  .embed-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .matrix-visual {
+    flex: 1;
+    min-width: 200px;
+  }
+  .matrix-title {
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .matrix-grid {
+    display: grid;
+    gap: 2px;
+  }
+  .matrix-row {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    transition: all 0.3s;
+  }
+  .matrix-row.highlighted {
+    transform: scale(1.02);
+  }
+  .matrix-row-label {
+    width: 28px;
+    font-size: 10px;
+    color: #484f58;
+    text-align: right;
+    padding-right: 4px;
+    flex-shrink: 0;
+  }
+  .matrix-cell {
+    width: 28px; height: 18px;
+    border-radius: 3px;
+    background: #161b22;
+    border: 1px solid #21262d;
+    transition: all 0.4s;
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #484f58;
+  }
+  .matrix-cell.active {
+    background: var(--color);
+    border-color: var(--color);
+    color: #fff;
+    box-shadow: 0 0 6px var(--color);
+  }
+  .vectors-extracted {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 160px;
+  }
+  .vector-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.5s ease;
+  }
+  .vector-row.show {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .vector-label {
+    font-size: 12px;
+    font-weight: bold;
+    width: 28px;
+    text-align: center;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  .vector-cells {
+    display: flex;
+    gap: 3px;
+  }
+  .vector-cell {
+    width: 36px; height: 22px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    border: 1px solid;
+  }
+
+  /* Average animation */
+  .avg-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    margin-top: 10px;
+  }
+  .avg-vectors {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    width: 100%;
+  }
+  .avg-vec-block {
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .avg-vec-block.show { opacity: 1; }
+  .avg-vec-block .vlabel {
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .avg-vec-vals {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .avg-val {
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    border: 1px solid;
+  }
+  .avg-arrow {
+    font-size: 28px;
+    color: #58a6ff;
+    opacity: 0;
+    transition: opacity 0.5s 0.5s;
+  }
+  .avg-arrow.show { opacity: 1; }
+  .h-vector-block {
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.5s 1s;
+    background: #1f6feb22;
+    border: 2px solid #58a6ff;
+    border-radius: 10px;
+    padding: 12px 20px;
+  }
+  .h-vector-block.show { opacity: 1; }
+  .h-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #58a6ff;
+    margin-bottom: 8px;
+  }
+  .h-vals {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+  }
+  .h-val {
+    width: 48px; height: 28px;
+    border-radius: 6px;
+    background: #58a6ff33;
+    border: 1px solid #58a6ff;
+    color: #79c0ff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: bold;
+  }
+
+  /* Score calculation */
+  .score-container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 10px;
+  }
+  .score-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .h-vec-display {
+    background: #1f6feb22;
+    border: 1px solid #58a6ff;
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .h-vec-display .title { font-size: 12px; color: #58a6ff; margin-bottom: 6px; }
+  .h-vec-display .vals { display: flex; gap: 4px; }
+  .h-vd-cell {
+    width: 42px; height: 24px;
+    background: #58a6ff22;
+    border: 1px solid #58a6ff;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: #79c0ff; font-weight: bold;
+  }
+  .times-sym { font-size: 22px; color: #bc8cff; font-weight: bold; }
+  .wout-display {
+    background: #bc8cff11;
+    border: 1px solid #bc8cff;
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .wout-display .title { font-size: 12px; color: #bc8cff; margin-bottom: 6px; }
+  .wout-grid { display: grid; gap: 2px; }
+  .wout-row { display: flex; gap: 3px; align-items: center; }
+  .wout-label { font-size: 10px; color: #8b949e; width: 30px; text-align: right; padding-right: 4px; }
+  .wout-cell {
+    width: 36px; height: 18px;
+    background: #bc8cff22;
+    border: 1px solid #bc8cff44;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: #bc8cff; font-weight: bold;
+    transition: all 0.3s;
+  }
+  .wout-cell.highlight-row {
+    background: #bc8cff55;
+    border-color: #bc8cff;
+    box-shadow: 0 0 6px #bc8cff55;
+  }
+  .cosine-note {
+    background: #ff7b7222;
+    border: 1px solid #ff7b72;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #ff7b72;
+    font-family: monospace;
+    line-height: 1.7;
+  }
+  .score-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .score-bar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .score-bar-item.show { opacity: 1; }
+  .score-word { width: 40px; font-size: 13px; text-align: right; color: #c9d1d9; font-weight: bold; }
+  .score-bar-wrap { flex: 1; height: 20px; background: #161b22; border-radius: 4px; overflow: hidden; }
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.8s ease;
+    display: flex; align-items: center; justify-content: flex-end; padding-right: 6px;
+    font-size: 11px; font-weight: bold;
+  }
+  .score-val { width: 36px; font-size: 12px; color: #8b949e; text-align: right; font-family: monospace; }
+
+  /* Softmax */
+  .softmax-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 10px;
+  }
+  .softmax-arrow {
+    text-align: center;
+    font-size: 24px;
+    color: #3fb950;
+    opacity: 0;
+    transition: opacity 0.5s 0.3s;
+  }
+  .softmax-arrow.show { opacity: 1; }
+  .prob-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .prob-bar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .prob-word { width: 50px; font-size: 14px; font-weight: bold; text-align: right; }
+  .prob-bar-wrap {
+    flex: 1;
+    height: 28px;
+    background: #161b22;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #21262d;
+  }
+  .prob-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    width: 0;
+    transition: width 1s ease;
+    display: flex; align-items: center; padding-left: 8px;
+    font-size: 12px; font-weight: bold;
+  }
+  .prob-bar-fill.target {
+    background: linear-gradient(90deg, #bc8cff, #ff7b72);
+    color: #fff;
+    box-shadow: 0 0 12px #bc8cff55;
+  }
+  .prob-bar-fill.other {
+    background: linear-gradient(90deg, #1f6feb44, #58a6ff44);
+    color: #8b949e;
+  }
+  .prob-val { width: 42px; font-size: 12px; color: #8b949e; font-family: monospace; }
+
+  /* Loss */
+  .loss-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 10px;
+    align-items: center;
+  }
+  .loss-formula-display {
+    background: #161b22;
+    border: 2px solid #ff7b72;
+    border-radius: 12px;
+    padding: 20px 30px;
+    text-align: center;
+    font-family: monospace;
+    font-size: 18px;
+    color: #ff7b72;
+    width: 100%;
+    animation: glowRed 2s infinite;
+  }
+  @keyframes glowRed { 0%,100% { box-shadow: 0 0 10px #ff7b7233; } 50% { box-shadow: 0 0 25px #ff7b7266; } }
+  .loss-breakdown {
+    width: 100%;
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .loss-breakdown h4 { color: #e3b341; font-size: 14px; margin-bottom: 10px; }
+  .loss-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #21262d;
+    font-size: 13px;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.5s;
+  }
+  .loss-step:last-child { border-bottom: none; }
+  .loss-step.show { opacity: 1; transform: translateX(0); }
+  .loss-step-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+  .loss-step-text { color: #c9d1d9; line-height: 1.5; }
+  .loss-step-text code {
+    background: #0d1117;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    color: #ff7b72;
+  }
+  .backprop-note {
+    background: #3fb95022;
+    border: 1px solid #3fb950;
+    border-radius: 10px;
+    padding: 14px;
+    width: 100%;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #7ee787;
+    opacity: 0;
+    transition: opacity 0.5s 1.5s;
+  }
+  .backprop-note.show { opacity: 1; }
+
+  /* ===== Scrollbar ===== */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0d1117; }
+  ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>CBOW 完整流程演示</h1>
+  <p>Continuous Bag of Words — 以句子 "我 爱 [北京] 天安门 广场" 为例，中心词为"北京"</p>
+</div>
+
+<div class="main-layout">
+  <!-- Left: Step List -->
+  <div class="left-panel">
+    <h3>执行步骤</h3>
+    <ul class="step-list" id="stepList">
+      <li class="step-item" data-step="1">
+        <div class="step-num">1</div>
+        <div class="step-title">句子 & 滑动窗口</div>
+      </li>
+      <li class="step-item" data-step="2">
+        <div class="step-num">2</div>
+        <div class="step-title">One-Hot 编码</div>
+      </li>
+      <li class="step-item" data-step="3">
+        <div class="step-num">3</div>
+        <div class="step-title">嵌入矩阵 W_in 查找</div>
+      </li>
+      <li class="step-item" data-step="4">
+        <div class="step-num">4</div>
+        <div class="step-title">求平均 → 隐藏层 h</div>
+      </li>
+      <li class="step-item" data-step="5">
+        <div class="step-num">5</div>
+        <div class="step-title">W_out 计算得分</div>
+      </li>
+      <li class="step-item" data-step="6">
+        <div class="step-num">6</div>
+        <div class="step-title">Softmax → 概率分布</div>
+      </li>
+      <li class="step-item" data-step="7">
+        <div class="step-num">7</div>
+        <div class="step-title">损失计算 & 反向传播</div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Center: Animation Area -->
+  <div class="center-panel">
+
+    <!-- Scene 1 -->
+    <div class="scene active" id="scene1">
+      <div class="scene-title">Step 1 · 句子与滑动窗口</div>
+      <div class="scene-desc">
+        给定句子中，选取"<span style="color:#bc8cff;font-weight:bold">北京</span>"作为中心词（target word），
+        窗口大小 = 2，左右各取 2 个上下文词作为输入。
+      </div>
+      <div class="sentence-display" id="sentenceDisplay">
+        <div class="word-chip normal" id="w_wo">我</div>
+        <div class="word-chip normal" id="w_ai">爱</div>
+        <div class="word-chip center" id="w_bj">北京</div>
+        <div class="word-chip normal" id="w_tam">天安门</div>
+        <div class="word-chip normal" id="w_sq">广场</div>
+      </div>
+      <div style="text-align:center;margin-top:8px;color:#484f58;font-size:13px;">← 点击"下一步"开始动画 →</div>
+    </div>
+
+    <!-- Scene 2 -->
+    <div class="scene" id="scene2">
+      <div class="scene-title">Step 2 · One-Hot 编码</div>
+      <div class="scene-desc">
+        假设词汇表大小 V = 10。每个上下文词用一个 10 维 One-Hot 向量表示，只有对应位置为 1，其余为 0。
+      </div>
+      <div class="onehot-container word-colors">
+        <div class="onehot-word">
+          <div class="onehot-label" style="background:#58a6ff22;color:#58a6ff;border:1px solid #58a6ff;">我</div>
+          <div class="onehot-grid" id="oh0">
+          </div>
+        </div>
+        <div class="onehot-word">
+          <div class="onehot-label" style="background:#3fb95022;color:#3fb950;border:1px solid #3fb950;">爱</div>
+          <div class="onehot-grid" id="oh1">
+          </div>
+        </div>
+        <div class="onehot-word">
+          <div class="onehot-label" style="background:#f0883e22;color:#f0883e;border:1px solid #f0883e;">天安门</div>
+          <div class="onehot-grid" id="oh2">
+          </div>
+        </div>
+        <div class="onehot-word">
+          <div class="onehot-label" style="background:#ff7b7222;color:#ff7b72;border:1px solid #ff7b72;">广场</div>
+          <div class="onehot-grid" id="oh3">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene 3 -->
+    <div class="scene" id="scene3">
+      <div class="scene-title">Step 3 · 嵌入矩阵 W_in 查找</div>
+      <div class="scene-desc">
+        W_in 是形状为 (V × d) = (10 × 3) 的矩阵，每行是一个词的嵌入向量。
+        One-Hot 向量选中对应行，等价于矩阵行提取。
+      </div>
+      <div class="embed-container">
+        <div class="matrix-visual">
+          <div class="matrix-title">W_in (10 × 3)</div>
+          <div class="matrix-grid" id="winMatrix"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 8px;">
+          <div style="font-size:24px;color:#58a6ff;">→</div>
+          <div style="font-size:11px;color:#8b949e;margin-top:4px;">提取行</div>
+        </div>
+        <div class="vectors-extracted" id="extractedVectors">
+          <div style="font-size:12px;color:#8b949e;margin-bottom:4px;">提取出的词向量（d=3维）</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene 4 -->
+    <div class="scene" id="scene4">
+      <div class="scene-title">Step 4 · 求平均 → 隐藏层向量 h</div>
+      <div class="scene-desc">
+        将 4 个上下文词向量相加后除以 4，得到隐藏层向量 h。
+        h = (v_我 + v_爱 + v_天安门 + v_广场) / 4
+      </div>
+      <div class="avg-container">
+        <div class="avg-vectors" id="avgVectors"></div>
+        <div class="avg-arrow" id="avgArrow">↓ 平均 ÷4 ↓</div>
+        <div class="h-vector-block" id="hVectorBlock">
+          <div class="h-title">隐藏层向量 h（3维）</div>
+          <div class="h-vals" id="hVals"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene 5 -->
+    <div class="scene" id="scene5">
+      <div class="scene-title">Step 5 · W_out 计算得分（余弦相似度！）</div>
+      <div class="scene-desc">
+        h 与 W_out 矩阵每行（每个词的输出向量 u_j）做点积，得到每个词的"得分" z_j。
+        这本质上是余弦相似度！
+      </div>
+      <div class="score-container">
+        <div class="score-top">
+          <div class="h-vec-display">
+            <div class="title">h（隐藏层）</div>
+            <div class="vals" id="scoreH"></div>
+          </div>
+          <div class="times-sym">·</div>
+          <div class="wout-display">
+            <div class="title">W_out (10 × 3)</div>
+            <div class="wout-grid" id="woutGrid"></div>
+          </div>
+        </div>
+        <div class="cosine-note" id="cosineNote">
+          z<sub>j</sub> = h · u<sub>j</sub> = |h| |u<sub>j</sub>| cos(θ)<br>
+          <span style="color:#e3b341">→ 越相似的词，点积越大，得分越高！</span>
+        </div>
+        <div class="score-bars" id="scoreBars"></div>
+      </div>
+    </div>
+
+    <!-- Scene 6 -->
+    <div class="scene" id="scene6">
+      <div class="scene-title">Step 6 · Softmax → 概率分布</div>
+      <div class="scene-desc">
+        将得分 z 经过 Softmax 转换为概率分布，使所有词的概率之和为 1。
+        P(w_j | context) = exp(z_j) / Σ exp(z_k)
+      </div>
+      <div class="softmax-container">
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#8b949e;">
+          <span>得分 z</span>
+          <span style="color:#3fb950;font-size:18px;">→ Softmax →</span>
+          <span>概率 P</span>
+        </div>
+        <div class="prob-bars" id="probBars"></div>
+      </div>
+    </div>
+
+    <!-- Scene 7 -->
+    <div class="scene" id="scene7">
+      <div class="scene-title">Step 7 · 损失计算 & 反向传播</div>
+      <div class="scene-desc">
+        使用交叉熵损失，最大化"北京"的预测概率，梯度反向传播更新 W_in 和 W_out。
+      </div>
+      <div class="loss-container">
+        <div class="loss-formula-display" id="lossFormula">
+          Loss = −log P(北京 | 我, 爱, 天安门, 广场)
+        </div>
+        <div class="loss-breakdown">
+          <h4>计算步骤详解</h4>
+          <div class="loss-step" id="ls1">
+            <div class="loss-step-icon">1️⃣</div>
+            <div class="loss-step-text">
+              查找"北京"在词表中的索引（假设为 index = 2），取 Softmax 输出中对应的概率值
+              <code>P(北京) = 0.62</code>
+            </div>
+          </div>
+          <div class="loss-step" id="ls2">
+            <div class="loss-step-icon">2️⃣</div>
+            <div class="loss-step-text">
+              计算损失：<code>Loss = −log(0.62) ≈ 0.478</code><br>
+              概率越高，loss 越小；训练目标是让"北京"的概率趋近 1
+            </div>
+          </div>
+          <div class="loss-step" id="ls3">
+            <div class="loss-step-icon">3️⃣</div>
+            <div class="loss-step-text">
+              反向传播：计算 ∂Loss/∂W_out 和 ∂Loss/∂W_in<br>
+              通过 SGD / Adam 更新权重矩阵
+            </div>
+          </div>
+          <div class="loss-step" id="ls4">
+            <div class="loss-step-icon">4️⃣</div>
+            <div class="loss-step-text">
+              多次迭代后，语义相近的词（北京、天安门、广场）的向量在空间中趋近
+            </div>
+          </div>
+        </div>
+        <div class="backprop-note" id="backpropNote">
+          ✅ 训练完成后，W_in 的每一行就是对应词的<strong style="color:#3fb950">词嵌入向量</strong>。<br>
+          "北京"和"天安门"会有较高的余弦相似度，因为它们总是出现在相似的上下文中。<br>
+          这就是 Word2Vec / CBOW 的本质：<strong style="color:#3fb950">用上下文预测中心词，迫使模型学习词义！</strong>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right: Formula Panel -->
+  <div class="right-panel">
+    <div class="formula-box">
+      <h4>当前公式</h4>
+      <div class="formula" id="currentFormula">
+        <span class="blue">CBOW 目标：</span><br>
+        给定上下文词<br>
+        <span class="green">x₁, x₂, ..., x_C</span><br>
+        预测中心词 <span class="highlight">y</span><br><br>
+        <span class="blue">条件概率：</span><br>
+        P(<span class="highlight">y</span> | x₁,...,x_C)
+      </div>
+    </div>
+    <div class="formula-box">
+      <h4>关键参数</h4>
+      <div class="formula">
+        <span class="orange">V</span> = 10（词汇表大小）<br>
+        <span class="orange">d</span> = 3（嵌入维度）<br>
+        <span class="orange">C</span> = 4（上下文词数）<br>
+        <span class="orange">W_in</span>: V × d<br>
+        <span class="orange">W_out</span>: d × V
+      </div>
+    </div>
+    <div class="formula-box" id="stepFormulaBox">
+      <h4>步骤说明</h4>
+      <div class="formula" id="stepFormula">
+        <span class="blue">当前步骤：</span><br>
+        初始状态<br><br>
+        点击"下一步"<br>
+        开始演示 →
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Progress + Buttons -->
+<div class="progress-section">
+  <span class="progress-text" id="progressText">步骤 0 / 7</span>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-prev" id="btnPrev" onclick="prevStep()" disabled>← 上一步</button>
+    <button class="btn btn-next" id="btnNext" onclick="nextStep()">下一步 →</button>
+  </div>
+</div>
+
+<script>
+// ===== Data =====
+const VOCAB = ['我','爱','北京','天安门','广场','学习','深度','学习','模型','向量'];
+const CTX_WORDS = ['我','爱','天安门','广场'];
+const CTX_COLORS = ['#58a6ff','#3fb950','#f0883e','#ff7b72'];
+const CTX_INDICES = [0, 1, 3, 4]; // indices in vocab
+
+// Fake W_in (10x3)
+const W_IN = [
+  [0.8, -0.2,  0.4],  // 我
+  [0.3,  0.9, -0.1],  // 爱
+  [0.7,  0.6,  0.8],  // 北京 (target)
+  [0.6,  0.5,  0.7],  // 天安门
+  [0.5,  0.4,  0.6],  // 广场
+  [-0.3, 0.2,  0.1],
+  [0.1, -0.5,  0.3],
+  [0.4,  0.1, -0.2],
+  [-0.1, 0.3,  0.5],
+  [0.2, -0.4,  0.1],
+];
+// h = avg of 4 context vectors
+const H = W_IN[0].map((_,i) => ((W_IN[0][i]+W_IN[1][i]+W_IN[3][i]+W_IN[4][i])/4).toFixed(2));
+
+// Fake W_out (10x3) - each row is output vector for a word
+const W_OUT = [
+  [ 0.3, -0.1,  0.2],
+  [ 0.2,  0.6, -0.2],
+  [ 0.6,  0.5,  0.7],  // 北京 row
+  [ 0.5,  0.4,  0.6],
+  [ 0.4,  0.3,  0.5],
+  [-0.2,  0.1,  0.0],
+  [ 0.1, -0.3,  0.2],
+  [ 0.3,  0.0, -0.1],
+  [-0.1,  0.2,  0.4],
+  [ 0.1, -0.3,  0.0],
+];
+
+// Scores = h · w_out_row
+function dot(a, b) {
+  return a.reduce((s,v,i) => s + v*b[i], 0);
+}
+const hNum = H.map(Number);
+const SCORES = W_OUT.map(row => dot(hNum, row));
+const maxScore = Math.max(...SCORES);
+const expScores = SCORES.map(z => Math.exp(z - maxScore));
+const sumExp = expScores.reduce((a,b) => a+b, 0);
+const PROBS = expScores.map(e => e / sumExp);
+
+// ===== State =====
+let currentStep = 0;
+const TOTAL_STEPS = 7;
+
+// ===== Step Formulas =====
+const stepFormulas = [
+  ``,
+  `<span class="blue">滑动窗口：</span><br>
+中心词：<span class="highlight">北京</span><br>
+上下文：{我, 爱, 天安门, 广场}<br><br>
+窗口大小 = 2<br>
+→ 左2个 + 右2个<br>
+共 <span class="green">C = 4</span> 个上下文词`,
+
+  `<span class="blue">One-Hot 编码：</span><br>
+x_i ∈ ℝ^V<br>
+只有第 i 位为 1<br>
+其余全为 0<br><br>
+<span class="orange">我</span> → index 0<br>
+<span class="green">爱</span> → index 1<br>
+<span class="orange">天安门</span> → index 3<br>
+<span class="highlight">广场</span> → index 4`,
+
+  `<span class="blue">嵌入查找：</span><br>
+v_i = W_in[index_i]<br><br>
+等价于：<br>
+v_i = x_i · W_in<br><br>
+<span class="orange">W_in</span> 形状: V×d<br>
+= 10×3<br><br>
+每行 = 一个词向量`,
+
+  `<span class="blue">隐藏层计算：</span><br>
+<span class="green">h = (1/C) Σ v_i</span><br><br>
+= (v_我 + v_爱<br>
+  + v_天安门<br>
+  + v_广场) / 4<br><br>
+h 是所有上下文<br>
+词向量的<span class="highlight">平均</span>`,
+
+  `<span class="blue">得分计算：</span><br>
+z_j = h · u_j<br><br>
+其中 u_j 是 W_out 的<br>第 j 行（词 j 的<br>输出嵌入）<br><br>
+<span class="highlight">余弦相似度：</span><br>
+z_j = |h||u_j|cos(θ)<br><br>
+<span class="green">越相似分数越高！</span>`,
+
+  `<span class="blue">Softmax：</span><br>
+P(w_j) =<br>
+exp(z_j) / Σ exp(z_k)<br><br>
+将任意实数<br>映射到 (0,1)<br>且所有概率<br>之和为 1<br><br>
+<span class="highlight">北京</span>概率最高 ✅`,
+
+  `<span class="blue">交叉熵损失：</span><br>
+L = −log P(y|ctx)<br><br>
+y = 北京（真实词）<br><br>
+<span class="highlight">反向传播：</span><br>
+∂L/∂W_out → 更新输出向量<br>
+∂L/∂W_in → 更新词嵌入<br><br>
+<span class="green">迭代后语义近<br>的词聚在一起</span>`
+];
+
+// ===== Init =====
+function init() {
+  buildOneHotGrids();
+  buildWinMatrix();
+  buildExtractedVectors();
+  buildAvgVectors();
+  buildScoreScene();
+  buildSoftmaxScene();
+  updateUI();
+}
+
+function buildOneHotGrids() {
+  const indices = CTX_INDICES;
+  const colors = CTX_COLORS;
+  for (let w = 0; w < 4; w++) {
+    const grid = document.getElementById('oh' + w);
+    grid.innerHTML = '';
+    for (let i = 0; i < 10; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'onehot-cell';
+      cell.id = `oh${w}_${i}`;
+      cell.textContent = i === indices[w] ? '1' : '0';
+      cell.style.color = i === indices[w] ? colors[w] : '#30363d';
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function animateOneHot() {
+  const indices = CTX_INDICES;
+  const colors = CTX_COLORS;
+  for (let w = 0; w < 4; w++) {
+    const idx = indices[w];
+    const cell = document.getElementById(`oh${w}_${idx}`);
+    if (cell) {
+      setTimeout(() => {
+        cell.classList.add('lit');
+        cell.style.setProperty('--color', colors[w]);
+      }, w * 200);
+    }
+  }
+}
+
+function buildWinMatrix() {
+  const grid = document.getElementById('winMatrix');
+  grid.innerHTML = '';
+  for (let i = 0; i < 10; i++) {
+    const row = document.createElement('div');
+    row.className = 'matrix-row';
+    row.id = `wrow${i}`;
+    const rlabel = document.createElement('div');
+    rlabel.className = 'matrix-row-label';
+    rlabel.textContent = VOCAB[i] || `w${i}`;
+    row.appendChild(rlabel);
+    for (let j = 0; j < 3; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'matrix-cell';
+      cell.id = `wc${i}_${j}`;
+      cell.textContent = W_IN[i][j].toFixed(1);
+      row.appendChild(cell);
+    }
+    grid.appendChild(row);
+  }
+}
+
+function animateWin() {
+  const indices = CTX_INDICES;
+  const colors = CTX_COLORS;
+  indices.forEach((idx, wi) => {
+    setTimeout(() => {
+      const row = document.getElementById(`wrow${idx}`);
+      if (row) row.classList.add('highlighted');
+      for (let j = 0; j < 3; j++) {
+        const cell = document.getElementById(`wc${idx}_${j}`);
+        if (cell) {
+          cell.classList.add('active');
+          cell.style.setProperty('--color', colors[wi]);
+        }
+      }
+      // show vector
+      const vr = document.getElementById(`evec${wi}`);
+      if (vr) vr.classList.add('show');
+    }, wi * 300);
+  });
+}
+
+function buildExtractedVectors() {
+  const container = document.getElementById('extractedVectors');
+  const indices = CTX_INDICES;
+  const colors = CTX_COLORS;
+  for (let wi = 0; wi < 4; wi++) {
+    const row = document.createElement('div');
+    row.className = 'vector-row';
+    row.id = `evec${wi}`;
+
+    const lbl = document.createElement('div');
+    lbl.className = 'vector-label';
+    lbl.textContent = CTX_WORDS[wi];
+    lbl.style.background = colors[wi] + '22';
+    lbl.style.color = colors[wi];
+    lbl.style.border = `1px solid ${colors[wi]}`;
+    row.appendChild(lbl);
+
+    const cells = document.createElement('div');
+    cells.className = 'vector-cells';
+    for (let j = 0; j < 3; j++) {
+      const c = document.createElement('div');
+      c.className = 'vector-cell';
+      c.textContent = W_IN[indices[wi]][j].toFixed(1);
+      c.style.background = colors[wi] + '22';
+      c.style.borderColor = colors[wi];
+      c.style.color = colors[wi];
+      cells.appendChild(c);
+    }
+    row.appendChild(cells);
+    container.appendChild(row);
+  }
+}
+
+function buildAvgVectors() {
+  const container = document.getElementById('avgVectors');
+  const indices = CTX_INDICES;
+  const colors = CTX_COLORS;
+  container.innerHTML = '';
+  for (let wi = 0; wi < 4; wi++) {
+    const block = document.createElement('div');
+    block.className = 'avg-vec-block';
+    block.id = `avb${wi}`;
+
+    const lbl = document.createElement('div');
+    lbl.className = 'vlabel';
+    lbl.textContent = `v_${CTX_WORDS[wi]}`;
+    lbl.style.background = colors[wi] + '22';
+    lbl.style.color = colors[wi];
+    lbl.style.border = `1px solid ${colors[wi]}`;
+    block.appendChild(lbl);
+
+    const vals = document.createElement('div');
+    vals.className = 'avg-vec-vals';
+    for (let j = 0; j < 3; j++) {
+      const v = document.createElement('div');
+      v.className = 'avg-val';
+      v.textContent = W_IN[indices[wi]][j].toFixed(2);
+      v.style.background = colors[wi] + '22';
+      v.style.borderColor = colors[wi];
+      v.style.color = colors[wi];
+      vals.appendChild(v);
+    }
+    block.appendChild(vals);
+    container.appendChild(block);
+  }
+
+  // h vals
+  const hc = document.getElementById('hVals');
+  hc.innerHTML = '';
+  H.forEach(v => {
+    const c = document.createElement('div');
+    c.className = 'h-val';
+    c.textContent = v;
+    hc.appendChild(c);
+  });
+}
+
+function animateAvg() {
+  for (let wi = 0; wi < 4; wi++) {
+    setTimeout(() => {
+      document.getElementById(`avb${wi}`).classList.add('show');
+    }, wi * 250);
+  }
+  setTimeout(() => {
+    document.getElementById('avgArrow').classList.add('show');
+  }, 1100);
+  setTimeout(() => {
+    document.getElementById('hVectorBlock').classList.add('show');
+  }, 1500);
+}
+
+function buildScoreScene() {
+  // H display
+  const scoreH = document.getElementById('scoreH');
+  scoreH.innerHTML = '';
+  H.forEach(v => {
+    const c = document.createElement('div');
+    c.className = 'h-vd-cell';
+    c.textContent = v;
+    scoreH.appendChild(c);
+  });
+
+  // W_out grid
+  const woutGrid = document.getElementById('woutGrid');
+  woutGrid.innerHTML = '';
+  for (let i = 0; i < 10; i++) {
+    const row = document.createElement('div');
+    row.className = 'wout-row';
+    row.id = `wor${i}`;
+    const lbl = document.createElement('div');
+    lbl.className = 'wout-label';
+    lbl.textContent = VOCAB[i] || `w${i}`;
+    row.appendChild(lbl);
+    for (let j = 0; j < 3; j++) {
+      const c = document.createElement('div');
+      c.className = 'wout-cell';
+      c.textContent = W_OUT[i][j].toFixed(1);
+      row.appendChild(c);
+    }
+    woutGrid.appendChild(row);
+  }
+
+  // Score bars
+  const scoreBars = document.getElementById('scoreBars');
+  scoreBars.innerHTML = '';
+  const maxS = Math.max(...SCORES);
+  const minS = Math.min(...SCORES);
+  const range = maxS - minS || 1;
+  for (let i = 0; i < 10; i++) {
+    const item = document.createElement('div');
+    item.className = 'score-bar-item';
+    item.id = `sb${i}`;
+    const pct = ((SCORES[i] - minS) / range * 100).toFixed(0);
+    const isTarget = i === 2;
+    item.innerHTML = `
+      <div class="score-word">${VOCAB[i]}</div>
+      <div class="score-bar-wrap">
+        <div class="score-bar-fill" id="sbf${i}" style="width:0%;background:${isTarget ? 'linear-gradient(90deg,#bc8cff,#ff7b72)' : '#1f6feb44'};"></div>
+      </div>
+      <div class="score-val">${SCORES[i].toFixed(3)}</div>`;
+    scoreBars.appendChild(item);
+  }
+}
+
+function animateScores() {
+  // Highlight W_out row 2 (北京)
+  setTimeout(() => {
+    const row = document.getElementById('wor2');
+    if (row) {
+      row.querySelectorAll('.wout-cell').forEach(c => c.classList.add('highlight-row'));
+    }
+  }, 300);
+
+  const maxS = Math.max(...SCORES);
+  const minS = Math.min(...SCORES);
+  const range = maxS - minS || 1;
+  for (let i = 0; i < 10; i++) {
+    const pct = ((SCORES[i] - minS) / range * 100).toFixed(0);
+    setTimeout(() => {
+      document.getElementById(`sb${i}`).classList.add('show');
+      setTimeout(() => {
+        const fill = document.getElementById(`sbf${i}`);
+        if (fill) fill.style.width = pct + '%';
+      }, 50);
+    }, 200 + i * 100);
+  }
+}
+
+function buildSoftmaxScene() {
+  const probBars = document.getElementById('probBars');
+  probBars.innerHTML = '';
+  const maxP = Math.max(...PROBS);
+  for (let i = 0; i < 10; i++) {
+    const isTarget = i === 2;
+    const pct = (PROBS[i] / maxP * 100).toFixed(0);
+    const item = document.createElement('div');
+    item.className = 'prob-bar-item';
+    item.innerHTML = `
+      <div class="prob-word" style="color:${isTarget ? '#bc8cff' : '#8b949e'}">${VOCAB[i]}</div>
+      <div class="prob-bar-wrap">
+        <div class="prob-bar-fill ${isTarget ? 'target' : 'other'}" id="pbf${i}" style="width:0%">
+          ${PROBS[i] > 0.08 ? VOCAB[i] : ''}
+        </div>
+      </div>
+      <div class="prob-val">${(PROBS[i]*100).toFixed(1)}%</div>`;
+    probBars.appendChild(item);
+  }
+}
+
+function animateSoftmax() {
+  const maxP = Math.max(...PROBS);
+  setTimeout(() => {
+    for (let i = 0; i < 10; i++) {
+      const pct = (PROBS[i] / maxP * 100).toFixed(0);
+      const fill = document.getElementById(`pbf${i}`);
+      if (fill) fill.style.width = pct + '%';
+    }
+  }, 200);
+}
+
+function animateLoss() {
+  ['ls1','ls2','ls3','ls4'].forEach((id, idx) => {
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('show');
+    }, idx * 400 + 200);
+  });
+  setTimeout(() => {
+    const el = document.getElementById('backpropNote');
+    if (el) el.classList.add('show');
+  }, 2200);
+}
+
+// ===== Navigation =====
+function updateUI() {
+  // Update step list
+  document.querySelectorAll('.step-item').forEach((item, idx) => {
+    const s = idx + 1;
+    item.className = 'step-item';
+    if (s < currentStep) item.classList.add('done');
+    else if (s === currentStep) item.classList.add('active');
+    else item.classList.add('pending');
+  });
+
+  // Update scenes
+  document.querySelectorAll('.scene').forEach((sc, idx) => {
+    sc.classList.toggle('active', idx + 1 === currentStep);
+  });
+
+  // Update progress
+  document.getElementById('progressText').textContent = `步骤 ${currentStep} / ${TOTAL_STEPS}`;
+  document.getElementById('progressBar').style.width = (currentStep / TOTAL_STEPS * 100) + '%';
+
+  // Buttons
+  document.getElementById('btnPrev').disabled = currentStep <= 1;
+  document.getElementById('btnNext').disabled = currentStep >= TOTAL_STEPS;
+  document.getElementById('btnNext').textContent = currentStep >= TOTAL_STEPS ? '完成 ✓' : '下一步 →';
+
+  // Formula
+  if (currentStep > 0) {
+    document.getElementById('stepFormula').innerHTML = stepFormulas[currentStep];
+  }
+
+  // Run step animations
+  runStepAnimation(currentStep);
+}
+
+function runStepAnimation(step) {
+  if (step === 1) {
+    // Highlight context words
+    setTimeout(() => {
+      document.getElementById('w_wo').className = 'word-chip context-left';
+      document.getElementById('w_ai').className = 'word-chip context-left';
+      document.getElementById('w_tam').className = 'word-chip context-right';
+      document.getElementById('w_sq').className = 'word-chip context-right';
+    }, 200);
+  }
+  if (step === 2) animateOneHot();
+  if (step === 3) setTimeout(animateWin, 300);
+  if (step === 4) setTimeout(animateAvg, 200);
+  if (step === 5) setTimeout(animateScores, 400);
+  if (step === 6) setTimeout(animateSoftmax, 300);
+  if (step === 7) setTimeout(animateLoss, 200);
+}
+
+function nextStep() {
+  if (currentStep < TOTAL_STEPS) {
+    currentStep++;
+    updateUI();
+  }
+}
+
+function prevStep() {
+  if (currentStep > 1) {
+    currentStep--;
+    updateUI();
+  } else if (currentStep === 1) {
+    currentStep = 0;
+    // Reset sentence
+    document.getElementById('w_wo').className = 'word-chip normal';
+    document.getElementById('w_ai').className = 'word-chip normal';
+    document.getElementById('w_tam').className = 'word-chip normal';
+    document.getElementById('w_sq').className = 'word-chip normal';
+    updateUI();
+  }
+}
+
+// Reset animations when going back
+const originalUpdateUI = updateUI;
+
+// ===== Start =====
+window.addEventListener('DOMContentLoaded', () => {
+  init();
+  currentStep = 1;
+  updateUI();
+});
+</script>
+</body>
+</html>

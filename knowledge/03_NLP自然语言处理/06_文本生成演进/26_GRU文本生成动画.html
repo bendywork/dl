@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRU 文本生成动画</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+.container { max-width: 960px; margin: 0 auto; padding: 30px 20px; }
+h1 { text-align: center; font-size: 1.8em; margin-bottom: 8px; color: #60a5fa; }
+.subtitle { text-align: center; color: #94a3b8; margin-bottom: 25px; }
+
+/* 对比区 */
+.compare { display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
+.compare-col { flex: 1; min-width: 380px; background: #1e293b; border-radius: 14px; border: 2px solid #334155; padding: 18px; transition: all 0.4s; }
+.compare-col.lstm-col { border-color: #a855f7; }
+.compare-col.gru-col { border-color: #34d399; }
+.col-title { text-align: center; font-size: 1.1em; font-weight: bold; margin-bottom: 12px; }
+.col-title.lstm { color: #a855f7; }
+.col-title.gru { color: #34d399; }
+
+/* 门组件 */
+.gate-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+.mini-gate { width: 100px; padding: 10px 6px; border-radius: 8px; text-align: center; transition: all 0.5s; opacity: 0.35; border: 2px solid transparent; }
+.mini-gate.active { opacity: 1; }
+.mini-gate .g-icon { font-size: 1.3em; }
+.mini-gate .g-name { font-size: 0.72em; font-weight: bold; margin-top: 2px; }
+.mini-gate .g-val { font-size: 0.7em; color: #94a3b8; margin-top: 2px; font-family: monospace; }
+.g-forget { background: rgba(239,68,68,0.15); border-color: #ef4444; }
+.g-forget.active { box-shadow: 0 0 12px rgba(239,68,68,0.3); }
+.g-input { background: rgba(59,130,246,0.15); border-color: #3b82f6; }
+.g-input.active { box-shadow: 0 0 12px rgba(59,130,246,0.3); }
+.g-output { background: rgba(52,211,153,0.15); border-color: #34d399; }
+.g-output.active { box-shadow: 0 0 12px rgba(52,211,153,0.3); }
+.g-reset { background: rgba(245,158,11,0.15); border-color: #f59e0b; }
+.g-reset.active { box-shadow: 0 0 12px rgba(245,158,11,0.3); }
+.g-update { background: rgba(168,85,247,0.15); border-color: #a855f7; }
+.g-update.active { box-shadow: 0 0 12px rgba(168,85,247,0.3); }
+
+/* 状态更新公式 */
+.state-update { background: #0f172a; border-radius: 8px; padding: 12px; margin: 10px 0; font-family: monospace; font-size: 0.8em; line-height: 1.8; transition: all 0.4s; }
+.state-update .highlight { font-weight: bold; }
+.hl-f { color: #ef4444; }
+.hl-i { color: #3b82f6; }
+.hl-o { color: #34d399; }
+.hl-r { color: #f59e0b; }
+.hl-z { color: #a855f7; }
+
+/* 参数量对比 */
+.param-bar { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.param-label { width: 60px; font-size: 0.8em; color: #94a3b8; text-align: right; }
+.param-track { flex: 1; height: 24px; background: #334155; border-radius: 6px; overflow: hidden; }
+.param-fill { height: 100%; border-radius: 6px; transition: width 1s; display: flex; align-items: center; padding-left: 8px; font-size: 0.7em; font-weight: bold; color: white; }
+
+/* 控制按钮 */
+.controls { display: flex; gap: 12px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
+.btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 0.95em; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+.btn-primary { background: #34d399; color: #0f172a; }
+.btn-primary:hover { background: #059669; }
+.btn-secondary { background: #64748b; color: white; }
+
+/* 步骤说明 */
+.step-info { text-align: center; margin: 10px 0; min-height: 40px; }
+.step-info .panel { background: #1e293b; padding: 10px 18px; border-radius: 8px; border-left: 3px solid #34d399; display: inline-block; font-size: 0.85em; }
+
+.info-box { background: #1e293b; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 3px solid #34d399; }
+.info-box h4 { color: #34d399; margin-bottom: 8px; }
+
+.mapping-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.8em; }
+.mapping-table th { background: #334155; padding: 8px; text-align: center; }
+.mapping-table td { padding: 8px; text-align: center; border-bottom: 1px solid #334155; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>⚡ GRU 文本生成动画</h1>
+<p class="subtitle">LSTM 的精简版：两门合一状态，参数更少、速度更快</p>
+
+<div class="controls">
+  <button class="btn btn-primary" onclick="nextStep()">⏭ 下一步</button>
+  <button class="btn btn-primary" onclick="autoPlay()" id="btnAuto" style="background:#3b82f6;color:white">▶ 自动</button>
+  <button class="btn btn-secondary" onclick="resetAll()">↻ 重置</button>
+</div>
+
+<div class="step-info" id="stepInfo">
+  <div class="panel">点击「下一步」，逐步观察 LSTM → GRU 的对应关系</div>
+</div>
+
+<!-- LSTM vs GRU 对比 -->
+<div class="compare">
+  <!-- LSTM -->
+  <div class="compare-col lstm-col">
+    <div class="col-title lstm">LSTM：3 门 + 2 状态</div>
+    <div class="gate-row">
+      <div class="mini-gate g-forget" id="lForget">
+        <div class="g-icon">🗑️</div>
+        <div class="g-name">遗忘门 f<sub>t</sub></div>
+        <div class="g-val" id="lfVal">—</div>
+      </div>
+      <div class="mini-gate g-input" id="lInput">
+        <div class="g-icon">✏️</div>
+        <div class="g-name">输入门 i<sub>t</sub></div>
+        <div class="g-val" id="liVal">—</div>
+      </div>
+      <div class="mini-gate g-output" id="lOutput">
+        <div class="g-icon">📢</div>
+        <div class="g-name">输出门 o<sub>t</sub></div>
+        <div class="g-val" id="loVal">—</div>
+      </div>
+    </div>
+    <div class="state-update" id="lFormula">
+      <span class="hl-f highlight">f<sub>t</sub></span> = σ(W<sub>f</sub>·[h,x]+b<sub>f</sub>)<br>
+      <span class="hl-i highlight">i<sub>t</sub></span> = σ(W<sub>i</sub>·[h,x]+b<sub>i</sub>)<br>
+      <span class="hl-o highlight">o<sub>t</sub></span> = σ(W<sub>o</sub>·[h,x]+b<sub>o</sub>)<br>
+      C<sub>t</sub> = <span class="hl-f">f<sub>t</sub></span>⊙C<sub>t-1</sub> + <span class="hl-i">i<sub>t</sub></span>⊙C̃<sub>t</sub><br>
+      h<sub>t</sub> = <span class="hl-o">o<sub>t</sub></span>⊙tanh(C<sub>t</sub>)
+    </div>
+  </div>
+
+  <!-- GRU -->
+  <div class="compare-col gru-col">
+    <div class="col-title gru">GRU：2 门 + 1 状态</div>
+    <div class="gate-row">
+      <div class="mini-gate g-reset" id="gReset">
+        <div class="g-icon">🔄</div>
+        <div class="g-name">重置门 r<sub>t</sub></div>
+        <div class="g-val" id="grVal">—</div>
+      </div>
+      <div class="mini-gate g-update" id="gUpdate">
+        <div class="g-icon">🔀</div>
+        <div class="g-name">更新门 z<sub>t</sub></div>
+        <div class="g-val" id="gzVal">—</div>
+      </div>
+    </div>
+    <div class="state-update" id="gFormula">
+      <span class="hl-r highlight">r<sub>t</sub></span> = σ(W<sub>r</sub>·[h,x]+b<sub>r</sub>)<br>
+      <span class="hl-z highlight">z<sub>t</sub></span> = σ(W<sub>z</sub>·[h,x]+b<sub>z</sub>)<br>
+      h̃<sub>t</sub> = tanh(W·[<span class="hl-r">r<sub>t</sub></span>⊙h<sub>t-1</sub>, x<sub>t</sub>])<br>
+      h<sub>t</sub> = <span class="hl-z">z<sub>t</sub></span>⊙h<sub>t-1</sub> + (<span class="hl-z">1-z<sub>t</sub></span>)⊙h̃<sub>t</sub>
+    </div>
+  </div>
+</div>
+
+<!-- LSTM → GRU 映射表 -->
+<div class="info-box">
+  <h4>🔑 LSTM → GRU 的关键映射</h4>
+  <table class="mapping-table">
+    <tr><th>LSTM</th><th>GRU</th><th>关系</th></tr>
+    <tr><td style="color:#ef4444">遗忘门 f<sub>t</sub></td><td style="color:#a855f7">更新门 z<sub>t</sub></td><td>z<sub>t</sub> ≈ f<sub>t</sub>：控制保留旧信息</td></tr>
+    <tr><td style="color:#3b82f6">输入门 i<sub>t</sub></td><td style="color:#a855f7">1 - z<sub>t</sub></td><td>保留+写入强制互补：z + (1-z) = 1</td></tr>
+    <tr><td style="color:#34d399">输出门 o<sub>t</sub></td><td style="color:#94a3b8">无对应</td><td>GRU 去掉了输出门，h<sub>t</sub> 直接暴露</td></tr>
+    <tr><td style="color:#d8b4fe">C<sub>t</sub> + h<sub>t</sub></td><td style="color:#6ee7b7">h<sub>t</sub></td><td>GRU 合二为一</td></tr>
+  </table>
+</div>
+
+<!-- 参数量对比 -->
+<div style="background:#1e293b;padding:18px;border-radius:12px;margin:15px 0;border:1px solid #334155">
+  <div style="text-align:center;margin-bottom:12px;color:#94a3b8;font-size:0.9em">参数量对比（隐藏维度 d=256，嵌入维度=256）</div>
+  <div class="param-bar">
+    <div class="param-label">LSTM</div>
+    <div class="param-track">
+      <div class="param-fill" id="lstmBar" style="width:0%;background:linear-gradient(90deg,#a855f7,#7c3aed)">4 × (256² + 256×256) ≈ 524K</div>
+    </div>
+  </div>
+  <div class="param-bar">
+    <div class="param-label">GRU</div>
+    <div class="param-track">
+      <div class="param-fill" id="gruBar" style="width:0%;background:linear-gradient(90deg,#34d399,#059669)">3 × (256² + 256×256) ≈ 393K</div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:8px;color:#f59e0b;font-size:0.85em">GRU 参数量 ≈ LSTM 的 75%，节省约 25%</div>
+</div>
+
+</div>
+
+<script>
+const steps = [
+  { token: '看遗忘门/更新门', lf: 0.8, gz: 0.75, desc: 'LSTM 的遗忘门 f=0.8 → GRU 的更新门 z=0.75，功能对应：控制保留多少旧信息' },
+  { token: '看输入门/(1-z)', li: 0.6, gz: 0.75, desc: 'LSTM 的输入门 i=0.6 → GRU 用 (1-z)=0.25，注意：LSTM 的 f+i 不一定为1，GRU 的 z+(1-z) 必然为1' },
+  { token: '看重置门', gr: 0.3, desc: '重置门 r=0.3：大幅忽略旧隐藏状态，"从零开始"计算候选——这是 GRU 独有的，LSTM 没有对应' },
+  { token: '看输出门', lo: 0.7, desc: 'LSTM 有输出门 o=0.7 控制暴露多少信息 → GRU 没有输出门，h_t 直接作为输出使用' },
+  { token: '总结区别', desc: 'GRU 用更少的门实现了接近 LSTM 的效果：更新门同时承担遗忘+输入的职责，重置门提供"选择性遗忘"的灵活性' },
+];
+
+let curStep = -1;
+let autoTimer = null;
+
+function nextStep() {
+  curStep++;
+  if (curStep >= steps.length) return;
+  const s = steps[curStep];
+
+  document.getElementById('stepInfo').innerHTML = `<div class="panel"><b>Step ${curStep+1}:</b> ${s.desc}</div>`;
+
+  // Reset gates
+  ['lForget','lInput','lOutput','gReset','gUpdate'].forEach(id => {
+    document.getElementById(id).classList.remove('active');
+  });
+
+  // Activate relevant gates per step
+  if (curStep === 0) {
+    document.getElementById('lForget').classList.add('active');
+    document.getElementById('gUpdate').classList.add('active');
+    document.getElementById('lfVal').textContent = `f=${s.lf}`;
+    document.getElementById('gzVal').textContent = `z=${s.gz}`;
+  } else if (curStep === 1) {
+    document.getElementById('lInput').classList.add('active');
+    document.getElementById('gUpdate').classList.add('active');
+    document.getElementById('liVal').textContent = `i=${s.li}`;
+    document.getElementById('gzVal').textContent = `z=${s.gz}, 1-z=${(1-s.gz).toFixed(2)}`;
+  } else if (curStep === 2) {
+    document.getElementById('gReset').classList.add('active');
+    document.getElementById('grVal').textContent = `r=${s.gr}`;
+  } else if (curStep === 3) {
+    document.getElementById('lOutput').classList.add('active');
+    document.getElementById('loVal').textContent = `o=${s.lo}`;
+  } else if (curStep === 4) {
+    // All gates active for summary
+    ['lForget','lInput','lOutput','gReset','gUpdate'].forEach(id => {
+      document.getElementById(id).classList.add('active');
+    });
+    // Animate param bars
+    setTimeout(() => {
+      document.getElementById('lstmBar').style.width = '100%';
+      document.getElementById('gruBar').style.width = '75%';
+    }, 200);
+  }
+}
+
+function autoPlay() {
+  const btn = document.getElementById('btnAuto');
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    btn.textContent = '▶ 自动';
+    return;
+  }
+  btn.textContent = '⏸ 暂停';
+  autoTimer = setInterval(() => {
+    if (curStep >= steps.length - 1) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+      btn.textContent = '▶ 自动';
+      return;
+    }
+    nextStep();
+  }, 2000);
+}
+
+function resetAll() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  document.getElementById('btnAuto').textContent = '▶ 自动';
+  curStep = -1;
+  ['lForget','lInput','lOutput','gReset','gUpdate'].forEach(id => {
+    document.getElementById(id).classList.remove('active');
+  });
+  ['lfVal','liVal','loVal','grVal','gzVal'].forEach(id => {
+    document.getElementById(id).textContent = '—';
+  });
+  document.getElementById('lstmBar').style.width = '0%';
+  document.getElementById('gruBar').style.width = '0%';
+  document.getElementById('stepInfo').innerHTML = '<div class="panel">点击「下一步」，逐步观察 LSTM → GRU 的对应关系</div>';
+}
+</script>
+</body>
+</html>

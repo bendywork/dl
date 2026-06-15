@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编码器-解码器分离 vs 一体化RNN 动画演示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .header {
+    text-align: center;
+    padding: 28px 20px 12px;
+    background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+    border-bottom: 1px solid #21262d;
+  }
+  .header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #58a6ff, #3fb950, #f0883e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  .header p { font-size: 14px; color: #8b949e; }
+  .main-container {
+    display: flex;
+    gap: 16px;
+    padding: 20px 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .panel {
+    flex: 1;
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .panel-title {
+    padding: 14px 18px;
+    font-size: 16px;
+    font-weight: 600;
+    border-bottom: 1px solid #21262d;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-title .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  .badge-s2s { background: #1f3a5f; color: #58a6ff; }
+  .badge-tag { background: #1a3a2a; color: #3fb950; }
+  .panel-title.seq2seq { color: #58a6ff; }
+  .panel-title.tagging { color: #3fb950; }
+  .canvas-wrap {
+    padding: 12px;
+    display: flex;
+    justify-content: center;
+  }
+  canvas { border-radius: 8px; display: block; }
+  .desc-bar {
+    padding: 10px 18px 14px;
+    min-height: 60px;
+    border-top: 1px solid #21262d;
+  }
+  .desc-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #8b949e;
+    transition: color 0.3s;
+  }
+  .desc-text.active { color: #e6edf3; }
+  .desc-text .hl-blue { color: #58a6ff; font-weight: 600; }
+  .desc-text .hl-green { color: #3fb950; font-weight: 600; }
+  .desc-text .hl-orange { color: #f0883e; font-weight: 600; }
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 24px 8px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 8px 22px;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    background: #21262d;
+    color: #e6edf3;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .btn:hover { background: #30363d; border-color: #8b949e; }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: #238636; border-color: #238636; color: #fff; }
+  .btn.primary:hover { background: #2ea043; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .step-indicator {
+    text-align: center;
+    padding: 4px 0 16px;
+    font-size: 13px;
+    color: #8b949e;
+  }
+  .step-indicator span { color: #f0883e; font-weight: 600; }
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 0 24px 18px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #8b949e;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+  .dot-encode { background: #1f6feb; }
+  .dot-decode { background: #238636; }
+  .dot-context { background: #f0883e; }
+  .dot-hidden { background: #6e7681; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>编码器-解码器分离 vs 一体化 RNN</h1>
+  <p>Seq2Seq 架构与序列标注架构的核心区别动画演示</p>
+</div>
+
+<div class="main-container">
+  <!-- Left: Seq2Seq -->
+  <div class="panel">
+    <div class="panel-title seq2seq">
+      Seq2Seq（编码器-解码器分离）
+      <span class="badge badge-s2s">机器翻译</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="cvs-s2s" width="620" height="440"></canvas>
+    </div>
+    <div class="desc-bar">
+      <div class="desc-text" id="desc-s2s">点击「开始」按钮，观察编码器-解码器分离架构的数据流动过程</div>
+    </div>
+  </div>
+
+  <!-- Right: Sequence Tagging -->
+  <div class="panel">
+    <div class="panel-title tagging">
+      序列标注 RNN（编码解码一体化）
+      <span class="badge badge-tag">NER 命名实体识别</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="cvs-tag" width="620" height="440"></canvas>
+    </div>
+    <div class="desc-bar">
+      <div class="desc-text" id="desc-tag">点击「开始」按钮，观察编码解码一体化架构的数据流动过程</div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn primary" id="btn-start" onclick="startAnim()">开始</button>
+  <button class="btn" id="btn-pause" onclick="pauseAnim()" disabled>暂停</button>
+  <button class="btn" id="btn-step" onclick="stepAnim()">单步</button>
+  <button class="btn" id="btn-reset" onclick="resetAnim()">重置</button>
+</div>
+
+<div class="step-indicator">
+  当前步骤：<span id="step-num">0</span> / <span id="step-total">11</span>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot dot-encode"></div>编码阶段</div>
+  <div class="legend-item"><div class="legend-dot dot-decode"></div>解码阶段</div>
+  <div class="legend-item"><div class="legend-dot dot-context"></div>上下文向量 c</div>
+  <div class="legend-item"><div class="legend-dot dot-hidden"></div>隐状态 h</div>
+</div>
+
+<script>
+// ===================== CONFIG =====================
+const STEP_DURATION = 900; // ms per step
+const LERP_SPEED = 0.08;
+
+// Seq2Seq data
+const S2S_INPUTS  = ['我', '爱', '北京'];
+const S2S_OUTPUTS = ['I', 'love', 'Beijing'];
+
+// Tagging data
+const TAG_INPUTS  = ['我', '爱', '北京'];
+const TAG_OUTPUTS = ['O', 'O', 'B-LOC'];
+
+// ===================== STEPS =====================
+// Step definitions for both panels
+const STEPS = [
+  { phase: 'init',      s2sDesc: '准备就绪：编码器和解码器等待数据输入',       tagDesc: '准备就绪：RNN 等待数据输入' },
+  { phase: 'enc-1',     s2sDesc: '<span class="hl-blue">编码器</span>正在读取输入「我」，构建隐状态 h₁',  tagDesc: '<span class="hl-blue">编码</span>：吸收「我」→ 隐状态 h₁　<span class="hl-green">解码</span>：用 h₁ 预测标签 <span class="hl-green">O</span>　<span class="hl-orange">同时进行！</span>' },
+  { phase: 'enc-2',     s2sDesc: '<span class="hl-blue">编码器</span>正在读取输入「爱」，隐状态 h₁ → h₂',  tagDesc: '<span class="hl-blue">编码</span>：吸收「爱」→ 隐状态 h₂　<span class="hl-green">解码</span>：用 h₂ 预测标签 <span class="hl-green">O</span>　<span class="hl-orange">同时进行！</span>' },
+  { phase: 'enc-3',     s2sDesc: '<span class="hl-blue">编码器</span>正在读取输入「北京」，隐状态 h₂ → h₃ = <span class="hl-orange">上下文向量 c</span>', tagDesc: '<span class="hl-blue">编码</span>：吸收「北京」→ 隐状态 h₃　<span class="hl-green">解码</span>：用 h₃ 预测标签 <span class="hl-green">B-LOC</span>　<span class="hl-orange">同时进行！</span>' },
+  { phase: 'transfer',  s2sDesc: '编码完成！<span class="hl-orange">上下文向量 c</span> 传递给解码器，作为解码的起始信息', tagDesc: '（对照左侧）此处无需单独的上下文向量传递步骤——每个时间步已实时完成编码+解码' },
+  { phase: 'dec-1',     s2sDesc: '<span class="hl-green">解码器</span>基于 c 生成输出「I」，隐状态 s₁',  tagDesc: '全部处理已完成，无需额外解码步骤' },
+  { phase: 'dec-2',     s2sDesc: '<span class="hl-green">解码器</span>基于 s₁ 生成输出「love」，隐状态 s₂',  tagDesc: '全部处理已完成，无需额外解码步骤' },
+  { phase: 'dec-3',     s2sDesc: '<span class="hl-green">解码器</span>基于 s₂ 生成输出「Beijing」，翻译完成！', tagDesc: '全部处理已完成，无需额外解码步骤' },
+  { phase: 'summary-1', s2sDesc: 'Seq2Seq 特点：<span class="hl-blue">先读完所有输入</span>，<span class="hl-orange">压缩为 c</span>，<span class="hl-green">再逐个生成输出</span>', tagDesc: '序列标注特点：<span class="hl-blue">编码</span>和<span class="hl-green">解码</span>交织，<span class="hl-orange">边读边输出</span>，一步到位' },
+  { phase: 'summary-2', s2sDesc: '优点：可处理输入输出长度不等的情况　缺点：c 是信息瓶颈，长序列信息易丢失', tagDesc: '优点：每步利用完整上下文，无信息瓶颈　缺点：输出长度必须等于输入长度' },
+  { phase: 'summary-3', s2sDesc: '典型场景：机器翻译、文本摘要、对话生成', tagDesc: '典型场景：命名实体识别、词性标注、分词' },
+];
+
+// ===================== CANVAS SETUP =====================
+const cvsS2S = document.getElementById('cvs-s2s');
+const ctxS2S = cvsS2S.getContext('2d');
+const cvsTag = document.getElementById('cvs-tag');
+const ctxTag = cvsTag.getContext('2d');
+
+const descS2S = document.getElementById('desc-s2s');
+const descTag = document.getElementById('desc-tag');
+const stepNum = document.getElementById('step-num');
+const stepTotal = document.getElementById('step-total');
+const btnStart = document.getElementById('btn-start');
+const btnPause = document.getElementById('btn-pause');
+
+stepTotal.textContent = STEPS.length - 1;
+
+// ===================== STATE =====================
+let currentStep = 0;
+let playing = false;
+let stepTimer = null;
+let animProgress = {}; // for smooth transitions
+
+// ===================== DRAWING HELPERS =====================
+function drawRoundRect(ctx, x, y, w, h, r, fill, stroke, lw) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1.5; ctx.stroke(); }
+}
+
+function drawCircle(ctx, x, y, r, fill, stroke, lw) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1.5; ctx.stroke(); }
+}
+
+function drawText(ctx, text, x, y, color, size, align, weight) {
+  ctx.fillStyle = color || '#e6edf3';
+  ctx.font = (weight || '600') + ' ' + (size || 14) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.textAlign = align || 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color, lw, dashed) {
+  ctx.save();
+  ctx.strokeStyle = color || '#8b949e';
+  ctx.lineWidth = lw || 2;
+  if (dashed) ctx.setLineDash([6, 4]);
+  else ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  // arrowhead
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const headLen = 8;
+  ctx.setLineDash([]);
+  ctx.fillStyle = color || '#8b949e';
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - headLen * Math.cos(angle - 0.4), y2 - headLen * Math.sin(angle - 0.4));
+  ctx.lineTo(x2 - headLen * Math.cos(angle + 0.4), y2 - headLen * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function pulseAlpha(t) {
+  return 0.5 + 0.5 * Math.sin(t * 0.005);
+}
+
+// ===================== SEQ2SEQ DRAWING =====================
+function drawSeq2Seq(step, time) {
+  const ctx = ctxS2S;
+  const W = cvsS2S.width, H = cvsS2S.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // background
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  // Layout constants
+  const encY = 130;
+  const decY = 310;
+  const nodeW = 80, nodeH = 44, nodeR = 10;
+  const hR = 22;
+  const xPositions = [120, 260, 400];
+  const ctxVecX = 530;
+
+  // ---- Section Labels ----
+  drawText(ctx, '编码器', 260, 40, '#58a6ff', 15, 'center', '700');
+  drawText(ctx, '解码器', 260, 220, '#3fb950', 15, 'center', '700');
+
+  // ---- Divider line ----
+  ctx.save();
+  ctx.strokeStyle = '#21262d';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath();
+  ctx.moveTo(30, 178);
+  ctx.lineTo(590, 178);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // ---- Encoder input tokens ----
+  for (let i = 0; i < 3; i++) {
+    const x = xPositions[i];
+    const active = step >= 1 + i;
+    const fill = active ? '#1f3a5f' : '#161b22';
+    const stroke = active ? '#58a6ff' : '#30363d';
+    const txtColor = active ? '#58a6ff' : '#484f58';
+    drawRoundRect(ctx, x - nodeW / 2, encY - nodeH / 2 - 56, nodeW, nodeH, nodeR, fill, stroke, 2);
+    drawText(ctx, S2S_INPUTS[i], x, encY - 56, txtColor, 16, 'center', '700');
+
+    // input arrow to encoder node
+    if (active) {
+      drawArrow(ctx, x, encY - 56 + nodeH / 2, x, encY - hR - 4, '#58a6ff', 2);
+    }
+  }
+
+  // ---- Encoder hidden states ----
+  for (let i = 0; i < 3; i++) {
+    const x = xPositions[i];
+    const active = step >= 1 + i;
+    const hFill = active ? '#1f3a5f' : '#161b22';
+    const hStroke = active ? '#58a6ff' : '#30363d';
+    const hText = active ? '#c9d1d9' : '#484f58';
+    drawCircle(ctx, x, encY, hR, hFill, hStroke, 2);
+    drawText(ctx, 'h' + subscript(i + 1), x, encY, hText, 14, 'center', '600');
+
+    // arrow between hidden states
+    if (i > 0 && step >= 1 + i) {
+      drawArrow(ctx, xPositions[i - 1] + hR + 4, encY, x - hR - 4, encY, '#58a6ff', 2);
+    }
+  }
+
+  // ---- Encoder label ----
+  drawText(ctx, 'RNN', 260, encY + 42, '#3d4450', 11, 'center', '400');
+
+  // ---- Context vector c ----
+  const cActive = step >= 4;
+  const cFill = cActive ? '#4a2800' : '#161b22';
+  const cStroke = cActive ? '#f0883e' : '#30363d';
+  const cText = cActive ? '#f0883e' : '#484f58';
+  const cPulse = cActive ? 0.6 + 0.4 * Math.sin(time * 0.006) : 1;
+
+  // draw context vector between encoder and decoder
+  const cX = ctxVecX;
+  const cMidY = 178;
+
+  // vertical arrow from encoder h3 to context vector
+  if (cActive) {
+    // h3 → c (down)
+    const fromX = xPositions[2];
+    drawArrow(ctx, fromX + hR + 4, encY, cX - 26, cMidY, '#f0883e', 2.5);
+  }
+
+  drawRoundRect(ctx, cX - 26, cMidY - 18, 52, 36, 8,
+    cActive ? `rgba(240,136,62,${cPulse * 0.25})` : '#161b22',
+    cStroke, 2.5);
+  drawText(ctx, 'c', cX, cMidY, cText, 18, 'center', '700');
+
+  // c → decoder arrow
+  if (step >= 5) {
+    drawArrow(ctx, cX - 26, cMidY + 18, xPositions[0] + hR + 4, decY, '#f0883e', 2.5);
+  }
+
+  // ---- Decoder hidden states ----
+  for (let i = 0; i < 3; i++) {
+    const x = xPositions[i];
+    const active = step >= 5 + i;
+    const hFill = active ? '#1a3a2a' : '#161b22';
+    const hStroke = active ? '#3fb950' : '#30363d';
+    const hText = active ? '#c9d1d9' : '#484f58';
+    drawCircle(ctx, x, decY, hR, hFill, hStroke, 2);
+    drawText(ctx, 's' + subscript(i + 1), x, decY, hText, 14, 'center', '600');
+
+    // arrow between decoder hidden states
+    if (i > 0 && step >= 5 + i) {
+      drawArrow(ctx, xPositions[i - 1] + hR + 4, decY, x - hR - 4, decY, '#3fb950', 2);
+    }
+
+    // decoder output
+    if (active) {
+      drawArrow(ctx, x, decY + hR + 4, x, decY + 56 - nodeH / 2, '#3fb950', 2);
+      drawRoundRect(ctx, x - nodeW / 2, decY + 56 - nodeH / 2 + 4, nodeW, nodeH, nodeR, '#1a3a2a', '#3fb950', 2);
+      drawText(ctx, S2S_OUTPUTS[i], x, decY + 56 + 4 + nodeH / 2 - nodeH / 2, '#3fb950', 15, 'center', '700');
+    }
+  }
+
+  // ---- Decoder label ----
+  drawText(ctx, 'RNN', 260, decY + 42, '#3d4450', 11, 'center', '400');
+
+  // ---- Phase indicator ----
+  let phaseText = '';
+  let phaseColor = '#8b949e';
+  if (step >= 1 && step <= 3) { phaseText = '编码阶段'; phaseColor = '#58a6ff'; }
+  else if (step === 4) { phaseText = '上下文传递'; phaseColor = '#f0883e'; }
+  else if (step >= 5 && step <= 7) { phaseText = '解码阶段'; phaseColor = '#3fb950'; }
+  else if (step >= 8) { phaseText = '完成'; phaseColor = '#e6edf3'; }
+  if (phaseText) {
+    drawRoundRect(ctx, 20, H - 36, 90, 26, 6, 'rgba(0,0,0,0.4)', phaseColor, 1.5);
+    drawText(ctx, phaseText, 65, H - 23, phaseColor, 12, 'center', '700');
+  }
+
+  // ---- "先读完再生成" annotation ----
+  if (step >= 8) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (time % 10000) / 500);
+    drawText(ctx, '先读完所有输入，再逐个生成输出', 260, H - 10, '#8b949e', 11, 'center', '400');
+    ctx.restore();
+  }
+}
+
+// ===================== TAGGING DRAWING =====================
+function drawTagging(step, time) {
+  const ctx = ctxTag;
+  const W = cvsTag.width, H = cvsTag.height;
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  // Layout
+  const midY = 200;
+  const nodeW = 80, nodeH = 44, nodeR = 10;
+  const hR = 28;
+  const xPositions = [120, 260, 400];
+
+  // ---- Title ----
+  drawText(ctx, '一体化 RNN（编码 + 解码 同时进行）', 260, 40, '#8b949e', 13, 'center', '400');
+
+  // ---- For each time step ----
+  for (let i = 0; i < 3; i++) {
+    const x = xPositions[i];
+    const active = step >= 1 + i;
+
+    // Input token (top)
+    const inFill = active ? '#1f3a5f' : '#161b22';
+    const inStroke = active ? '#58a6ff' : '#30363d';
+    const inText = active ? '#58a6ff' : '#484f58';
+    drawRoundRect(ctx, x - nodeW / 2, midY - hR - 80, nodeW, nodeH, nodeR, inFill, inStroke, 2);
+    drawText(ctx, TAG_INPUTS[i], x, midY - hR - 58, inText, 16, 'center', '700');
+
+    // Input arrow
+    if (active) {
+      drawArrow(ctx, x, midY - hR - 80 + nodeH, x, midY - hR - 6, '#58a6ff', 2);
+    }
+
+    // Hidden state (center)
+    const hFill = active ? '#2a1f3d' : '#161b22';
+    const hStroke = active ? '#bc8cff' : '#30363d';
+    const hText = active ? '#e6edf3' : '#484f58';
+    drawCircle(ctx, x, midY, hR, hFill, hStroke, 2.5);
+    drawText(ctx, 'h' + subscript(i + 1), x, midY, hText, 14, 'center', '600');
+
+    // Arrow between hidden states
+    if (i > 0 && step >= 1 + i) {
+      drawArrow(ctx, xPositions[i - 1] + hR + 4, midY, x - hR - 4, midY, '#6e7681', 2);
+    }
+
+    // ---- Encoding label (left side of hidden state) ----
+    if (active) {
+      drawText(ctx, '编码', x - 18, midY + hR + 16, '#58a6ff', 10, 'center', '600');
+    }
+
+    // Output arrow
+    if (active) {
+      drawArrow(ctx, x, midY + hR + 6, x, midY + hR + 40, '#3fb950', 2);
+    }
+
+    // Output tag (bottom)
+    const outFill = active ? '#1a3a2a' : '#161b22';
+    const outStroke = active ? '#3fb950' : '#30363d';
+    const outText = active ? '#3fb950' : '#484f58';
+    drawRoundRect(ctx, x - nodeW / 2, midY + hR + 40, nodeW, nodeH, nodeR, outFill, outStroke, 2);
+    drawText(ctx, TAG_OUTPUTS[i], x, midY + hR + 62, outText, 14, 'center', '700');
+
+    // ---- Decoding label (right side of hidden state) ----
+    if (active) {
+      drawText(ctx, '解码', x + 18, midY + hR + 16, '#3fb950', 10, 'center', '600');
+    }
+
+    // ---- "同时" annotation ----
+    if (active && step < 8) {
+      const pulseA = 0.4 + 0.4 * Math.sin(time * 0.004 + i);
+      ctx.save();
+      ctx.globalAlpha = pulseA;
+      drawText(ctx, '同时', x, midY + hR + 104, '#f0883e', 11, 'center', '600');
+      ctx.restore();
+    }
+  }
+
+  // ---- RNN label ----
+  drawText(ctx, 'RNN', 260, midY - hR - 106, '#3d4450', 11, 'center', '400');
+
+  // ---- Phase indicator ----
+  let phaseText = '';
+  let phaseColor = '#8b949e';
+  if (step >= 1 && step <= 3) { phaseText = '编码+解码'; phaseColor = '#bc8cff'; }
+  else if (step >= 8) { phaseText = '完成'; phaseColor = '#e6edf3'; }
+  if (phaseText) {
+    drawRoundRect(ctx, 20, H - 36, 106, 26, 6, 'rgba(0,0,0,0.4)', phaseColor, 1.5);
+    drawText(ctx, phaseText, 73, H - 23, phaseColor, 12, 'center', '700');
+  }
+
+  // ---- "边读边输出" annotation ----
+  if (step >= 4 && step < 8) {
+    drawText(ctx, '（对照左侧）编码解码交织进行，无需等待全部输入读完', 260, H - 10, '#8b949e', 11, 'center', '400');
+  } else if (step >= 8) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (time % 10000) / 500);
+    drawText(ctx, '每个时间步：边编码边解码，一步到位', 260, H - 10, '#8b949e', 11, 'center', '400');
+    ctx.restore();
+  }
+
+  // ---- Comparison highlight: no context vector needed ----
+  if (step === 4) {
+    // Show a faded-out context vector placeholder with X
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    const cX = 540;
+    const cMidY = 200;
+    drawRoundRect(ctx, cX - 26, cMidY - 18, 52, 36, 8, '#161b22', '#484f58', 1);
+    drawText(ctx, 'c', cX, cMidY, '#484f58', 16, 'center', '400');
+    // X mark
+    ctx.globalAlpha = 0.5;
+    drawText(ctx, '✕', cX, cMidY - 30, '#f85149', 18, 'center', '700');
+    drawText(ctx, '无需此步骤', cX, cMidY + 30, '#f85149', 10, 'center', '400');
+    ctx.restore();
+  }
+}
+
+function subscript(n) {
+  const subs = ['₀','₁','₂','₃','₄','₅','₆','₇','₈','₉'];
+  return String(n).split('').map(d => subs[+d]).join('');
+}
+
+// ===================== ANIMATION LOOP =====================
+let animFrameId = null;
+let lastTime = 0;
+
+function renderLoop(time) {
+  drawSeq2Seq(currentStep, time);
+  drawTagging(currentStep, time);
+  animFrameId = requestAnimationFrame(renderLoop);
+}
+
+animFrameId = requestAnimationFrame(renderLoop);
+
+// ===================== CONTROLS =====================
+function updateUI() {
+  stepNum.textContent = currentStep;
+  const stepData = STEPS[currentStep];
+  if (stepData) {
+    descS2S.innerHTML = stepData.s2sDesc;
+    descS2S.classList.toggle('active', currentStep > 0);
+    descTag.innerHTML = stepData.tagDesc;
+    descTag.classList.toggle('active', currentStep > 0);
+  }
+  btnPause.disabled = !playing;
+}
+
+function startAnim() {
+  if (playing) return;
+  if (currentStep >= STEPS.length - 1) currentStep = 0;
+  playing = true;
+  btnStart.disabled = true;
+  btnPause.disabled = false;
+  updateUI();
+  autoAdvance();
+}
+
+function autoAdvance() {
+  if (!playing) return;
+  clearTimeout(stepTimer);
+  stepTimer = setTimeout(() => {
+    if (!playing) return;
+    if (currentStep < STEPS.length - 1) {
+      currentStep++;
+      updateUI();
+      autoAdvance();
+    } else {
+      playing = false;
+      btnStart.disabled = false;
+      btnPause.disabled = true;
+    }
+  }, STEP_DURATION);
+}
+
+function pauseAnim() {
+  playing = false;
+  clearTimeout(stepTimer);
+  btnStart.disabled = false;
+  btnPause.disabled = true;
+}
+
+function stepAnim() {
+  pauseAnim();
+  if (currentStep < STEPS.length - 1) {
+    currentStep++;
+    updateUI();
+  }
+}
+
+function resetAnim() {
+  pauseAnim();
+  currentStep = 0;
+  updateUI();
+  descS2S.innerHTML = '点击「开始」按钮，观察编码器-解码器分离架构的数据流动过程';
+  descS2S.classList.remove('active');
+  descTag.innerHTML = '点击「开始」按钮，观察编码解码一体化架构的数据流动过程';
+  descTag.classList.remove('active');
+}
+
+updateUI();
+</script>
+</body>
+</html>

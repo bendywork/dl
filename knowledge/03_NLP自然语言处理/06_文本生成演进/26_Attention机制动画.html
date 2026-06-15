@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attention 机制动画</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+.container { max-width: 960px; margin: 0 auto; padding: 30px 20px; }
+h1 { text-align: center; font-size: 1.8em; margin-bottom: 8px; color: #60a5fa; }
+.subtitle { text-align: center; color: #94a3b8; margin-bottom: 25px; }
+
+/* 编码器-解码器 */
+.seq2seq { display: flex; justify-content: center; align-items: flex-start; gap: 30px; margin: 20px 0; flex-wrap: wrap; }
+.encoder, .decoder { background: #1e293b; border-radius: 14px; padding: 16px; border: 2px solid #334155; min-width: 280px; }
+.encoder { border-color: #3b82f6; }
+.decoder { border-color: #f59e0b; }
+.enc-title, .dec-title { text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 0.95em; }
+.enc-title { color: #60a5fa; }
+.dec-title { color: #fbbf24; }
+
+/* 隐藏状态行 */
+.h-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 8px 0; }
+.h-cell { width: 50px; height: 50px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.7em; border: 2px solid; transition: all 0.4s; opacity: 0.5; }
+.h-cell.active { opacity: 1; }
+.enc-cell { border-color: #3b82f6; background: rgba(59,130,246,0.1); }
+.enc-cell.active { box-shadow: 0 0 12px rgba(59,130,246,0.4); }
+.dec-cell { border-color: #f59e0b; background: rgba(245,158,11,0.1); }
+.dec-cell.active { box-shadow: 0 0 12px rgba(245,158,11,0.4); }
+.h-cell .tok { font-weight: bold; font-size: 1em; }
+.h-cell .hval { color: #94a3b8; font-size: 0.8em; }
+
+/* 注意力热力图 */
+.heatmap-section { margin: 20px 0; background: #1e293b; border-radius: 14px; padding: 18px; border: 1px solid #334155; }
+.heatmap-title { text-align: center; margin-bottom: 12px; color: #f59e0b; font-weight: bold; }
+.heatmap { display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.hm-row { display: flex; gap: 3px; }
+.hm-cell { width: 55px; height: 45px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.65em; transition: all 0.5s; border: 1px solid #334155; }
+.hm-cell .alpha { font-weight: bold; }
+.hm-cell .src-tok { color: #94a3b8; font-size: 0.85em; }
+.hm-label { font-size: 0.7em; color: #94a3b8; margin-top: 2px; }
+
+/* 上下文向量 */
+.context-section { display: flex; justify-content: center; align-items: center; gap: 15px; margin: 15px 0; flex-wrap: wrap; }
+.ctx-step { background: #0f172a; padding: 12px; border-radius: 10px; border: 1px solid #334155; min-width: 200px; text-align: center; transition: all 0.4s; }
+.ctx-step.active { border-color: #34d399; }
+.ctx-step .ctx-title { color: #34d399; font-weight: bold; font-size: 0.85em; margin-bottom: 6px; }
+.ctx-step .ctx-formula { font-family: monospace; font-size: 0.75em; color: #cbd5e1; }
+
+/* 控制面板 */
+.controls { display: flex; gap: 12px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
+.btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 0.95em; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+.btn-primary { background: #f59e0b; color: #0f172a; }
+.btn-secondary { background: #64748b; color: white; }
+
+.step-info { text-align: center; margin: 10px 0; }
+.step-info .panel { background: #1e293b; padding: 10px 18px; border-radius: 8px; border-left: 3px solid #f59e0b; display: inline-block; font-size: 0.85em; max-width: 800px; }
+
+.info-box { background: #1e293b; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 3px solid #3b82f6; }
+.info-box h4 { color: #3b82f6; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🎯 Attention 机制动画</h1>
+<p class="subtitle">解码器每一步如何"回头看"编码器的所有隐藏状态</p>
+
+<div class="controls">
+  <button class="btn btn-primary" onclick="nextStep()">⏭ 下一步</button>
+  <button class="btn btn-primary" onclick="autoPlay()" id="btnAuto" style="background:#3b82f6;color:white">▶ 自动</button>
+  <button class="btn btn-secondary" onclick="resetAll()">↻ 重置</button>
+</div>
+
+<div class="step-info" id="stepInfo">
+  <div class="panel">逐步观察：解码器生成 "China" 时，Attention 如何找到对应的编码器位置</div>
+</div>
+
+<!-- Seq2Seq + Attention -->
+<div class="seq2seq">
+  <div class="encoder">
+    <div class="enc-title">📥 编码器（源：我 爱 中 国）</div>
+    <div class="h-row" id="encRow"></div>
+  </div>
+  <div class="decoder">
+    <div class="dec-title">📤 解码器（目标：I love China）</div>
+    <div class="h-row" id="decRow"></div>
+  </div>
+</div>
+
+<!-- 注意力热力图 -->
+<div class="heatmap-section">
+  <div class="heatmap-title">🔥 注意力权重热力图</div>
+  <div style="display:flex;gap:20px;justify-content:center;margin-bottom:8px;font-size:0.8em">
+    <span style="color:#3b82f6">← 源(编码器)</span>
+    <span style="color:#f59e0b">↓ 目标(解码器)</span>
+  </div>
+  <div class="heatmap" id="heatmap"></div>
+</div>
+
+<!-- 上下文向量计算 -->
+<div class="context-section" id="ctxSection">
+  <div class="ctx-step" id="ctxStep">
+    <div class="ctx-title">上下文向量 c<sub>t</sub></div>
+    <div class="ctx-formula">c<sub>t</sub> = Σ α<sub>ti</sub> · h<sub>i</sub></div>
+    <div class="ctx-formula" id="ctxDetail" style="margin-top:4px;color:#94a3b8">等待计算...</div>
+  </div>
+</div>
+
+<div class="info-box">
+  <h4>💡 Attention 解决的核心问题</h4>
+  <p style="font-size:0.85em">没有 Attention：解码器只能看编码器最后一个隐藏状态 h₄ → 信息瓶颈<br>
+  有 Attention：解码器每步都能"回头看"所有 h₁~h₄，自动决定关注哪个 → 翻译 "China" 时自然聚焦到 "中国" 对应的 h₃, h₄</p>
+</div>
+</div>
+
+<script>
+const srcTokens = ['我', '爱', '中', '国'];
+const tgtTokens = ['I', 'love', 'China'];
+
+// 预设的注意力权重（模拟翻译对齐）
+const attentionWeights = [
+  [0.70, 0.15, 0.10, 0.05],  // "I" 主要关注 "我"
+  [0.10, 0.75, 0.10, 0.05],  // "love" 主要关注 "爱"
+  [0.05, 0.05, 0.40, 0.50],  // "China" 关注 "中国"
+];
+
+const steps = [
+  { desc: 'Step 1: 编码器处理源序列 "我爱中国"，产生隐藏状态 h₁~h₄', type: 'encode' },
+  { desc: 'Step 2: 解码器生成 "I"，计算注意力 → 70%关注"我"', type: 'attend', tgtIdx: 0 },
+  { desc: 'Step 3: 解码器生成 "love"，注意力 → 75%关注"爱"', type: 'attend', tgtIdx: 1 },
+  { desc: 'Step 4: 解码器生成 "China"，注意力 → 40%关注"中" + 50%关注"国"', type: 'attend', tgtIdx: 2 },
+];
+
+let curStep = -1;
+let autoTimer = null;
+
+function buildEncRow() {
+  const el = document.getElementById('encRow');
+  el.innerHTML = '';
+  srcTokens.forEach((tok, i) => {
+    const d = document.createElement('div');
+    d.className = 'h-cell enc-cell';
+    d.id = `enc-${i}`;
+    d.innerHTML = `<div class="tok">${tok}</div><div class="hval">h${i+1}</div>`;
+    el.appendChild(d);
+  });
+}
+
+function buildDecRow() {
+  const el = document.getElementById('decRow');
+  el.innerHTML = '';
+  tgtTokens.forEach((tok, i) => {
+    const d = document.createElement('div');
+    d.className = 'h-cell dec-cell';
+    d.id = `dec-${i}`;
+    d.innerHTML = `<div class="tok">${tok}</div><div class="hval">s${i+1}</div>`;
+    el.appendChild(d);
+  });
+}
+
+function buildHeatmap() {
+  const el = document.getElementById('heatmap');
+  el.innerHTML = '';
+  tgtTokens.forEach((tgt, ti) => {
+    const row = document.createElement('div');
+    row.className = 'hm-row';
+    // 标签
+    const lbl = document.createElement('div');
+    lbl.className = 'hm-cell';
+    lbl.style.cssText = 'border:none;width:50px;background:transparent';
+    lbl.innerHTML = `<div style="color:#f59e0b;font-weight:bold">${tgt}</div>`;
+    row.appendChild(lbl);
+
+    srcTokens.forEach((src, si) => {
+      const cell = document.createElement('div');
+      cell.className = 'hm-cell';
+      cell.id = `hm-${ti}-${si}`;
+      cell.innerHTML = `<div class="alpha">—</div><div class="src-tok">${src}</div>`;
+      row.appendChild(cell);
+    });
+    el.appendChild(row);
+  });
+  // 源标签行
+  const labelRow = document.createElement('div');
+  labelRow.className = 'hm-row';
+  const spacer = document.createElement('div');
+  spacer.style.cssText = 'width:50px';
+  labelRow.appendChild(spacer);
+  srcTokens.forEach(src => {
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'width:55px;text-align:center;font-size:0.75em;color:#60a5fa;font-weight:bold';
+    lbl.textContent = src;
+    labelRow.appendChild(lbl);
+  });
+  el.appendChild(labelRow);
+}
+
+function nextStep() {
+  curStep++;
+  if (curStep >= steps.length) return;
+  const s = steps[curStep];
+
+  document.getElementById('stepInfo').innerHTML = `<div class="panel">${s.desc}</div>`;
+
+  if (s.type === 'encode') {
+    srcTokens.forEach((_, i) => {
+      setTimeout(() => {
+        document.getElementById(`enc-${i}`).classList.add('active');
+      }, i * 300);
+    });
+  } else if (s.type === 'attend') {
+    const ti = s.tgtIdx;
+    const weights = attentionWeights[ti];
+
+    // 激活解码器状态
+    document.getElementById(`dec-${ti}`).classList.add('active');
+
+    // 更新热力图
+    weights.forEach((w, si) => {
+      const cell = document.getElementById(`hm-${ti}-${si}`);
+      const alpha = w;
+      cell.querySelector('.alpha').textContent = alpha.toFixed(2);
+      // 颜色映射
+      const intensity = Math.round(alpha * 200);
+      const r = intensity;
+      const g = Math.round(intensity * 0.7);
+      const b = Math.round(30 + alpha * 50);
+      cell.style.background = `rgba(${r},${g},${b},0.7)`;
+      cell.style.borderColor = `rgba(${r},${g},${b},1)`;
+    });
+
+    // 编码器高亮
+    srcTokens.forEach((_, si) => {
+      const enc = document.getElementById(`enc-${si}`);
+      if (weights[si] > 0.2) enc.classList.add('active');
+    });
+
+    // 上下文向量
+    document.getElementById('ctxStep').classList.add('active');
+    const ctxParts = weights.map((w, si) => `${w.toFixed(2)}·h${si+1}`).join(' + ');
+    document.getElementById('ctxDetail').textContent = `c${ti+1} = ${ctxParts}`;
+  }
+}
+
+function autoPlay() {
+  const btn = document.getElementById('btnAuto');
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    btn.textContent = '▶ 自动';
+    return;
+  }
+  btn.textContent = '⏸ 暂停';
+  autoTimer = setInterval(() => {
+    if (curStep >= steps.length - 1) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+      btn.textContent = '▶ 自动';
+      return;
+    }
+    nextStep();
+  }, 1500);
+}
+
+function resetAll() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  document.getElementById('btnAuto').textContent = '▶ 自动';
+  curStep = -1;
+  srcTokens.forEach((_, i) => document.getElementById(`enc-${i}`).classList.remove('active'));
+  tgtTokens.forEach((_, i) => document.getElementById(`dec-${i}`).classList.remove('active'));
+  for (let ti = 0; ti < tgtTokens.length; ti++) {
+    for (let si = 0; si < srcTokens.length; si++) {
+      const cell = document.getElementById(`hm-${ti}-${si}`);
+      if (cell) {
+        cell.querySelector('.alpha').textContent = '—';
+        cell.style.background = '';
+        cell.style.borderColor = '#334155';
+      }
+    }
+  }
+  document.getElementById('ctxStep').classList.remove('active');
+  document.getElementById('ctxDetail').textContent = '等待计算...';
+  document.getElementById('stepInfo').innerHTML = '<div class="panel">逐步观察：解码器生成 "China" 时，Attention 如何找到对应的编码器位置</div>';
+}
+
+buildEncRow();
+buildDecRow();
+buildHeatmap();
+</script>
+</body>
+</html>

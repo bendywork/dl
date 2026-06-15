@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSTM 文本生成动画</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+.container { max-width: 1000px; margin: 0 auto; padding: 30px 20px; }
+h1 { text-align: center; font-size: 1.8em; margin-bottom: 8px; color: #60a5fa; }
+.subtitle { text-align: center; color: #94a3b8; margin-bottom: 25px; font-size: 0.95em; }
+
+/* LSTM 单元图 */
+.lstm-cell { display: flex; justify-content: center; margin: 20px 0; }
+.cell-diagram { width: 700px; background: #1e293b; border-radius: 16px; border: 2px solid #334155; padding: 20px; position: relative; }
+.cell-title { text-align: center; font-size: 1.1em; color: #94a3b8; margin-bottom: 15px; }
+
+/* 门控区域 */
+.gates { display: flex; gap: 16px; justify-content: center; margin-bottom: 15px; }
+.gate-box { width: 200px; border-radius: 10px; padding: 12px; text-align: center; transition: all 0.5s; opacity: 0.4; border: 2px solid transparent; }
+.gate-box.active { opacity: 1; }
+.gate-forget { background: rgba(239,68,68,0.15); border-color: #ef4444; }
+.gate-forget.active { box-shadow: 0 0 20px rgba(239,68,68,0.3); }
+.gate-input { background: rgba(59,130,246,0.15); border-color: #3b82f6; }
+.gate-input.active { box-shadow: 0 0 20px rgba(59,130,246,0.3); }
+.gate-output { background: rgba(52,211,153,0.15); border-color: #34d399; }
+.gate-output.active { box-shadow: 0 0 20px rgba(52,211,153,0.3); }
+.gate-icon { font-size: 1.5em; margin-bottom: 4px; }
+.gate-name { font-weight: bold; font-size: 0.9em; margin-bottom: 2px; }
+.gate-formula { font-size: 0.72em; color: #94a3b8; font-family: monospace; }
+.gate-value { font-size: 0.85em; font-weight: bold; margin-top: 4px; }
+
+/* 细胞状态线 */
+.state-line { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 15px 0; padding: 12px; background: #0f172a; border-radius: 10px; }
+.state-item { padding: 6px 14px; border-radius: 6px; font-size: 0.8em; font-weight: bold; transition: all 0.4s; }
+.c-old { background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid #ef4444; }
+.c-new { background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid #3b82f6; }
+.c-result { background: rgba(168,85,247,0.2); color: #d8b4fe; border: 1px solid #a855f7; }
+.h-out { background: rgba(52,211,153,0.2); color: #6ee7b7; border: 1px solid #34d399; }
+.op { font-size: 1.2em; color: #94a3b8; font-weight: bold; }
+
+/* 步骤控制器 */
+.controls { display: flex; gap: 12px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
+.btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 0.95em; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+.btn-primary { background: #3b82f6; color: white; }
+.btn-primary:hover { background: #2563eb; }
+.btn-success { background: #34d399; color: #0f172a; }
+.btn-success:hover { background: #059669; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 步骤说明 */
+.step-desc { text-align: center; margin: 15px 0; min-height: 50px; }
+.step-desc .current { background: #1e293b; padding: 12px 20px; border-radius: 8px; border-left: 3px solid #f59e0b; display: inline-block; text-align: left; }
+.step-desc .current .step-title { color: #f59e0b; font-weight: bold; margin-bottom: 4px; }
+.step-desc .current .step-body { font-size: 0.85em; color: #cbd5e1; }
+
+/* 生成序列 */
+.gen-seq { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 25px 0; flex-wrap: wrap; }
+.gen-token { width: 48px; height: 48px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.95em; font-weight: bold; background: #1e293b; border: 1px solid #334155; transition: all 0.3s; }
+.gen-token.filled { background: rgba(59,130,246,0.2); border-color: #3b82f6; color: #93c5fd; }
+.gen-token.predicting { background: rgba(245,158,11,0.2); border-color: #f59e0b; color: #fbbf24; animation: pulse 0.8s infinite; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+
+.info-box { background: #1e293b; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 3px solid #a855f7; }
+.info-box h4 { color: #a855f7; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🧠 LSTM 文本生成动画</h1>
+<p class="subtitle">三门一细胞：遗忘门、输入门、输出门如何协作维持长程记忆</p>
+
+<div class="controls">
+  <button class="btn btn-primary" id="btnStep" onclick="nextStep()">⏭ 下一步</button>
+  <button class="btn btn-success" id="btnAuto" onclick="autoPlay()">▶ 自动播放</button>
+  <button class="btn btn-primary" onclick="resetAll()" style="background:#64748b">↻ 重置</button>
+</div>
+
+<div class="step-desc" id="stepDesc">
+  <div class="current">
+    <div class="step-title">准备就绪</div>
+    <div class="step-body">点击「下一步」开始，观察 LSTM 如何逐步处理输入并生成文本</div>
+  </div>
+</div>
+
+<!-- LSTM 单元 -->
+<div class="lstm-cell">
+  <div class="cell-diagram">
+    <div class="cell-title">LSTM 单元内部（时间步 t）</div>
+    <div class="gates">
+      <div class="gate-box gate-forget" id="gateForget">
+        <div class="gate-icon">🗑️</div>
+        <div class="gate-name">遗忘门 f<sub>t</sub></div>
+        <div class="gate-formula">σ(W<sub>f</sub>·[h<sub>t-1</sub>,x<sub>t</sub>]+b<sub>f</sub>)</div>
+        <div class="gate-value" id="fVal">—</div>
+      </div>
+      <div class="gate-box gate-input" id="gateInput">
+        <div class="gate-icon">✏️</div>
+        <div class="gate-name">输入门 i<sub>t</sub></div>
+        <div class="gate-formula">σ(W<sub>i</sub>·[h<sub>t-1</sub>,x<sub>t</sub>]+b<sub>i</sub>)</div>
+        <div class="gate-value" id="iVal">—</div>
+      </div>
+      <div class="gate-box gate-output" id="gateOutput">
+        <div class="gate-icon">📢</div>
+        <div class="gate-name">输出门 o<sub>t</sub></div>
+        <div class="gate-formula">σ(W<sub>o</sub>·[h<sub>t-1</sub>,x<sub>t</sub>]+b<sub>o</sub>)</div>
+        <div class="gate-value" id="oVal">—</div>
+      </div>
+    </div>
+
+    <!-- 细胞状态更新 -->
+    <div class="state-line" id="stateLine">
+      <div class="state-item c-old" id="cOld">C<sub>t-1</sub>=0.5</div>
+      <div class="op">×</div>
+      <div class="state-item c-old" id="fGate">f<sub>t</sub>=?</div>
+      <div class="op">+</div>
+      <div class="state-item c-new" id="iGate">i<sub>t</sub>=?</div>
+      <div class="op">×</div>
+      <div class="state-item c-new" id="cCand">C̃<sub>t</sub>=?</div>
+      <div class="op">=</div>
+      <div class="state-item c-result" id="cResult">C<sub>t</sub>=?</div>
+    </div>
+
+    <!-- 隐藏状态输出 -->
+    <div class="state-line" style="margin-top:5px">
+      <div class="state-item c-result">C<sub>t</sub></div>
+      <div class="op">→ tanh →</div>
+      <div class="op">×</div>
+      <div class="state-item" id="oGate2" style="background:rgba(52,211,153,0.2);color:#6ee7b7;border:1px solid #34d399">o<sub>t</sub>=?</div>
+      <div class="op">=</div>
+      <div class="state-item h-out" id="hResult">h<sub>t</sub>=?</div>
+    </div>
+  </div>
+</div>
+
+<!-- 生成序列 -->
+<div style="text-align:center;margin:15px 0 5px;color:#94a3b8;font-size:0.85em">已生成的文本序列：</div>
+<div class="gen-seq" id="genSeq"></div>
+
+<div class="info-box">
+  <h4>💡 LSTM vs RNN 的核心区别</h4>
+  <p style="font-size:0.85em">RNN 的记忆 h 每步都被 <b>tanh 重写</b>，旧信息必然衰减。LSTM 引入 <b>细胞状态 C</b>，通过加法更新（C<sub>t</sub> = f·C<sub>t-1</sub> + i·C̃<sub>t</sub>），只要遗忘门 f≈1，旧信息就能无损保留——这就是"高速公路"。</p>
+</div>
+</div>
+
+<script>
+const inputSeq = ['我', '爱', '中', '国', '，', '她', '爱', '世', '界'];
+const outputSeq = ['爱', '中', '国', '，', '她', '爱', '世', '界', '<EOS>'];
+
+// 每步的门控值（模拟）
+const stepData = [
+  { token: '我', f: 0.8, i: 0.6, o: 0.7, cOld: 0.0, cCand: 0.5, cNew: 0.30, h: 0.18, desc: '遗忘门0.8：保留80%旧记忆 | 输入门0.6：写入60%新信息 | 开始记住"我"' },
+  { token: '爱', f: 0.9, i: 0.7, o: 0.8, cOld: 0.30, cCand: 0.6, cNew: 0.69, h: 0.48, desc: '遗忘门0.9：几乎保留全部旧记忆 | 记住"我爱"的关系' },
+  { token: '中', f: 0.95, i: 0.8, o: 0.85, cOld: 0.69, cCand: 0.7, cNew: 1.17, h: 0.74, desc: '遗忘门0.95：长记忆几乎无损 | "中国"信息写入细胞' },
+  { token: '国', f: 0.95, i: 0.5, o: 0.6, cOld: 1.17, cCand: 0.4, cNew: 1.31, h: 0.53, desc: '遗忘门0.95：继续保留 | 输入门减小：信息已充分' },
+  { token: '，', f: 0.3, i: 0.4, o: 0.5, cOld: 1.31, cCand: 0.2, cNew: 0.47, h: 0.22, desc: '⚠️ 遗忘门0.3！逗号处大幅遗忘旧话题，准备新话题' },
+  { token: '她', f: 0.7, i: 0.6, o: 0.7, cOld: 0.47, cCand: 0.5, cNew: 0.63, h: 0.38, desc: '新主语"她"开始写入，遗忘部分逗号前的残留' },
+  { token: '爱', f: 0.9, i: 0.7, o: 0.8, cOld: 0.63, cCand: 0.6, cNew: 0.99, h: 0.64, desc: '再次出现"爱"，与前面的模式匹配' },
+  { token: '世', f: 0.95, i: 0.8, o: 0.85, cOld: 0.99, cCand: 0.7, cNew: 1.47, h: 0.93, desc: '记忆持续积累，"世界"写入' },
+  { token: '界', f: 0.95, i: 0.3, o: 0.9, cOld: 1.47, cCand: 0.2, cNew: 1.46, h: 0.84, desc: '序列接近完成，输入门关闭，准备输出' },
+];
+
+let currentStep = -1;
+let autoTimer = null;
+
+function buildGenSeq() {
+  const el = document.getElementById('genSeq');
+  el.innerHTML = '<div class="gen-token filled">[BOS]</div>';
+  for (let i = 0; i < 9; i++) {
+    const d = document.createElement('div');
+    d.className = 'gen-token';
+    d.id = `gtok-${i}`;
+    d.textContent = '?';
+    el.appendChild(d);
+  }
+}
+
+function nextStep() {
+  currentStep++;
+  if (currentStep >= stepData.length) return;
+
+  const s = stepData[currentStep];
+
+  // 更新步骤描述
+  document.getElementById('stepDesc').innerHTML = `
+    <div class="current">
+      <div class="step-title">Step ${currentStep+1}: 输入 "${s.token}"</div>
+      <div class="step-body">${s.desc}</div>
+    </div>`;
+
+  // 激活门
+  ['gateForget','gateInput','gateOutput'].forEach(id => document.getElementById(id).classList.remove('active'));
+  // 按顺序激活：遗忘门 → 输入门 → 输出门
+  setTimeout(() => {
+    document.getElementById('gateForget').classList.add('active');
+    document.getElementById('fVal').textContent = `f = ${s.f.toFixed(2)}`;
+    document.getElementById('fGate').textContent = `f=${s.f.toFixed(2)}`;
+  }, 0);
+  setTimeout(() => {
+    document.getElementById('gateInput').classList.add('active');
+    document.getElementById('iVal').textContent = `i = ${s.i.toFixed(2)}`;
+    document.getElementById('iGate').textContent = `i=${s.i.toFixed(2)}`;
+    document.getElementById('cCand').textContent = `C̃=${s.cCand.toFixed(2)}`;
+  }, 300);
+  setTimeout(() => {
+    document.getElementById('gateOutput').classList.add('active');
+    document.getElementById('oVal').textContent = `o = ${s.o.toFixed(2)}`;
+    document.getElementById('oGate2').textContent = `o=${s.o.toFixed(2)}`;
+  }, 600);
+
+  // 更新状态值
+  setTimeout(() => {
+    document.getElementById('cOld').innerHTML = `C<sub>t-1</sub>=${s.cOld.toFixed(2)}`;
+    document.getElementById('cResult').innerHTML = `C<sub>t</sub>=${s.cNew.toFixed(2)}`;
+    document.getElementById('hResult').innerHTML = `h<sub>t</sub>=${s.h.toFixed(2)}`;
+  }, 400);
+
+  // 更新生成序列
+  const prevTok = document.getElementById(`gtok-${currentStep-1}`);
+  if (prevTok) { prevTok.classList.remove('predicting'); prevTok.classList.add('filled'); }
+
+  const curTok = document.getElementById(`gtok-${currentStep}`);
+  if (curTok) { curTok.textContent = outputSeq[currentStep]; curTok.classList.add('predicting'); }
+}
+
+function autoPlay() {
+  const btn = document.getElementById('btnAuto');
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    btn.textContent = '▶ 自动播放';
+    return;
+  }
+  btn.textContent = '⏸ 暂停';
+  autoTimer = setInterval(() => {
+    if (currentStep >= stepData.length - 1) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+      btn.textContent = '▶ 自动播放';
+      return;
+    }
+    nextStep();
+  }, 1200);
+}
+
+function resetAll() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  document.getElementById('btnAuto').textContent = '▶ 自动播放';
+  currentStep = -1;
+  ['gateForget','gateInput','gateOutput'].forEach(id => {
+    document.getElementById(id).classList.remove('active');
+  });
+  ['fVal','iVal','oVal'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('cOld').innerHTML = 'C<sub>t-1</sub>=0.5';
+  document.getElementById('fGate').textContent = 'f=?';
+  document.getElementById('iGate').textContent = 'i=?';
+  document.getElementById('cCand').textContent = 'C̃=?';
+  document.getElementById('cResult').innerHTML = 'C<sub>t</sub>=?';
+  document.getElementById('oGate2').textContent = 'o=?';
+  document.getElementById('hResult').innerHTML = 'h<sub>t</sub>=?';
+  document.getElementById('stepDesc').innerHTML = `
+    <div class="current">
+      <div class="step-title">准备就绪</div>
+      <div class="step-body">点击「下一步」开始</div>
+    </div>`;
+  for (let i = 0; i < 9; i++) {
+    const t = document.getElementById(`gtok-${i}`);
+    if (t) { t.textContent = '?'; t.className = 'gen-token'; }
+  }
+}
+
+buildGenSeq();
+</script>
+</body>
+</html>

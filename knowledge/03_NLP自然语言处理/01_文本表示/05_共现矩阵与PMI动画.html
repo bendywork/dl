@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>共现矩阵与PMI（点互信息）交互式动画</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0e1a;
+    color: #e0e6f0;
+    font-family: 'Courier New', 'Consolas', monospace;
+    min-height: 100vh;
+  }
+  .page-header {
+    background: linear-gradient(135deg, #0d1b2a, #1a2744);
+    border-bottom: 1px solid #1e3a5f;
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .page-header h1 {
+    font-size: 1.5rem;
+    color: #58a6ff;
+    letter-spacing: 2px;
+  }
+  .page-header .subtitle {
+    font-size: 0.8rem;
+    color: #8b98b0;
+    margin-top: 4px;
+  }
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: #8b98b0;
+  }
+  .speed-control label { color: #a0b0c8; }
+  .speed-btn {
+    background: #1a2744;
+    border: 1px solid #2a4070;
+    color: #7090c0;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+  }
+  .speed-btn.active, .speed-btn:hover {
+    background: #1e3a70;
+    border-color: #58a6ff;
+    color: #58a6ff;
+  }
+
+  /* Tab Navigation */
+  .tabs {
+    display: flex;
+    background: #0d1520;
+    border-bottom: 1px solid #1e3a5f;
+    padding: 0 40px;
+  }
+  .tab {
+    padding: 14px 24px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #5a7090;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab:hover { color: #8ab0d0; }
+  .tab.active {
+    color: #58a6ff;
+    border-bottom-color: #58a6ff;
+  }
+
+  /* Module Container */
+  .module { display: none; padding: 30px 40px; max-width: 1200px; margin: 0 auto; }
+  .module.active { display: block; }
+
+  .module-title {
+    font-size: 1.2rem;
+    color: #58a6ff;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .module-title::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: #58a6ff;
+    border-radius: 2px;
+  }
+  .module-desc {
+    font-size: 0.85rem;
+    color: #6a8aaa;
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #1a2a40;
+    flex-wrap: wrap;
+  }
+  .btn {
+    background: #1a2744;
+    border: 1px solid #2a4070;
+    color: #8ab0d0;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .btn:hover { background: #1e3a70; border-color: #58a6ff; color: #58a6ff; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.primary {
+    background: #1e4080;
+    border-color: #58a6ff;
+    color: #58a6ff;
+  }
+  .btn.primary:hover { background: #2a50a0; }
+
+  .step-info {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: #5a7090;
+  }
+
+  /* ===== MODULE 1: Sliding Window ===== */
+  .corpus-display {
+    background: #0d1520;
+    border: 1px solid #1e3a5f;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .corpus-title {
+    font-size: 0.75rem;
+    color: #4a6a8a;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .corpus-words {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .word-token {
+    background: #1a2744;
+    border: 1px solid #2a4070;
+    color: #a0c0e0;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: all 0.3s;
+    position: relative;
+  }
+  .word-token.center {
+    background: #1e4a80;
+    border-color: #58a6ff;
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(88, 166, 255, 0.4);
+  }
+  .word-token.context {
+    background: #1a3a20;
+    border-color: #3dba4e;
+    color: #7de88e;
+    box-shadow: 0 0 8px rgba(61, 186, 78, 0.3);
+  }
+  .word-token.idx {
+    position: absolute;
+    top: -8px;
+    right: -4px;
+    background: #0d1520;
+    color: #4a6a8a;
+    font-size: 0.6rem;
+    border: none;
+    padding: 1px 3px;
+  }
+
+  .window-size-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+    color: #8b98b0;
+  }
+  .window-size-control select {
+    background: #1a2744;
+    border: 1px solid #2a4070;
+    color: #8ab0d0;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.85rem;
+  }
+
+  .cooccur-live {
+    background: #0d1520;
+    border: 1px solid #1e3a5f;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .cooccur-live .live-title {
+    font-size: 0.75rem;
+    color: #4a6a8a;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .cooccur-pairs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pair-badge {
+    background: #1a2744;
+    border: 1px solid #2a4070;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    color: #6a8aaa;
+    transition: all 0.3s;
+  }
+  .pair-badge.new-pair {
+    background: #1a3a20;
+    border-color: #3dba4e;
+    color: #7de88e;
+    animation: flashPair 0.5s ease;
+  }
+  @keyframes flashPair {
+    0% { transform: scale(1.2); box-shadow: 0 0 12px rgba(61,186,78,0.6); }
+    100% { transform: scale(1); }
+  }
+
+  .step-log {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: #5a7a5a;
+    min-height: 20px;
+  }
+
+  /* ===== MODULE 2: Matrix Build ===== */
+  .matrix-container {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .matrix-wrap { flex: 1; min-width: 320px; }
+  .matrix-info { flex: 1; min-width: 280px; }
+
+  .matrix-label {
+    font-size: 0.75rem;
+    color: #4a6a8a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+
+  table.cooccur-table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  table.cooccur-table th, table.cooccur-table td {
+    width: 56px;
+    height: 48px;
+    text-align: center;
+    font-size: 0.8rem;
+    border: 1px solid #1e3a5f;
+    transition: all 0.4s;
+    position: relative;
+  }
+  table.cooccur-table th {
+    background: #0d1520;
+    color: #4a80b0;
+    font-weight: normal;
+    font-size: 0.75rem;
+  }
+  table.cooccur-table td {
+    background: #0d1520;
+    color: #3a5a7a;
+  }
+  table.cooccur-table td.has-value {
+    color: #a0c8f0;
+  }
+  table.cooccur-table td.highlight {
+    animation: cellFlash 0.6s ease;
+    background: #1a3a60 !important;
+    color: #ffffff !important;
+    box-shadow: inset 0 0 8px rgba(88,166,255,0.4);
+  }
+  @keyframes cellFlash {
+    0% { background: #2a5a90 !important; transform: scale(1.1); }
+    100% { }
+  }
+
+  .matrix-info-box {
+    background: #0d1520;
+    border: 1px solid #1e3a5f;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid #1a2a40;
+    font-size: 0.82rem;
+    color: #6a8aaa;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .val { color: #a0c8f0; }
+
+  /* ===== MODULE 3: PMI Calculator ===== */
+  .pmi-layout {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .pmi-selector { flex: 1; min-width: 260px; }
+  .pmi-result { flex: 2; min-width: 320px; }
+
+  .selector-box {
+    background: #0d1520;
+    border: 1px solid #1e3a5f;
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .selector-box label {
+    display: block;
+    font-size: 0.8rem;
+    color: #4a6a8a;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .selector-box select {
+    width: 100%;
+    background: #1a2744;
+    border: 1px solid #2a4070;
+    color: #8ab0d0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+    cursor: pointer;
+  }
+  .selector-box select:focus {
+    outline: none;
+    border-color: #58a6ff;
+  }
+
+  .formula-box {
+    background: #0d1520;
+    border: 1px solid #1e3a5f;
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .formula-title {
+    font-size: 0.75rem;
+    color: #4a6a8a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+  .formula-line {
+    font-size: 0.85rem;
+    color: #7a9ab8;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: #0a1020;
+    border-radius: 4px;
+    border-left: 2px solid #1e3a5f;
+    line-height: 1.7;
+  }
+  .formula-line .hl-blue { color: #58a6ff; }
+  .formula-line .hl-green { color: #4dbb5e; }
+  .formula-line .hl-orange { color: #f0a040; }
+  .formula-line .hl-red { color: #f05050; }
+  .formula-line .hl-yellow { color: #e0d060; }
+
+  .pmi-gauge {
+    margin-top: 16px;
+    padding: 14px;
+    background: #0a1020;
+    border-radius: 6px;
+    border: 1px solid #1a2a40;
+  }
+  .gauge-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: #5a7090;
+    margin-bottom: 6px;
+  }
+  .gauge-bar-bg {
+    height: 10px;
+    background: #1a2a40;
+    border-radius: 5px;
+    overflow: visible;
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .gauge-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.6s ease, background 0.4s;
+    min-width: 2px;
+  }
+  .gauge-bar-fill.positive { background: linear-gradient(90deg, #1a5030, #3dba4e); }
+  .gauge-bar-fill.negative { background: linear-gradient(90deg, #f05050, #7a2020); }
+  .gauge-value {
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: bold;
+    transition: color 0.4s;
+    padding: 6px;
+  }
+
+  /* ===== MODULE 4: PPMI Heatmap ===== */
+  .heatmap-layout {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+  .heatmap-block { flex: 1; min-width: 320px; }
+
+  .heatmap-table-wrap {
+    overflow-x: auto;
+  }
+  table.heatmap-table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  table.heatmap-table th, table.heatmap-table td {
+    width: 62px;
+    height: 52px;
+    text-align: center;
+    font-size: 0.78rem;
+    border: 1px solid #1a2a40;
+    transition: all 0.2s;
+    cursor: pointer;
+    position: relative;
+  }
+  table.heatmap-table th {
+    background: #0d1520;
+    color: #4a80b0;
+    font-weight: normal;
+    cursor: default;
+  }
+  table.heatmap-table td:hover {
+    transform: scale(1.15);
+    z-index: 10;
+    box-shadow: 0 0 12px rgba(88,166,255,0.5);
+  }
+
+  .tooltip-box {
+    background: #0a1828;
+    border: 1px solid #2a4a6a;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 0.8rem;
+    color: #8ab0d0;
+    min-height: 60px;
+    line-height: 1.7;
+    margin-top: 12px;
+  }
+  .tooltip-box .t-val { color: #58a6ff; font-weight: bold; }
+  .tooltip-box .t-note { color: #5a8a5a; }
+
+  .color-legend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 0.78rem;
+    color: #5a7090;
+  }
+  .legend-bar {
+    height: 10px;
+    flex: 1;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #0d1520, #0d3a60, #1468c0, #58a6ff, #a0e0ff);
+  }
+
+  /* Responsive */
+  @media (max-width: 800px) {
+    .page-header { flex-direction: column; gap: 12px; padding: 16px 20px; }
+    .tabs { padding: 0 16px; overflow-x: auto; }
+    .module { padding: 20px 16px; }
+    .matrix-container, .pmi-layout, .heatmap-layout { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div>
+    <div class="module-title" style="margin:0; font-size:1.4rem;">共现矩阵与 PMI 点互信息</div>
+    <div class="subtitle">分布假说 · 共现统计 · 点互信息 · PPMI 矩阵热力图</div>
+  </div>
+  <div class="speed-control">
+    <label>动画速度：</label>
+    <button class="speed-btn" data-speed="1500" onclick="setSpeed(1500,this)">慢</button>
+    <button class="speed-btn active" data-speed="800" onclick="setSpeed(800,this)">中</button>
+    <button class="speed-btn" data-speed="300" onclick="setSpeed(300,this)">快</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchModule(0,this)">一、分布假说</div>
+  <div class="tab" onclick="switchModule(1,this)">二、共现矩阵构建</div>
+  <div class="tab" onclick="switchModule(2,this)">三、PMI 计算器</div>
+  <div class="tab" onclick="switchModule(3,this)">四、PPMI 热力图</div>
+</div>
+
+<!-- MODULE 1: Distribution Hypothesis -->
+<div class="module active" id="mod0">
+  <div class="module-title">分布假说与滑动窗口</div>
+  <div class="module-desc">
+    分布假说（Distributional Hypothesis）：<strong style="color:#8ab0d0">词义相近的词，出现在相似语境中</strong>。
+    通过滑动窗口扫描语料，统计目标词与上下文词的共同出现次数，即为共现统计。
+  </div>
+
+  <div class="window-size-control">
+    <label>窗口大小（单侧）：</label>
+    <select id="winSize" onchange="resetMod1()">
+      <option value="1">1（只看紧邻词）</option>
+      <option value="2" selected>2（左右各2词）</option>
+      <option value="3">3（左右各3词）</option>
+    </select>
+    <span style="color:#4a6a8a; font-size:0.8rem;">— 窗口越大，捕获语义越宽泛</span>
+  </div>
+
+  <div class="corpus-display">
+    <div class="corpus-title">语料库（9个词）</div>
+    <div class="corpus-words" id="corpusWords"></div>
+  </div>
+
+  <div class="cooccur-live">
+    <div class="live-title">实时共现对计数</div>
+    <div class="cooccur-pairs" id="cooccurPairs"></div>
+    <div class="step-log" id="stepLog1">点击「下一步」开始滑动窗口扫描...</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" onclick="prevStep1()" id="prevBtn1" disabled>上一步</button>
+    <button class="btn primary" onclick="nextStep1()" id="nextBtn1">下一步</button>
+    <button class="btn" onclick="autoPlay1()" id="autoBtn1">自动播放</button>
+    <button class="btn" onclick="resetMod1()">重置</button>
+    <div class="step-info" id="stepInfo1">步骤 0 / 9</div>
+  </div>
+</div>
+
+<!-- MODULE 2: Matrix Build -->
+<div class="module" id="mod1">
+  <div class="module-title">共现矩阵逐步构建</div>
+  <div class="module-desc">
+    对整个语料进行滑动窗口统计（窗口大小=2），将每对词的共现次数填入矩阵。
+    矩阵是<strong style="color:#8ab0d0">对称的</strong>：C(i,j) = C(j,i)。热力图颜色越亮，共现次数越高。
+  </div>
+
+  <div class="matrix-container">
+    <div class="matrix-wrap">
+      <div class="matrix-label">共现矩阵（窗口大小=2）</div>
+      <div id="matrixTableWrap"></div>
+    </div>
+    <div class="matrix-info">
+      <div class="matrix-label">当前操作</div>
+      <div class="matrix-info-box" id="matrixInfoBox">
+        <div class="info-row"><span>状态</span><span class="val">等待开始...</span></div>
+      </div>
+      <div class="matrix-label" style="margin-top:16px">词频统计</div>
+      <div class="matrix-info-box" id="wordFreqBox"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" onclick="prevStep2()" id="prevBtn2" disabled>上一步</button>
+    <button class="btn primary" onclick="nextStep2()" id="nextBtn2">下一步</button>
+    <button class="btn" onclick="autoPlay2()" id="autoBtn2">自动播放</button>
+    <button class="btn" onclick="resetMod2()">重置</button>
+    <div class="step-info" id="stepInfo2">步骤 0 / ?</div>
+  </div>
+</div>
+
+<!-- MODULE 3: PMI Calculator -->
+<div class="module" id="mod2">
+  <div class="module-title">PMI vs PPMI 计算器</div>
+  <div class="module-desc">
+    PMI（点互信息）= log₂[ P(w,c) / (P(w)·P(c)) ]。正值表示共现比随机期望更频繁；负值表示比随机期望更少。
+    PPMI（正向PMI）= max(PMI, 0)，去掉负值噪声。
+  </div>
+
+  <div class="pmi-layout">
+    <div class="pmi-selector">
+      <div class="selector-box">
+        <label>选择词 W（目标词）</label>
+        <select id="selW" onchange="calcPMI()"></select>
+        <label>选择词 C（上下文词）</label>
+        <select id="selC" onchange="calcPMI()"></select>
+        <div style="font-size:0.78rem; color:#4a6a8a; line-height:1.6; margin-top:8px;">
+          PMI &gt; 0：两词共现比随机期望<span style="color:#4dbb5e">更频繁</span><br>
+          PMI &lt; 0：两词共现比随机期望<span style="color:#f05050">更少</span><br>
+          PMI = 0：两词完全独立<br>
+          PPMI = max(PMI, 0)
+        </div>
+      </div>
+    </div>
+    <div class="pmi-result">
+      <div class="formula-box">
+        <div class="formula-title">PMI 逐步推导</div>
+        <div class="formula-line" id="fLine1">PMI(w, c) = log₂ [ P(w,c) / (P(w) · P(c)) ]</div>
+        <div class="formula-line" id="fLine2">等待选择词对...</div>
+        <div class="formula-line" id="fLine3"></div>
+        <div class="formula-line" id="fLine4"></div>
+        <div class="pmi-gauge">
+          <div class="gauge-label">
+            <span>PMI 值</span>
+            <span id="pmiValLabel">—</span>
+          </div>
+          <div class="gauge-bar-bg">
+            <div class="gauge-bar-fill" id="pmiBarFill" style="width:0%"></div>
+          </div>
+          <div class="gauge-label">
+            <span>PPMI 值</span>
+            <span id="ppmiValLabel">—</span>
+          </div>
+          <div class="gauge-bar-bg">
+            <div class="gauge-bar-fill positive" id="ppmiBarFill" style="width:0%"></div>
+          </div>
+          <div class="gauge-value" id="pmiValueDisplay" style="color:#8ab0d0">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODULE 4: PPMI Heatmap -->
+<div class="module" id="mod3">
+  <div class="module-title">PPMI 矩阵热力图对比</div>
+  <div class="module-desc">
+    悬停在格子上查看详细数值。左侧为原始共现计数矩阵，右侧为 PPMI 矩阵。
+    颜色越亮表示数值越高，<strong style="color:#8ab0d0">PPMI 消除了高频词的统计偏差</strong>。
+  </div>
+
+  <div class="heatmap-layout">
+    <div class="heatmap-block">
+      <div class="matrix-label">原始共现矩阵（计数）</div>
+      <div class="heatmap-table-wrap" id="rawHeatmap"></div>
+    </div>
+    <div class="heatmap-block">
+      <div class="matrix-label">PPMI 矩阵（正向点互信息）</div>
+      <div class="heatmap-table-wrap" id="ppmiHeatmap"></div>
+    </div>
+  </div>
+
+  <div class="tooltip-box" id="heatTooltip">
+    将鼠标悬停在任意格子上，查看详细计算信息...
+  </div>
+
+  <div class="color-legend">
+    <span>低</span>
+    <div class="legend-bar"></div>
+    <span>高</span>
+    <span style="margin-left:16px; color:#4a6a8a">（颜色深度代表数值大小）</span>
+  </div>
+</div>
+
+<script>
+// ========== GLOBAL DATA ==========
+const CORPUS = ['I','love','cats','I','love','dogs','cats','are','great'];
+const VOCAB = ['I','love','cats','dogs','are','great'];
+const V = VOCAB.length;
+let animSpeed = 800;
+
+function setSpeed(ms, btn) {
+  animSpeed = ms;
+  document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function switchModule(idx, tab) {
+  document.querySelectorAll('.module').forEach((m,i) => m.classList.toggle('active', i===idx));
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  if(idx===3) renderHeatmaps();
+}
+
+// ========== PRECOMPUTE COOCCURRENCE ==========
+function computeCooccur(winSize) {
+  const mat = Array.from({length:V}, () => Array(V).fill(0));
+  for(let i=0; i<CORPUS.length; i++) {
+    const ci = VOCAB.indexOf(CORPUS[i]);
+    if(ci < 0) continue;
+    for(let j=Math.max(0,i-winSize); j<=Math.min(CORPUS.length-1,i+winSize); j++) {
+      if(i===j) continue;
+      const cj = VOCAB.indexOf(CORPUS[j]);
+      if(cj < 0) continue;
+      mat[ci][cj]++;
+    }
+  }
+  return mat;
+}
+
+const COOCCUR_MAT_2 = computeCooccur(2); // window=2 for modules 2,3,4
+
+// Word frequencies
+const WORD_FREQ = {};
+CORPUS.forEach(w => WORD_FREQ[w] = (WORD_FREQ[w]||0)+1);
+const TOTAL = CORPUS.length;
+
+// ========== MODULE 1 ==========
+let m1Step = 0, m1Auto = null, m1WinSize = 2;
+let m1CooccurCounts = {}; // "w1_w2" -> count
+
+function resetMod1() {
+  clearInterval(m1Auto); m1Auto = null;
+  m1Step = 0;
+  m1CooccurCounts = {};
+  m1WinSize = parseInt(document.getElementById('winSize').value);
+  renderCorpusWords(-1, []);
+  document.getElementById('cooccurPairs').innerHTML = '';
+  document.getElementById('stepLog1').textContent = '点击「下一步」开始滑动窗口扫描...';
+  document.getElementById('prevBtn1').disabled = true;
+  document.getElementById('nextBtn1').disabled = false;
+  document.getElementById('autoBtn1').textContent = '自动播放';
+  updateStepInfo1();
+}
+
+function renderCorpusWords(center, ctxIdxs) {
+  const el = document.getElementById('corpusWords');
+  el.innerHTML = CORPUS.map((w,i) => {
+    let cls = 'word-token';
+    if(i === center) cls += ' center';
+    else if(ctxIdxs.includes(i)) cls += ' context';
+    return `<div class="${cls}">${w}<span class="idx">${i}</span></div>`;
+  }).join('');
+}
+
+function nextStep1() {
+  if(m1Step >= CORPUS.length) return;
+  const i = m1Step;
+  const ws = m1WinSize;
+  const ctxIdxs = [];
+  const newPairs = [];
+
+  for(let j=Math.max(0,i-ws); j<=Math.min(CORPUS.length-1,i+ws); j++) {
+    if(j===i) continue;
+    ctxIdxs.push(j);
+    const w1 = CORPUS[i], w2 = CORPUS[j];
+    if(VOCAB.includes(w1) && VOCAB.includes(w2)) {
+      const key = [w1,w2].sort().join('_');
+      m1CooccurCounts[key] = (m1CooccurCounts[key]||0);
+      newPairs.push(key);
+    }
+  }
+
+  // Increment counts
+  newPairs.forEach(k => m1CooccurCounts[k]++);
+
+  renderCorpusWords(i, ctxIdxs);
+  renderPairs(newPairs);
+
+  const ctxWords = ctxIdxs.map(j=>CORPUS[j]).join(', ');
+  document.getElementById('stepLog1').textContent =
+    `扫描位置 ${i}：中心词 "${CORPUS[i]}"，上下文词 [${ctxWords}]，更新了 ${newPairs.length} 对共现`;
+
+  m1Step++;
+  document.getElementById('prevBtn1').disabled = false;
+  document.getElementById('nextBtn1').disabled = m1Step >= CORPUS.length;
+  updateStepInfo1();
+}
+
+function prevStep1() {
+  if(m1Step <= 0) return;
+  m1Step--;
+  m1CooccurCounts = {};
+  // Recompute up to m1Step-1
+  for(let i=0; i<m1Step; i++) {
+    const ws = m1WinSize;
+    for(let j=Math.max(0,i-ws); j<=Math.min(CORPUS.length-1,i+ws); j++) {
+      if(j===i) continue;
+      const w1=CORPUS[i], w2=CORPUS[j];
+      if(VOCAB.includes(w1)&&VOCAB.includes(w2)) {
+        const key=[w1,w2].sort().join('_');
+        m1CooccurCounts[key]=(m1CooccurCounts[key]||0)+1;
+      }
+    }
+  }
+  if(m1Step > 0) {
+    const i=m1Step-1, ws=m1WinSize;
+    const ctxIdxs=[];
+    for(let j=Math.max(0,i-ws); j<=Math.min(CORPUS.length-1,i+ws); j++) {
+      if(j!==i) ctxIdxs.push(j);
+    }
+    renderCorpusWords(i, ctxIdxs);
+  } else {
+    renderCorpusWords(-1,[]);
+  }
+  renderPairs([]);
+  document.getElementById('prevBtn1').disabled = m1Step===0;
+  document.getElementById('nextBtn1').disabled = false;
+  updateStepInfo1();
+}
+
+function renderPairs(highlightKeys) {
+  const el = document.getElementById('cooccurPairs');
+  el.innerHTML = Object.entries(m1CooccurCounts).map(([k,v]) => {
+    const [a,b] = k.split('_');
+    const isNew = highlightKeys.includes(k);
+    return `<div class="pair-badge${isNew?' new-pair':''}">${a} ↔ ${b}: <strong style="color:#8ab0d0">${v}</strong></div>`;
+  }).join('');
+}
+
+function autoPlay1() {
+  const btn = document.getElementById('autoBtn1');
+  if(m1Auto) {
+    clearInterval(m1Auto); m1Auto=null; btn.textContent='自动播放'; return;
+  }
+  btn.textContent='暂停';
+  m1Auto = setInterval(() => {
+    if(m1Step >= CORPUS.length) {
+      clearInterval(m1Auto); m1Auto=null; btn.textContent='自动播放'; return;
+    }
+    nextStep1();
+  }, animSpeed);
+}
+
+function updateStepInfo1() {
+  document.getElementById('stepInfo1').textContent = `步骤 ${m1Step} / ${CORPUS.length}`;
+}
+
+// ========== MODULE 2 ==========
+let m2Step = 0, m2Auto = null;
+let m2Mat, m2Steps;
+
+function buildM2Steps() {
+  const steps = [];
+  const tmpMat = Array.from({length:V}, ()=>Array(V).fill(0));
+  const ws = 2;
+  for(let i=0; i<CORPUS.length; i++) {
+    const ci = VOCAB.indexOf(CORPUS[i]);
+    if(ci<0) continue;
+    for(let j=Math.max(0,i-ws); j<=Math.min(CORPUS.length-1,i+ws); j++) {
+      if(i===j) continue;
+      const cj = VOCAB.indexOf(CORPUS[j]);
+      if(cj<0) continue;
+      tmpMat[ci][cj]++;
+      steps.push({
+        r:ci, c:cj, val: tmpMat[ci][cj],
+        mat: tmpMat.map(row=>[...row]),
+        desc: `位置 ${i} "${CORPUS[i]}" ↔ 位置 ${j} "${CORPUS[j]}"，C[${VOCAB[ci]}][${VOCAB[cj]}] = ${tmpMat[ci][cj]}`
+      });
+    }
+  }
+  return steps;
+}
+
+function resetMod2() {
+  clearInterval(m2Auto); m2Auto=null;
+  m2Step=0;
+  m2Steps = buildM2Steps();
+  const emptyMat = Array.from({length:V},()=>Array(V).fill(0));
+  renderMatrix2(emptyMat, -1,-1);
+  renderMatrixInfo('等待开始...','','','');
+  renderWordFreq();
+  document.getElementById('prevBtn2').disabled=true;
+  document.getElementById('nextBtn2').disabled=false;
+  document.getElementById('autoBtn2').textContent='自动播放';
+  updateStepInfo2();
+}
+
+function renderMatrix2(mat, hr, hc) {
+  let html = '<table class="cooccur-table"><tr><th></th>';
+  VOCAB.forEach(v => html+=`<th>${v}</th>`);
+  html+='</tr>';
+  mat.forEach((row,ri) => {
+    html+=`<tr><th>${VOCAB[ri]}</th>`;
+    row.forEach((val,ci) => {
+      const maxVal = Math.max(...mat.flat().filter(x=>x>0), 1);
+      const intensity = val===0 ? 0 : 0.15 + 0.85*(val/maxVal);
+      const bg = val===0 ? '#0d1520' : `rgba(20,104,192,${intensity})`;
+      const color = val===0 ? '#3a5a7a' : '#e0f0ff';
+      const isHL = ri===hr && ci===hc;
+      html+=`<td class="${val>0?'has-value':''} ${isHL?'highlight':''}" style="background:${bg};color:${color}">${val||''}</td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</table>';
+  document.getElementById('matrixTableWrap').innerHTML=html;
+}
+
+function renderMatrixInfo(desc, r, c, val) {
+  document.getElementById('matrixInfoBox').innerHTML=`
+    <div class="info-row"><span>操作</span><span class="val">${desc}</span></div>
+    ${r!==''?`<div class="info-row"><span>行词</span><span class="val">${r}</span></div>`:''}
+    ${c!==''?`<div class="info-row"><span>列词</span><span class="val">${c}</span></div>`:''}
+    ${val!==''?`<div class="info-row"><span>当前值</span><span class="val" style="color:#58a6ff">${val}</span></div>`:''}
+  `;
+}
+
+function renderWordFreq() {
+  document.getElementById('wordFreqBox').innerHTML = VOCAB.map(w=>
+    `<div class="info-row"><span>${w}</span><span class="val">${WORD_FREQ[w]||0} 次 (P=${((WORD_FREQ[w]||0)/TOTAL).toFixed(3)})</span></div>`
+  ).join('');
+}
+
+function nextStep2() {
+  if(m2Step >= m2Steps.length) return;
+  const s = m2Steps[m2Step];
+  renderMatrix2(s.mat, s.r, s.c);
+  renderMatrixInfo(s.desc, VOCAB[s.r], VOCAB[s.c], s.val);
+  m2Step++;
+  document.getElementById('prevBtn2').disabled=false;
+  document.getElementById('nextBtn2').disabled=m2Step>=m2Steps.length;
+  updateStepInfo2();
+}
+
+function prevStep2() {
+  if(m2Step<=0) return;
+  m2Step--;
+  if(m2Step===0) {
+    renderMatrix2(Array.from({length:V},()=>Array(V).fill(0)),-1,-1);
+    renderMatrixInfo('已回到初始状态','','','');
+    document.getElementById('prevBtn2').disabled=true;
+  } else {
+    const s=m2Steps[m2Step-1];
+    renderMatrix2(s.mat,s.r,s.c);
+    renderMatrixInfo(s.desc,VOCAB[s.r],VOCAB[s.c],s.val);
+  }
+  document.getElementById('nextBtn2').disabled=false;
+  updateStepInfo2();
+}
+
+function autoPlay2() {
+  const btn=document.getElementById('autoBtn2');
+  if(m2Auto){clearInterval(m2Auto);m2Auto=null;btn.textContent='自动播放';return;}
+  btn.textContent='暂停';
+  m2Auto=setInterval(()=>{
+    if(m2Step>=m2Steps.length){clearInterval(m2Auto);m2Auto=null;btn.textContent='自动播放';return;}
+    nextStep2();
+  },animSpeed);
+}
+
+function updateStepInfo2() {
+  document.getElementById('stepInfo2').textContent=`步骤 ${m2Step} / ${m2Steps.length}`;
+}
+
+// ========== MODULE 3: PMI ==========
+function initPMISelectors() {
+  const sw=document.getElementById('selW');
+  const sc=document.getElementById('selC');
+  VOCAB.forEach(v=>{
+    sw.innerHTML+=`<option value="${v}">${v}</option>`;
+    sc.innerHTML+=`<option value="${v}">${v}</option>`;
+  });
+  sc.selectedIndex=1;
+}
+
+function calcPMI() {
+  const w=document.getElementById('selW').value;
+  const c=document.getElementById('selC').value;
+  const wi=VOCAB.indexOf(w), ci=VOCAB.indexOf(c);
+
+  const coCount=COOCCUR_MAT_2[wi][ci];
+  const totalPairs=COOCCUR_MAT_2.flat().reduce((a,b)=>a+b,0)/2;
+  const wCount=COOCCUR_MAT_2[wi].reduce((a,b)=>a+b,0);
+  const cCount=COOCCUR_MAT_2.map(row=>row[ci]).reduce((a,b)=>a+b,0);
+
+  if(totalPairs===0||wCount===0||cCount===0) {
+    document.getElementById('fLine2').innerHTML='<span style="color:#f05050">词频不足，无法计算</span>';
+    return;
+  }
+
+  const Pwc=coCount/(totalPairs*2);
+  const Pw=wCount/(totalPairs*2);
+  const Pc=cCount/(totalPairs*2);
+
+  let pmi,ppmi;
+  if(coCount===0){
+    pmi=-Infinity; ppmi=0;
+  } else {
+    pmi=Math.log2(Pwc/(Pw*Pc));
+    ppmi=Math.max(pmi,0);
+  }
+
+  document.getElementById('fLine1').innerHTML=
+    `PMI(<span class="hl-blue">${w}</span>, <span class="hl-green">${c}</span>) = log₂ [ P(w,c) / (P(w) · P(c)) ]`;
+
+  document.getElementById('fLine2').innerHTML=
+    `共现次数 C(<span class="hl-blue">${w}</span>,<span class="hl-green">${c}</span>) = <span class="hl-orange">${coCount}</span>，` +
+    `C(<span class="hl-blue">${w}</span>) = ${wCount}，C(<span class="hl-green">${c}</span>) = ${cCount}，总对数 ≈ ${totalPairs.toFixed(0)}`;
+
+  document.getElementById('fLine3').innerHTML=
+    `P(w,c) = <span class="hl-orange">${coCount}</span> / ${(totalPairs*2).toFixed(0)} = <span class="hl-yellow">${Pwc.toFixed(4)}</span>，` +
+    `P(w) = ${Pw.toFixed(4)}，P(c) = ${Pc.toFixed(4)}`;
+
+  if(coCount===0) {
+    document.getElementById('fLine4').innerHTML=`<span class="hl-red">P(w,c)=0，PMI = −∞，PPMI = 0（两词从未共现）</span>`;
+  } else {
+    document.getElementById('fLine4').innerHTML=
+      `PMI = log₂( <span class="hl-yellow">${Pwc.toFixed(4)}</span> / (${Pw.toFixed(4)} × ${Pc.toFixed(4)}) ) = ` +
+      `log₂( ${(Pwc/(Pw*Pc)).toFixed(4)} ) = <span class="${pmi>=0?'hl-green':'hl-red'}">${pmi.toFixed(3)}</span>`;
+  }
+
+  // Gauge bars
+  const maxPMI=3;
+  const pmiPct = coCount===0 ? 0 : Math.min(Math.max((pmi/maxPMI*0.5+0.5)*100,2),98);
+  const ppmiPct = coCount===0 ? 0 : Math.min((ppmi/maxPMI)*100,100);
+
+  const barFill=document.getElementById('pmiBarFill');
+  barFill.style.width=pmiPct+'%';
+  barFill.className='gauge-bar-fill '+(pmi>=0?'positive':'negative');
+
+  document.getElementById('ppmiBarFill').style.width=ppmiPct+'%';
+
+  const valEl=document.getElementById('pmiValueDisplay');
+  valEl.textContent = coCount===0 ? 'PMI = −∞  |  PPMI = 0' :
+    `PMI = ${pmi.toFixed(3)}  |  PPMI = ${ppmi.toFixed(3)}`;
+  valEl.style.color = coCount===0 ? '#f05050' : pmi>=0 ? '#4dbb5e' : '#f05050';
+
+  document.getElementById('pmiValLabel').textContent = coCount===0 ? '−∞' : pmi.toFixed(3);
+  document.getElementById('ppmiValLabel').textContent = ppmi.toFixed(3);
+}
+
+// ========== MODULE 4: Heatmaps ==========
+function computePPMI() {
+  const mat=COOCCUR_MAT_2;
+  const totalAll=mat.flat().reduce((a,b)=>a+b,0);
+  if(totalAll===0) return Array.from({length:V},()=>Array(V).fill(0));
+  const rowSums=mat.map(row=>row.reduce((a,b)=>a+b,0));
+  const colSums=Array.from({length:V},(_,ci)=>mat.reduce((s,row)=>s+row[ci],0));
+  return mat.map((row,ri)=>row.map((val,ci)=>{
+    if(val===0||rowSums[ri]===0||colSums[ci]===0) return 0;
+    const Pwc=val/totalAll;
+    const Pw=rowSums[ri]/totalAll;
+    const Pc=colSums[ci]/totalAll;
+    return Math.max(Math.log2(Pwc/(Pw*Pc)),0);
+  }));
+}
+
+function cellColor(val, maxVal, isRaw) {
+  if(val===0) return '#0d1520';
+  const t=val/maxVal;
+  if(isRaw) {
+    const r=Math.round(13+t*55), g=Math.round(21+t*80), b=Math.round(32+t*160);
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const r=Math.round(13+t*20), g=Math.round(21+t*140), b=Math.round(32+t*160);
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
+function renderHeatmaps() {
+  const ppmiMat=computePPMI();
+  const rawMax=Math.max(...COOCCUR_MAT_2.flat(),1);
+  const ppmiMax=Math.max(...ppmiMat.flat(),0.001);
+
+  function buildTable(mat, maxVal, isRaw, tableId) {
+    let html=`<table class="heatmap-table"><tr><th></th>`;
+    VOCAB.forEach(v=>html+=`<th>${v}</th>`);
+    html+='</tr>';
+    mat.forEach((row,ri)=>{
+      html+=`<tr><th>${VOCAB[ri]}</th>`;
+      row.forEach((val,ci)=>{
+        const bg=cellColor(val,maxVal,isRaw);
+        const dispVal=isRaw?val:val.toFixed(2);
+        const textCol=val===0?'#3a5a7a':'#e0f0ff';
+        html+=`<td style="background:${bg};color:${textCol}"
+          onmouseenter="showHeatTooltip(${ri},${ci},${val},${isRaw?1:0})"
+          onmouseleave="clearHeatTooltip()">${val===0?'':dispVal}</td>`;
+      });
+      html+='</tr>';
+    });
+    html+='</table>';
+    document.getElementById(tableId).innerHTML=html;
+  }
+
+  buildTable(COOCCUR_MAT_2,rawMax,true,'rawHeatmap');
+  buildTable(ppmiMat,ppmiMax,false,'ppmiHeatmap');
+}
+
+function showHeatTooltip(ri, ci, val, isRaw) {
+  const w=VOCAB[ri], c=VOCAB[ci];
+  const ppmiMat=computePPMI();
+  const rawVal=COOCCUR_MAT_2[ri][ci];
+  const ppmiVal=ppmiMat[ri][ci];
+  const totalAll=COOCCUR_MAT_2.flat().reduce((a,b)=>a+b,0);
+  const rowSums=COOCCUR_MAT_2.map(row=>row.reduce((a,b)=>a+b,0));
+  const colSums=Array.from({length:V},(_,ci2)=>COOCCUR_MAT_2.reduce((s,row)=>s+row[ci2],0));
+  const Pwc=totalAll>0?rawVal/totalAll:0;
+  const Pw=totalAll>0?rowSums[ri]/totalAll:0;
+  const Pc=totalAll>0?colSums[ci]/totalAll:0;
+  let pmiStr=rawVal===0?'−∞':Math.log2(Pwc/(Pw*Pc)).toFixed(3);
+  document.getElementById('heatTooltip').innerHTML=
+    `<strong style="color:#8ab0d0">${w} ↔ ${c}</strong> —
+    共现次数: <span class="t-val">${rawVal}</span>，
+    P(w,c): <span class="t-val">${Pwc.toFixed(4)}</span>，
+    P(w): <span class="t-val">${Pw.toFixed(4)}</span>，
+    P(c): <span class="t-val">${Pc.toFixed(4)}</span><br>
+    PMI = <span class="t-val">${pmiStr}</span>，
+    PPMI = <span class="t-val">${ppmiVal.toFixed(3)}</span>
+    <span class="t-note"> &nbsp;— ${ppmiVal>0?'正相关，共现比随机期望频繁':rawVal===0?'从未共现':'负相关或独立'}</span>`;
+}
+
+function clearHeatTooltip() {
+  document.getElementById('heatTooltip').textContent='将鼠标悬停在任意格子上，查看详细计算信息...';
+}
+
+// ========== INIT ==========
+resetMod1();
+resetMod2();
+initPMISelectors();
+calcPMI();
+</script>
+</body>
+</html>

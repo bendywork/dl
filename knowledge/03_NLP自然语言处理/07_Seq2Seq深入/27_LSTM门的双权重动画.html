@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSTM 门的双权重动画</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #0f172a; color: #e2e8f0; }
+.container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+.header { text-align: center; padding: 20px 0; }
+.header h1 { font-size: 22px; background: linear-gradient(135deg, #a78bfa, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.header p { color: #94a3b8; margin-top: 6px; font-size: 13px; }
+.canvas-wrap { background: #1e293b; border-radius: 12px; border: 1px solid #334155; padding: 16px; margin: 16px 0; }
+canvas { display: block; margin: 0 auto; }
+.controls { display: flex; justify-content: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+.btn { padding: 8px 18px; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; cursor: pointer; font-size: 13px; transition: all 0.3s; }
+.btn:hover { border-color: #60a5fa; }
+.btn.active { background: #1e3a5f; border-color: #60a5fa; color: #60a5fa; }
+.explain { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin: 16px 0; }
+.explain h3 { color: #a78bfa; font-size: 16px; margin-bottom: 12px; }
+.explain p { color: #94a3b8; font-size: 13px; line-height: 2; }
+.explain .key { color: #f59e0b; font-weight: 600; }
+.explain .good { color: #22c55e; }
+.explain .bad { color: #ef4444; }
+.explain .code { background: #0f172a; padding: 12px 16px; border-radius: 8px; font-family: 'Menlo', monospace; font-size: 12px; color: #e2e8f0; margin: 12px 0; border-left: 3px solid #a78bfa; }
+.gate-tabs { display: flex; justify-content: center; gap: 6px; margin: 12px 0; }
+.gate-tab { padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; border: 1px solid #334155; background: #1e293b; transition: all 0.3s; }
+.gate-tab.forget { color: #ef4444; }
+.gate-tab.input { color: #22c55e; }
+.gate-tab.candidate { color: #f59e0b; }
+.gate-tab.output { color: #ec4899; }
+.gate-tab:hover, .gate-tab.active { background: #1e3a5f; border-color: currentColor; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🧠 LSTM 门为什么需要两个权重？</h1>
+    <p>每个门要同时考虑"当前输入"和"已有记忆"才能做出正确决策</p>
+  </div>
+
+  <div class="gate-tabs">
+    <div class="gate-tab forget active" onclick="setGate('forget')">遗忘门 f</div>
+    <div class="gate-tab input" onclick="setGate('input')">输入门 i</div>
+    <div class="gate-tab candidate" onclick="setGate('candidate')">候选状态 g</div>
+    <div class="gate-tab output" onclick="setGate('output')">输出门 o</div>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="mainCanvas" width="960" height="440"></canvas>
+  </div>
+
+  <div class="controls">
+    <button class="btn active" onclick="play()">▶ 播放</button>
+    <button class="btn" onclick="pause()">⏸ 暂停</button>
+    <button class="btn" onclick="reset()">↺ 重置</button>
+    <button class="btn" onclick="stepForward()">⏭ 单步</button>
+  </div>
+
+  <div class="explain" id="explainBox">
+    <h3>💡 遗忘门为什么需要两个权重？</h3>
+    <p>
+      遗忘门要决定：<span class="key">从旧记忆中忘掉哪些、保留哪些</span><br>
+      只看 x_t（当前词）：不知道旧记忆里有什么，无法判断该不该忘<br>
+      只看 h_{t-1}（记忆）：不知道新来了什么信息，无法判断是否需要腾空间<br>
+      <span class="good">必须同时看两者 → 所以需要 W_x 和 W_h 两个权重</span>
+    </p>
+    <div class="code">
+      f_t = sigmoid(W_xf · x_t + W_hf · h_{t-1} + b)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;↑ 当前输入的贡献 &nbsp;&nbsp;↑ 已有记忆的贡献
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+canvas.width = 960 * dpr;
+canvas.height = 440 * dpr;
+canvas.style.width = '960px';
+canvas.style.height = '440px';
+ctx.scale(dpr, dpr);
+
+let currentGate = 'forget';
+let step = 0;
+let maxStep = 8;
+let playing = false;
+let timer = null;
+
+const GATE_INFO = {
+  forget: {
+    name: '遗忘门 f',
+    color: '#ef4444',
+    decision: '要不要忘掉旧记忆中的某些信息？',
+    wxRole: '当前词说"但是"→ 可能要转折，旧信息该忘了',
+    whRole: '旧记忆里有主语信息 → 还需要，不该忘',
+    result: '综合考虑：忘掉不相关的，保留重要的',
+    formula: 'f_t = σ(W_xf · x_t + W_hf · h_{t-1} + b)',
+    explain: `<h3>💡 遗忘门为什么需要两个权重？</h3>
+      <p>遗忘门要决定：<span class="key">从旧记忆中忘掉哪些、保留哪些</span><br>
+      只看 x_t（当前词）：不知道旧记忆里有什么，无法判断该不该忘<br>
+      只看 h_{t-1}（记忆）：不知道新来了什么信息，无法判断是否需要腾空间<br>
+      <span class="good">必须同时看两者 → 所以需要 W_x 和 W_h 两个权重</span></p>
+      <div class="code">f_t = sigmoid(W_xf · x_t + W_hf · h_{t-1} + b)<br>&nbsp;&nbsp;&nbsp;&nbsp;↑ 当前输入的贡献 &nbsp;&nbsp;↑ 已有记忆的贡献</div>`
+  },
+  input: {
+    name: '输入门 i',
+    color: '#22c55e',
+    decision: '要不要把新信息写入记忆？',
+    wxRole: '当前词是关键动词 → 应该写入记忆',
+    whRole: '记忆中已有类似信息 → 不需要重复写入',
+    result: '综合考虑：写入真正新的、重要的信息',
+    formula: 'i_t = σ(W_xi · x_t + W_hi · h_{t-1} + b)',
+    explain: `<h3>💡 输入门为什么需要两个权重？</h3>
+      <p>输入门要决定：<span class="key">要不要把新信息写入记忆</span><br>
+      只看 x_t（当前词）：看到新词就想写入 → 可能重复写入已有信息<br>
+      只看 h_{t-1}（记忆）：不知道新来了什么 → 可能错过重要新信息<br>
+      <span class="good">必须同时看两者 → 避免重复写入，也不错过新信息</span></p>
+      <div class="code">i_t = sigmoid(W_xi · x_t + W_hi · h_{t-1} + b)<br>&nbsp;&nbsp;&nbsp;&nbsp;↑ 当前输入的贡献 &nbsp;&nbsp;↑ 已有记忆的贡献</div>`
+  },
+  candidate: {
+    name: '候选状态 g',
+    color: '#f59e0b',
+    decision: '如果要写入，写入什么内容？',
+    wxRole: '当前词的语义 → 这就是候选的新信息',
+    whRole: '旧记忆的上下文 → 在旧信息基础上调整候选内容',
+    result: '综合考虑：生成与上下文一致的新候选信息',
+    formula: 'g_t = tanh(W_xg · x_t + W_hg · h_{t-1} + b)',
+    explain: `<h3>💡 候选状态为什么需要两个权重？</h3>
+      <p>候选状态要生成：<span class="key">如果要写入，写入什么内容？</span><br>
+      只看 x_t（当前词）：只看字面意思，缺乏上下文调整<br>
+      只看 h_{t-1}（记忆）：在旧信息基础上微调，但不知道新来了什么<br>
+      <span class="good">必须同时看两者 → 生成既反映新输入又与上下文一致的候选</span></p>
+      <div class="code">g_t = tanh(W_xg · x_t + W_hg · h_{t-1} + b)<br>&nbsp;&nbsp;&nbsp;&nbsp;↑ 当前输入的贡献 &nbsp;&nbsp;↑ 已有记忆的贡献</div>`
+  },
+  output: {
+    name: '输出门 o',
+    color: '#ec4899',
+    decision: '从记忆中读出哪些信息对外输出？',
+    wxRole: '当前任务需要什么 → 比如"现在要预测动词"',
+    whRole: '记忆中哪些维度最相关 → 比如"主语信息当前最需要"',
+    result: '综合考虑：只输出当前时刻最相关的信息',
+    formula: 'o_t = σ(W_xo · x_t + W_ho · h_{t-1} + b)',
+    explain: `<h3>💡 输出门为什么需要两个权重？</h3>
+      <p>输出门要决定：<span class="key">从记忆中读出哪些信息对外输出？</span><br>
+      只看 x_t（当前词）：知道现在要做什么，但不知道记忆里有什么可读<br>
+      只看 h_{t-1}（记忆）：知道记忆里有什么，但不知道当前需要什么<br>
+      <span class="good">必须同时看两者 → 只输出当前时刻最需要的部分</span></p>
+      <div class="code">o_t = sigmoid(W_xo · x_t + W_ho · h_{t-1} + b)<br>&nbsp;&nbsp;&nbsp;&nbsp;↑ 当前输入的贡献 &nbsp;&nbsp;↑ 已有记忆的贡献</div>`
+  }
+};
+
+function setGate(gate) {
+  currentGate = gate;
+  step = 0;
+  pause();
+  document.querySelectorAll('.gate-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.gate-tab.' + gate).classList.add('active');
+  document.getElementById('explainBox').innerHTML = GATE_INFO[gate].explain;
+  draw();
+}
+
+function alpha(s) {
+  if (step < s) return 0.12;
+  if (step === s) return 0.6 + 0.4 * Math.sin(Date.now() / 250);
+  return 1;
+}
+
+function roundRect(x, y, w, h, r, fill, stroke, lw) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw||1; ctx.stroke(); }
+}
+
+function arrow(x1,y1,x2,y2,color,a,lw,dash) {
+  ctx.globalAlpha = a||1;
+  ctx.strokeStyle = color; ctx.lineWidth = lw||2;
+  ctx.setLineDash(dash?[5,3]:[]);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  const ang = Math.atan2(y2-y1,x2-x1), hl=8;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hl*Math.cos(ang-0.4),y2-hl*Math.sin(ang-0.4));
+  ctx.lineTo(x2-hl*Math.cos(ang+0.4),y2-hl*Math.sin(ang+0.4));
+  ctx.closePath(); ctx.fill();
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+}
+
+function label(x,y,text,color,size,align) {
+  ctx.fillStyle = color||'#e2e8f0';
+  ctx.font = (size||12)+'px -apple-system,PingFang SC,sans-serif';
+  ctx.textAlign = align||'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text,x,y);
+}
+
+function draw() {
+  const g = GATE_INFO[currentGate];
+  ctx.clearRect(0,0,960,440);
+
+  // Title
+  label(480, 25, g.name + '：' + g.decision, g.color, 15);
+
+  // ======== Left side: x_t input ========
+  const xtX = 120, xtY = 160;
+  const a0 = alpha(0);
+  roundRect(xtX-55, xtY-20, 110, 40, 8, '#60a5fa15', '#60a5fa', 2*a0);
+  ctx.globalAlpha = a0;
+  label(xtX, xtY-5, 'x_t', '#60a5fa', 14);
+  label(xtX, xtY+12, '当前输入', '#64748b', 9);
+  ctx.globalAlpha = 1;
+
+  // Example word
+  if (step >= 0) {
+    roundRect(xtX-40, xtY+35, 80, 24, 6, '#60a5fa10', '#60a5fa40', 1);
+    label(xtX, xtY+47, '"但是"', '#60a5fa', 11);
+  }
+
+  // ======== Right side: h_{t-1} memory ========
+  const htX = 120, htY = 310;
+  const a1 = alpha(1);
+  roundRect(htX-55, htY-20, 110, 40, 8, '#a78bfa15', '#a78bfa', 2*a1);
+  ctx.globalAlpha = a1;
+  label(htX, htY-5, 'h_{t-1}', '#a78bfa', 14);
+  label(htX, htY+12, '已有记忆', '#64748b', 9);
+  ctx.globalAlpha = 1;
+
+  if (step >= 1) {
+    roundRect(htX-50, htY+35, 100, 24, 6, '#a78bfa10', '#a78bfa40', 1);
+    label(htX, htY+47, '旧记忆内容', '#a78bfa', 11);
+  }
+
+  // ======== W_x transform ========
+  const wxX = 310, wxY = 160;
+  const a2 = alpha(2);
+  arrow(xtX+55, xtY, wxX-45, wxY, '#60a5fa', a2);
+  roundRect(wxX-45, wxY-25, 90, 50, 8, '#60a5fa10', '#60a5fa', 1.5*a2);
+  ctx.globalAlpha = a2;
+  label(wxX, wxY-8, 'W_x · x_t', '#60a5fa', 12);
+  label(wxX, wxY+10, '输入的贡献', '#64748b', 9);
+  ctx.globalAlpha = 1;
+
+  // W_x role explanation
+  if (step >= 3) {
+    const a3 = alpha(3);
+    roundRect(wxX-60, wxY+38, 120, 48, 6, '#60a5fa08', '#60a5fa60', 1*a3);
+    ctx.globalAlpha = a3;
+    label(wxX, wxY+50, g.wxRole.split('→')[0], '#60a5fa', 9);
+    label(wxX, wxY+66, g.wxRole.split('→')[1] || '', '#94a3b8', 9);
+    ctx.globalAlpha = 1;
+  }
+
+  // ======== W_h transform ========
+  const whX = 310, whY = 310;
+  const a4 = alpha(4);
+  arrow(htX+55, htY, whX-45, whY, '#a78bfa', a4);
+  roundRect(whX-45, whY-25, 90, 50, 8, '#a78bfa10', '#a78bfa', 1.5*a4);
+  ctx.globalAlpha = a4;
+  label(whX, whY-8, 'W_h · h_{t-1}', '#a78bfa', 12);
+  label(whX, whY+10, '记忆的贡献', '#64748b', 9);
+  ctx.globalAlpha = 1;
+
+  // W_h role explanation
+  if (step >= 5) {
+    const a5 = alpha(5);
+    roundRect(whX-60, whY+38, 120, 48, 6, '#a78bfa08', '#a78bfa60', 1*a5);
+    ctx.globalAlpha = a5;
+    label(whX, whY+50, g.whRole.split('→')[0], '#a78bfa', 9);
+    label(whX, whY+66, g.whRole.split('→')[1] || '', '#94a3b8', 9);
+    ctx.globalAlpha = 1;
+  }
+
+  // ======== Add (merge two streams) ========
+  const addX = 480, addY = 235;
+  const a6 = alpha(6);
+  arrow(wxX+45, wxY, addX-25, addY-15, '#60a5fa', a6);
+  arrow(whX+45, whY, addX-25, addY+15, '#a78bfa', a6);
+  // + symbol
+  ctx.globalAlpha = a6;
+  roundRect(addX-25, addY-25, 50, 50, 25, g.color+'15', g.color, 2);
+  label(addX, addY, '+', g.color, 20);
+  ctx.globalAlpha = 1;
+
+  // ======== Activation (sigmoid or tanh) ========
+  const actX = 620, actY = 235;
+  const a7 = alpha(7);
+  arrow(addX+25, actY, actX-40, actY, g.color, a7);
+  const actName = currentGate === 'candidate' ? 'tanh' : 'sigmoid';
+  roundRect(actX-40, actY-30, 80, 60, 8, g.color+'10', g.color, 2*a7);
+  ctx.globalAlpha = a7;
+  label(actX, actY-10, actName, g.color, 16);
+  label(actX, actY+10, '激活函数', '#64748b', 9);
+  ctx.globalAlpha = 1;
+
+  // ======== Gate output ========
+  const outX = 790, outY = 235;
+  const a8 = alpha(8);
+  arrow(actX+40, actY, outX-50, actY, g.color, a8);
+  roundRect(outX-50, outY-35, 100, 70, 8, g.color+'15', g.color, 2*a8);
+  ctx.globalAlpha = a8;
+  if (currentGate === 'forget') {
+    label(outX, outY-12, 'f_t', g.color, 16);
+    label(outX, outY+5, '遗忘比例', '#64748b', 10);
+    label(outX, outY+22, '0=全忘 1=全留', '#94a3b8', 9);
+  } else if (currentGate === 'input') {
+    label(outX, outY-12, 'i_t', g.color, 16);
+    label(outX, outY+5, '写入比例', '#64748b', 10);
+    label(outX, outY+22, '0=不写 1=全写', '#94a3b8', 9);
+  } else if (currentGate === 'candidate') {
+    label(outX, outY-12, 'g_t', g.color, 16);
+    label(outX, outY+5, '候选新信息', '#64748b', 10);
+    label(outX, outY+22, '值域 [-1, 1]', '#94a3b8', 9);
+  } else {
+    label(outX, outY-12, 'o_t', g.color, 16);
+    label(outX, outY+5, '输出比例', '#64748b', 10);
+    label(outX, outY+22, '0=不输出 1=全输出', '#94a3b8', 9);
+  }
+  ctx.globalAlpha = 1;
+
+  // Result explanation at bottom
+  if (step >= 7) {
+    const ra = alpha(7);
+    roundRect(300, 400, 600, 30, 6, g.color+'08', g.color, 1);
+    ctx.globalAlpha = ra;
+    label(600, 415, '✅ ' + g.result, g.color, 12);
+    ctx.globalAlpha = 1;
+  }
+
+  // Formula at top-right
+  label(780, 55, g.formula, '#94a3b8', 11);
+}
+
+// Animation controls
+function play() {
+  if (playing) return;
+  playing = true;
+  timer = setInterval(() => {
+    if (step >= maxStep) { pause(); return; }
+    step++; draw();
+  }, 700);
+}
+function pause() { playing = false; if (timer) clearInterval(timer); }
+function reset() { pause(); step = 0; draw(); }
+function stepForward() { if (step < maxStep) { step++; draw(); } }
+
+// Initial draw + pulse animation
+draw();
+function pulse() { if (!playing) draw(); requestAnimationFrame(pulse); }
+pulse();
+</script>
+</body>
+</html>

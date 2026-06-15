@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer 文本生成动画</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+.container { max-width: 980px; margin: 0 auto; padding: 30px 20px; }
+h1 { text-align: center; font-size: 1.7em; margin-bottom: 8px; color: #60a5fa; }
+.subtitle { text-align: center; color: #94a3b8; margin-bottom: 20px; font-size: 0.95em; }
+
+/* QKV 投影 */
+.qkv-section { background: #1e293b; border-radius: 14px; padding: 18px; margin: 15px 0; border: 1px solid #334155; }
+.qkv-title { text-align: center; color: #f59e0b; font-weight: bold; margin-bottom: 12px; }
+
+.token-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+.tok-vec { width: 70px; text-align: center; border-radius: 8px; padding: 8px 4px; transition: all 0.4s; border: 2px solid transparent; }
+.tok-vec .tv-label { font-size: 0.7em; color: #94a3b8; margin-bottom: 3px; }
+.tok-vec .tv-val { font-weight: bold; font-size: 0.85em; }
+.tv-x { border-color: #94a3b8; background: rgba(148,163,184,0.1); }
+.tv-q { border-color: #ef4444; background: rgba(239,68,68,0.1); }
+.tv-k { border-color: #3b82f6; background: rgba(59,130,246,0.1); }
+.tv-v { border-color: #34d399; background: rgba(52,211,153,0.1); }
+.tv-x .tv-val { color: #e2e8f0; }
+.tv-q .tv-val { color: #fca5a5; }
+.tv-k .tv-val { color: #93c5fd; }
+.tv-v .tv-val { color: #6ee7b7; }
+
+.qkv-arrow { text-align: center; color: #64748b; font-size: 0.8em; margin: 4px 0; }
+
+/* 注意力矩阵 */
+.attn-section { background: #1e293b; border-radius: 14px; padding: 18px; margin: 15px 0; border: 1px solid #334155; }
+.attn-title { text-align: center; color: #60a5fa; font-weight: bold; margin-bottom: 12px; }
+
+.matrix-container { display: flex; justify-content: center; }
+.attn-matrix { border-collapse: collapse; }
+.attn-matrix th { padding: 6px 10px; font-size: 0.75em; color: #94a3b8; }
+.attn-matrix th.row-hdr { color: #fbbf24; }
+.attn-matrix th.col-hdr { color: #60a5fa; }
+.attn-matrix td { width: 52px; height: 42px; text-align: center; border: 1px solid #334155; font-size: 0.72em; font-weight: bold; transition: all 0.5s; position: relative; }
+.attn-matrix td .val { font-weight: bold; }
+.attn-matrix td.masked { background: #1e293b !important; color: #475569; }
+
+/* 因果掩码 */
+.mask-section { background: #1e293b; border-radius: 14px; padding: 18px; margin: 15px 0; border: 1px solid #334155; }
+.mask-title { text-align: center; color: #ef4444; font-weight: bold; margin-bottom: 12px; }
+.mask-grid { display: flex; flex-direction: column; gap: 4px; align-items: center; margin: 10px 0; }
+.mask-row { display: flex; gap: 4px; }
+.mask-cell { width: 50px; height: 38px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7em; font-weight: bold; transition: all 0.4s; border: 1px solid #334155; }
+.mask-see { background: rgba(52,211,153,0.2); border-color: #34d399; color: #6ee7b7; }
+.mask-hide { background: rgba(239,68,68,0.15); border-color: #ef4444; color: #ef4444; }
+
+/* 多头注意力 */
+.mha-section { background: #1e293b; border-radius: 14px; padding: 18px; margin: 15px 0; border: 1px solid #334155; }
+.mha-title { text-align: center; color: #a855f7; font-weight: bold; margin-bottom: 12px; }
+.head-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.head-box { width: 180px; padding: 10px; border-radius: 10px; border: 2px solid transparent; text-align: center; transition: all 0.5s; opacity: 0.4; }
+.head-box.active { opacity: 1; }
+.head-box .h-name { font-weight: bold; font-size: 0.85em; margin-bottom: 4px; }
+.head-box .h-desc { font-size: 0.7em; color: #94a3b8; }
+.head-1 { border-color: #ef4444; background: rgba(239,68,68,0.08); }
+.head-1.active { box-shadow: 0 0 15px rgba(239,68,68,0.3); }
+.head-2 { border-color: #3b82f6; background: rgba(59,130,246,0.08); }
+.head-2.active { box-shadow: 0 0 15px rgba(59,130,246,0.3); }
+.head-3 { border-color: #34d399; background: rgba(52,211,153,0.08); }
+.head-3.active { box-shadow: 0 0 15px rgba(52,211,153,0.3); }
+.head-4 { border-color: #a855f7; background: rgba(168,85,247,0.08); }
+.head-4.active { box-shadow: 0 0 15px rgba(168,85,247,0.3); }
+
+/* 控制 */
+.controls { display: flex; gap: 12px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
+.btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 0.95em; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+.btn-primary { background: #3b82f6; color: white; }
+.btn-primary:hover { background: #2563eb; }
+.btn-secondary { background: #64748b; color: white; }
+
+.step-info { text-align: center; margin: 10px 0; }
+.step-info .panel { background: #1e293b; padding: 10px 18px; border-radius: 8px; border-left: 3px solid #60a5fa; display: inline-block; font-size: 0.85em; max-width: 800px; text-align: left; }
+
+.info-box { background: #1e293b; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 3px solid #a855f7; }
+.info-box h4 { color: #a855f7; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🤖 Transformer 文本生成动画</h1>
+<p class="subtitle">Self-Attention + 因果掩码 + 多头注意力：并行编码，自回归生成</p>
+
+<div class="controls">
+  <button class="btn btn-primary" onclick="nextStep()">⏭ 下一步</button>
+  <button class="btn btn-primary" onclick="autoPlay()" id="btnAuto" style="background:#8b5cf6;color:white">▶ 自动</button>
+  <button class="btn btn-secondary" onclick="resetAll()">↻ 重置</button>
+</div>
+
+<div class="step-info" id="stepInfo">
+  <div class="panel">逐步观察 Transformer 如何用 Self-Attention 替代 RNN 进行文本生成</div>
+</div>
+
+<!-- 1. QKV 投影 -->
+<div class="qkv-section">
+  <div class="qkv-title">Step 1: QKV 投影</div>
+  <div class="qkv-arrow">输入嵌入 x</div>
+  <div class="token-row" id="xRow"></div>
+  <div class="qkv-arrow">↓ × W_Q / W_K / W_V</div>
+  <div class="token-row" id="qRow" style="display:none"></div>
+  <div class="token-row" id="kRow" style="display:none"></div>
+  <div class="token-row" id="vRow" style="display:none"></div>
+</div>
+
+<!-- 2. 注意力矩阵 -->
+<div class="attn-section">
+  <div class="attn-title">Step 2: 注意力分数 = softmax(QK<sup>T</sup> / √d<sub>k</sub>)</div>
+  <div class="matrix-container">
+    <table class="attn-matrix" id="attnMatrix"></table>
+  </div>
+</div>
+
+<!-- 3. 因果掩码 -->
+<div class="mask-section">
+  <div class="mask-title">Step 3: 因果掩码（Causal Mask）</div>
+  <p style="text-align:center;font-size:0.8em;color:#94a3b8;margin-bottom:8px">生成时，第 t 步不能看到 >t 的位置 → 掩码为 -inf → softmax 后变 0</p>
+  <div class="mask-grid" id="maskGrid"></div>
+</div>
+
+<!-- 4. 多头注意力 -->
+<div class="mha-section">
+  <div class="mha-title">Step 4: 多头注意力 — 每个头学不同的关注模式</div>
+  <div class="head-row">
+    <div class="head-box head-1" id="head1">
+      <div class="h-name" style="color:#ef4444">Head 1</div>
+      <div class="h-desc">语法关系<br>主语→动词</div>
+    </div>
+    <div class="head-box head-2" id="head2">
+      <div class="h-name" style="color:#3b82f6">Head 2</div>
+      <div class="h-desc">共指关系<br>代词→实体</div>
+    </div>
+    <div class="head-box head-3" id="head3">
+      <div class="h-name" style="color:#34d399">Head 3</div>
+      <div class="h-desc">语义相似<br>同义/近义</div>
+    </div>
+    <div class="head-box head-4" id="head4">
+      <div class="h-name" style="color:#a855f7">Head 4</div>
+      <div class="h-desc">位置邻近<br>相邻词关注</div>
+    </div>
+  </div>
+</div>
+
+<div class="info-box">
+  <h4>💡 Transformer vs RNN 核心区别</h4>
+  <p style="font-size:0.85em">
+    RNN：必须从左到右逐词处理，第100个词要等前99个算完 → <b>串行</b><br>
+    Transformer：所有词同时做 QKV 投影 + Self-Attention → <b>训练时可并行</b><br>
+    但生成仍是自回归的（每步生成一个词），只是每步内部并行处理所有已有位置。
+  </p>
+</div>
+</div>
+
+<script>
+const tokens = ['我', '爱', '中', '国'];
+
+// 预设注意力矩阵（因果掩码后的 softmax 结果）
+const attnWeights = [
+  [1.00, 0.00, 0.00, 0.00],   // "我" 只看自己
+  [0.30, 0.70, 0.00, 0.00],   // "爱" 看 "我"30% + "爱"70%
+  [0.10, 0.20, 0.70, 0.00],   // "中" 主要看自己
+  [0.05, 0.05, 0.40, 0.50],   // "国" 看 "中"40% + "国"50%
+];
+
+// 原始掩码：1=可见, 0=掩码
+const causalMask = [
+  [1, 0, 0, 0],
+  [1, 1, 0, 0],
+  [1, 1, 1, 0],
+  [1, 1, 1, 1],
+];
+
+const stepDescs = [
+  '1️⃣ 输入词嵌入 x：每个词的向量表示',
+  '2️⃣ QKV 投影：Q = "我在找什么"，K = "我能提供什么"，V = "我的实际内容"',
+  '3️⃣ 计算注意力分数 QKᵀ/√d：每个位置和所有位置算匹配度',
+  '4️⃣ 应用因果掩码：未来位置设为 -inf，softmax 后变 0',
+  '5️⃣ 加权求和 Attention × V：得到每个位置融合了上下文的输出',
+  '6️⃣ 多头注意力：不同头学到不同的关注模式，拼接后投影',
+];
+
+let curStep = -1;
+let autoTimer = null;
+
+function buildXRow() {
+  const el = document.getElementById('xRow');
+  el.innerHTML = '';
+  tokens.forEach((tok, i) => {
+    const d = document.createElement('div');
+    d.className = 'tok-vec tv-x';
+    d.innerHTML = `<div class="tv-label">x${i+1}</div><div class="tv-val">${tok}</div>`;
+    el.appendChild(d);
+  });
+}
+
+function buildQKVRows() {
+  ['q','k','v'].forEach(type => {
+    const el = document.getElementById(`${type}Row`);
+    el.innerHTML = '';
+    const cls = type === 'q' ? 'tv-q' : type === 'k' ? 'tv-k' : 'tv-v';
+    const label = type.toUpperCase();
+    tokens.forEach((tok, i) => {
+      const d = document.createElement('div');
+      d.className = `tok-vec ${cls}`;
+      d.innerHTML = `<div class="tv-label">${label}${i+1}</div><div class="tv-val">${tok}'</div>`;
+      el.appendChild(d);
+    });
+  });
+}
+
+function buildAttnMatrix() {
+  const table = document.getElementById('attnMatrix');
+  table.innerHTML = '';
+  // Header row
+  const hdr = table.insertRow();
+  hdr.insertCell(); // empty corner
+  tokens.forEach(t => {
+    const th = document.createElement('th');
+    th.className = 'col-hdr';
+    th.textContent = t;
+    hdr.appendChild(th);
+  });
+  // Data rows
+  tokens.forEach((tgt, ti) => {
+    const row = table.insertRow();
+    const th = document.createElement('th');
+    th.className = 'row-hdr';
+    th.textContent = tgt;
+    row.appendChild(th);
+    tokens.forEach((src, si) => {
+      const td = row.insertCell();
+      td.id = `attn-${ti}-${si}`;
+      td.innerHTML = '<div class="val">—</div>';
+    });
+  });
+}
+
+function buildMaskGrid() {
+  const el = document.getElementById('maskGrid');
+  el.innerHTML = '';
+  // Header
+  const hdrRow = document.createElement('div');
+  hdrRow.className = 'mask-row';
+  const spacer = document.createElement('div');
+  spacer.style.cssText = 'width:50px';
+  hdrRow.appendChild(spacer);
+  tokens.forEach(t => {
+    const d = document.createElement('div');
+    d.style.cssText = 'width:50px;text-align:center;font-size:0.75em;color:#60a5fa;font-weight:bold';
+    d.textContent = t;
+    hdrRow.appendChild(d);
+  });
+  el.appendChild(hdrRow);
+  // Grid
+  tokens.forEach((tgt, ti) => {
+    const row = document.createElement('div');
+    row.className = 'mask-row';
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'width:50px;text-align:center;font-size:0.75em;color:#fbbf24;font-weight:bold';
+    lbl.textContent = tgt;
+    row.appendChild(lbl);
+    tokens.forEach((src, si) => {
+      const cell = document.createElement('div');
+      cell.className = 'mask-cell';
+      cell.id = `mask-${ti}-${si}`;
+      cell.textContent = '?';
+      row.appendChild(cell);
+    });
+    el.appendChild(row);
+  });
+}
+
+function nextStep() {
+  curStep++;
+  if (curStep >= stepDescs.length) return;
+
+  document.getElementById('stepInfo').innerHTML = `<div class="panel">${stepDescs[curStep]}</div>`;
+
+  if (curStep === 0) {
+    // Show x embeddings
+    document.querySelectorAll('#xRow .tok-vec').forEach(el => el.style.opacity = '1');
+  } else if (curStep === 1) {
+    // Show QKV
+    ['qRow','kRow','vRow'].forEach(id => {
+      document.getElementById(id).style.display = 'flex';
+    });
+  } else if (curStep === 2) {
+    // Show raw attention scores (before mask)
+    for (let ti = 0; ti < tokens.length; ti++) {
+      for (let si = 0; si <= ti; si++) {
+        const cell = document.getElementById(`attn-${ti}-${si}`);
+        const raw = (attnWeights[ti][si] * 100).toFixed(0);
+        cell.querySelector('.val').textContent = raw + '%';
+        const intensity = attnWeights[ti][si];
+        const g = Math.round(100 + intensity * 155);
+        cell.style.background = `rgba(59,130,246,${intensity * 0.7})`;
+        cell.style.color = `rgb(${200-intensity*100},${g},${200})`;
+      }
+    }
+  } else if (curStep === 3) {
+    // Show causal mask
+    for (let ti = 0; ti < tokens.length; ti++) {
+      for (let si = 0; si < tokens.length; si++) {
+        const cell = document.getElementById(`mask-${ti}-${si}`);
+        if (causalMask[ti][si]) {
+          cell.className = 'mask-cell mask-see';
+          cell.textContent = '✓ 可见';
+        } else {
+          cell.className = 'mask-cell mask-hide';
+          cell.textContent = '✗ 掩码';
+        }
+      }
+    }
+    // Also mask the attention matrix
+    for (let ti = 0; ti < tokens.length; ti++) {
+      for (let si = ti + 1; si < tokens.length; si++) {
+        const cell = document.getElementById(`attn-${ti}-${si}`);
+        cell.className = 'masked';
+        cell.querySelector('.val').textContent = '-inf→0';
+        cell.style.background = '#1e293b';
+        cell.style.color = '#475569';
+      }
+    }
+  } else if (curStep === 4) {
+    // Context vectors computed - highlight the V row
+    document.querySelectorAll('#vRow .tok-vec').forEach(el => {
+      el.style.boxShadow = '0 0 15px rgba(52,211,153,0.5)';
+    });
+  } else if (curStep === 5) {
+    // Multi-head attention
+    ['head1','head2','head3','head4'].forEach((id, i) => {
+      setTimeout(() => {
+        document.getElementById(id).classList.add('active');
+      }, i * 400);
+    });
+  }
+}
+
+function autoPlay() {
+  const btn = document.getElementById('btnAuto');
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    btn.textContent = '▶ 自动';
+    return;
+  }
+  btn.textContent = '⏸ 暂停';
+  autoTimer = setInterval(() => {
+    if (curStep >= stepDescs.length - 1) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+      btn.textContent = '▶ 自动';
+      return;
+    }
+    nextStep();
+  }, 1800);
+}
+
+function resetAll() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  document.getElementById('btnAuto').textContent = '▶ 自动';
+  curStep = -1;
+  ['qRow','kRow','vRow'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.querySelectorAll('#vRow .tok-vec').forEach(el => el.style.boxShadow = '');
+  ['head1','head2','head3','head4'].forEach(id => document.getElementById(id).classList.remove('active'));
+  for (let ti = 0; ti < tokens.length; ti++) {
+    for (let si = 0; si < tokens.length; si++) {
+      const ac = document.getElementById(`attn-${ti}-${si}`);
+      if (ac) { ac.querySelector('.val').textContent = '—'; ac.style.background = ''; ac.style.color = ''; ac.className = ''; }
+      const mc = document.getElementById(`mask-${ti}-${si}`);
+      if (mc) { mc.className = 'mask-cell'; mc.textContent = '?'; }
+    }
+  }
+  document.getElementById('stepInfo').innerHTML = '<div class="panel">逐步观察 Transformer 如何用 Self-Attention 替代 RNN 进行文本生成</div>';
+}
+
+buildXRow();
+buildQKVRows();
+buildAttnMatrix();
+buildMaskGrid();
+</script>
+</body>
+</html>

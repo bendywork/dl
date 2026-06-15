@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attention 的 QKV 计算全过程</title>
+<style>
+/* ===== 全局样式 ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #0a0e1a;
+    color: #e0e6f0;
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ===== 顶部标题区 ===== */
+.header {
+    text-align: center;
+    padding: 24px 20px 12px;
+    background: linear-gradient(135deg, #0d1526 0%, #162038 100%);
+    border-bottom: 1px solid rgba(64, 196, 255, 0.2);
+}
+
+.header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #40c4ff, #00e5ff, #69f0ae);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 2px;
+}
+
+.header .subtitle {
+    font-size: 14px;
+    color: #78909c;
+    margin-top: 6px;
+}
+
+/* ===== 控制按钮区 ===== */
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    padding: 14px 20px;
+    background: #0d1526;
+    border-bottom: 1px solid rgba(64, 196, 255, 0.1);
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 8px 22px;
+    border: 1px solid rgba(64, 196, 255, 0.4);
+    background: rgba(64, 196, 255, 0.08);
+    color: #40c4ff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.25s;
+    user-select: none;
+}
+
+.btn:hover {
+    background: rgba(64, 196, 255, 0.18);
+    border-color: #40c4ff;
+}
+
+.btn:active {
+    transform: scale(0.96);
+}
+
+.btn.active {
+    background: rgba(64, 196, 255, 0.22);
+    border-color: #40c4ff;
+    color: #fff;
+}
+
+.btn.reset {
+    border-color: rgba(255, 107, 107, 0.4);
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.08);
+}
+
+.btn.reset:hover {
+    background: rgba(255, 107, 107, 0.18);
+    border-color: #ff6b6b;
+}
+
+/* ===== 步骤指示器 ===== */
+.step-indicator {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: #0b1020;
+}
+
+.step-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.4s;
+}
+
+.step-dot.active {
+    background: #40c4ff;
+    box-shadow: 0 0 8px rgba(64, 196, 255, 0.5);
+}
+
+.step-dot.done {
+    background: #69f0ae;
+}
+
+/* ===== 主内容区 ===== */
+.main-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    gap: 20px;
+    min-height: 500px;
+}
+
+/* ===== 计算流程容器 ===== */
+.flow-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 24px;
+    width: 100%;
+    max-width: 1200px;
+}
+
+/* ===== 矩阵卡片 ===== */
+.matrix-card {
+    background: rgba(22, 32, 56, 0.85);
+    border: 1px solid rgba(64, 196, 255, 0.15);
+    border-radius: 10px;
+    padding: 16px;
+    min-width: 180px;
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.matrix-card.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.matrix-card.q-card {
+    border-color: rgba(66, 165, 245, 0.5);
+    box-shadow: 0 0 20px rgba(66, 165, 245, 0.1);
+}
+
+.matrix-card.k-card {
+    border-color: rgba(102, 187, 106, 0.5);
+    box-shadow: 0 0 20px rgba(102, 187, 106, 0.1);
+}
+
+.matrix-card.v-card {
+    border-color: rgba(255, 167, 38, 0.5);
+    box-shadow: 0 0 20px rgba(255, 167, 38, 0.1);
+}
+
+.matrix-card.score-card {
+    border-color: rgba(171, 71, 188, 0.5);
+    box-shadow: 0 0 20px rgba(171, 71, 188, 0.1);
+}
+
+.matrix-card.attn-card {
+    border-color: rgba(233, 30, 99, 0.5);
+    box-shadow: 0 0 20px rgba(233, 30, 99, 0.1);
+}
+
+.matrix-card.output-card {
+    border-color: rgba(255, 215, 64, 0.5);
+    box-shadow: 0 0 20px rgba(255, 215, 64, 0.1);
+}
+
+.card-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+.card-title.q-title { color: #42a5f5; }
+.card-title.k-title { color: #66bb6a; }
+.card-title.v-title { color: #ffa726; }
+.card-title.score-title { color: #ab47bc; }
+.card-title.attn-title { color: #e91e63; }
+.card-title.output-title { color: #ffd740; }
+
+/* ===== 矩阵网格 ===== */
+.matrix-grid {
+    display: grid;
+    gap: 3px;
+    justify-content: center;
+}
+
+.cell {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 4px;
+    transition: all 0.3s;
+    cursor: default;
+    position: relative;
+}
+
+.cell.q-cell {
+    background: rgba(66, 165, 245, 0.15);
+    border: 1px solid rgba(66, 165, 245, 0.25);
+    color: #90caf9;
+}
+
+.cell.k-cell {
+    background: rgba(102, 187, 106, 0.15);
+    border: 1px solid rgba(102, 187, 106, 0.25);
+    color: #a5d6a7;
+}
+
+.cell.v-cell {
+    background: rgba(255, 167, 38, 0.15);
+    border: 1px solid rgba(255, 167, 38, 0.25);
+    color: #ffcc80;
+}
+
+.cell.score-cell {
+    border: 1px solid rgba(171, 71, 188, 0.25);
+    color: #ce93d8;
+    font-size: 10px;
+}
+
+.cell.attn-cell {
+    border: 1px solid rgba(233, 30, 99, 0.25);
+    color: #f48fb1;
+    font-size: 10px;
+}
+
+.cell.output-cell {
+    background: rgba(255, 215, 64, 0.15);
+    border: 1px solid rgba(255, 215, 64, 0.25);
+    color: #fff9c4;
+}
+
+.cell.x-cell {
+    background: rgba(176, 190, 197, 0.15);
+    border: 1px solid rgba(176, 190, 197, 0.25);
+    color: #b0bec5;
+}
+
+.cell.highlight {
+    transform: scale(1.15);
+    z-index: 10;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
+}
+
+.cell.q-cell.highlight {
+    background: rgba(66, 165, 245, 0.5);
+    border-color: #42a5f5;
+}
+
+.cell.k-cell.highlight {
+    background: rgba(102, 187, 106, 0.5);
+    border-color: #66bb6a;
+}
+
+/* ===== 行/列标签 ===== */
+.row-labels, .col-labels {
+    display: grid;
+    gap: 3px;
+}
+
+.row-labels {
+    margin-right: 4px;
+}
+
+.label-cell {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: #78909c;
+}
+
+/* ===== 箭头 ===== */
+.arrow-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    opacity: 0;
+    transition: opacity 0.5s;
+}
+
+.arrow-container.visible {
+    opacity: 1;
+}
+
+.arrow-svg {
+    width: 40px;
+    height: 30px;
+}
+
+/* ===== 热力图样式 ===== */
+.heatmap-container {
+    position: relative;
+}
+
+.heatmap-tooltip {
+    position: absolute;
+    background: rgba(13, 21, 38, 0.95);
+    border: 1px solid rgba(64, 196, 255, 0.4);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #e0e6f0;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+    display: none;
+}
+
+/* ===== 注意力条形图区 ===== */
+.bar-chart-container {
+    background: rgba(22, 32, 56, 0.85);
+    border: 1px solid rgba(64, 196, 255, 0.15);
+    border-radius: 10px;
+    padding: 16px;
+    min-width: 280px;
+    display: none;
+}
+
+.bar-chart-container.visible {
+    display: block;
+}
+
+.bar-chart-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #40c4ff;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.bar-label {
+    width: 70px;
+    font-size: 11px;
+    color: #90a4ae;
+    text-align: right;
+}
+
+.bar-track {
+    flex: 1;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    background: linear-gradient(90deg, #40c4ff, #00e5ff);
+}
+
+.bar-value {
+    width: 48px;
+    font-size: 11px;
+    color: #78909c;
+}
+
+/* ===== 底部公式说明 ===== */
+.formula-area {
+    text-align: center;
+    padding: 16px 20px;
+    background: rgba(13, 21, 38, 0.9);
+    border-top: 1px solid rgba(64, 196, 255, 0.15);
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.formula-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #40c4ff;
+    font-family: 'Consolas', 'Monaco', monospace;
+    letter-spacing: 1px;
+}
+
+.formula-desc {
+    font-size: 13px;
+    color: #78909c;
+}
+
+/* ===== Token 颜色标识 ===== */
+.token-colors {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    padding: 8px 20px;
+    flex-wrap: wrap;
+}
+
+.token-tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #90a4ae;
+}
+
+.token-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+
+/* ===== 动画关键帧 ===== */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(64, 196, 255, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(64, 196, 255, 0.5); }
+}
+
+.pulse {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 900px) {
+    .flow-container {
+        gap: 14px;
+    }
+    .cell {
+        width: 28px;
+        height: 28px;
+        font-size: 9px;
+    }
+    .label-cell {
+        width: 28px;
+        height: 28px;
+        font-size: 8px;
+    }
+    .matrix-card {
+        min-width: 140px;
+        padding: 10px;
+    }
+    .header h1 {
+        font-size: 22px;
+    }
+}
+
+@media (max-width: 600px) {
+    .cell {
+        width: 22px;
+        height: 22px;
+        font-size: 8px;
+    }
+    .label-cell {
+        width: 22px;
+        height: 22px;
+        font-size: 7px;
+    }
+    .matrix-card {
+        min-width: 110px;
+        padding: 8px;
+    }
+    .btn {
+        padding: 6px 14px;
+        font-size: 12px;
+    }
+}
+</style>
+</head>
+<body>
+
+<!-- 顶部标题区 -->
+<div class="header">
+    <h1>Attention 的 QKV 计算全过程</h1>
+    <div class="subtitle">Scaled Dot-Product Attention — 从输入 X 到输出 Output 的逐步可视化</div>
+</div>
+
+<!-- Token 颜色标识 -->
+<div class="token-colors">
+    <div class="token-tag"><div class="token-dot" style="background:#42a5f5"></div> Query (Q) — 蓝色</div>
+    <div class="token-tag"><div class="token-dot" style="background:#66bb6a"></div> Key (K) — 绿色</div>
+    <div class="token-tag"><div class="token-dot" style="background:#ffa726"></div> Value (V) — 橙色</div>
+    <div class="token-tag"><div class="token-dot" style="background:#ab47bc"></div> Score — 紫色</div>
+    <div class="token-tag"><div class="token-dot" style="background:#e91e63"></div> Attention — 粉色</div>
+    <div class="token-tag"><div class="token-dot" style="background:#ffd740"></div> Output — 金色</div>
+</div>
+
+<!-- 控制按钮区 -->
+<div class="controls">
+    <button class="btn" id="btnPrev" onclick="prevStep()">&#9664; 上一步</button>
+    <button class="btn" id="btnNext" onclick="nextStep()">下一步 &#9654;</button>
+    <button class="btn" id="btnAuto" onclick="toggleAutoPlay()">&#9654; 自动播放</button>
+    <button class="btn reset" id="btnReset" onclick="resetAll()">&#8634; 重置</button>
+</div>
+
+<!-- 步骤指示器 -->
+<div class="step-indicator" id="stepIndicator"></div>
+
+<!-- 主内容区 -->
+<div class="main-content">
+    <div class="flow-container" id="flowContainer"></div>
+    <div class="bar-chart-container" id="barChart">
+        <div class="bar-chart-title" id="barChartTitle">点击热力图格子查看注意力分布</div>
+        <div id="barChartContent"></div>
+    </div>
+</div>
+
+<!-- 底部公式说明 -->
+<div class="formula-area" id="formulaArea">
+    <div class="formula-text" id="formulaText">点击「下一步」开始演示</div>
+    <div class="formula-desc" id="formulaDesc">共 7 步，逐步展示 Attention 的 QKV 计算全过程</div>
+</div>
+
+<script>
+// ===== 数据定义 =====
+// 4个token，3维嵌入
+const tokens = ['我', '爱', '深', '度'];
+const d_model = 3;
+const d_k = 2;
+const d_v = 2;
+
+// 输入矩阵 X [4, 3]
+const X = [
+    [1.0, 0.5, 0.2],
+    [0.3, 1.0, 0.4],
+    [0.6, 0.3, 1.0],
+    [0.1, 0.8, 0.7]
+];
+
+// 投影矩阵 Wq [3, 2]
+const Wq = [
+    [0.8, 0.2],
+    [0.1, 0.9],
+    [0.5, 0.3]
+];
+
+// 投影矩阵 Wk [3, 2]
+const Wk = [
+    [0.3, 0.7],
+    [0.6, 0.2],
+    [0.4, 0.8]
+];
+
+// 投影矩阵 Wv [3, 2]
+const Wv = [
+    [0.9, 0.1],
+    [0.2, 0.7],
+    [0.5, 0.6]
+];
+
+// ===== 矩阵运算工具函数 =====
+function matMul(A, B) {
+    const rowsA = A.length, colsA = A[0].length;
+    const rowsB = B.length, colsB = B[0].length;
+    const result = [];
+    for (let i = 0; i < rowsA; i++) {
+        result[i] = [];
+        for (let j = 0; j < colsB; j++) {
+            let sum = 0;
+            for (let k = 0; k < colsA; k++) {
+                sum += A[i][k] * B[k][j];
+            }
+            result[i][j] = Math.round(sum * 1000) / 1000;
+        }
+    }
+    return result;
+}
+
+function transpose(M) {
+    const rows = M.length, cols = M[0].length;
+    const result = [];
+    for (let j = 0; j < cols; j++) {
+        result[j] = [];
+        for (let i = 0; i < rows; i++) {
+            result[j][i] = M[i][j];
+        }
+    }
+    return result;
+}
+
+function scaleMatrix(M, s) {
+    return M.map(row => row.map(v => Math.round(v * s * 1000) / 1000));
+}
+
+function softmaxRows(M) {
+    return M.map(row => {
+        const maxVal = Math.max(...row);
+        const exps = row.map(v => Math.exp(v - maxVal));
+        const sumExps = exps.reduce((a, b) => a + b, 0);
+        return exps.map(e => Math.round((e / sumExps) * 1000) / 1000);
+    });
+}
+
+// ===== 计算所有中间结果 =====
+const Q = matMul(X, Wq);
+const K = matMul(X, Wk);
+const V = matMul(X, Wv);
+const Kt = transpose(K);
+const rawScores = matMul(Q, Kt);
+const scaleFactor = 1 / Math.sqrt(d_k);
+const scaledScores = scaleMatrix(rawScores, scaleFactor);
+const attnWeights = softmaxRows(scaledScores);
+const output = matMul(attnWeights, V);
+
+// ===== 步骤定义 =====
+const steps = [
+    {
+        name: 'Step 1: 输入矩阵 X',
+        formula: 'X ∈ R^(4×3)',
+        desc: '4 个 token（我、爱、深、度），每个 token 用 3 维嵌入向量表示'
+    },
+    {
+        name: 'Step 2: 计算 Q = XWq',
+        formula: 'Q = X · Wq',
+        desc: '查询变换：每个 token 的嵌入通过 Wq 投影到"查询空间"，表示"我想找什么信息"'
+    },
+    {
+        name: 'Step 3: 计算 K = XWk',
+        formula: 'K = X · Wk',
+        desc: '键变换：每个 token 的嵌入通过 Wk 投影到"键空间"，表示"我有什么标签可被匹配"'
+    },
+    {
+        name: 'Step 4: 计算 V = XWv',
+        formula: 'V = X · Wv',
+        desc: '值变换：每个 token 的嵌入通过 Wv 投影到"值空间"，表示"我的实际内容是什么"'
+    },
+    {
+        name: 'Step 5: 计算 QK^T / sqrt(d_k)',
+        formula: 'score = Q · K^T / sqrt(d_k)',
+        desc: '缩放点积：Q 和 K 的相似度矩阵，除以 sqrt(2) 防止 softmax 饱和'
+    },
+    {
+        name: 'Step 6: softmax 得到注意力权重',
+        formula: 'α = softmax(score)',
+        desc: '对每行做 softmax 归一化，将分数转化为概率分布，每行求和为 1'
+    },
+    {
+        name: 'Step 7: 加权求和 α·V 得到输出',
+        formula: 'output = α · V',
+        desc: '每个 token 的输出 = 所有 token 的 Value 按注意力权重加权求和'
+    }
+];
+
+// ===== 状态管理 =====
+let currentStep = 0;
+let autoPlaying = false;
+let autoTimer = null;
+
+// ===== 初始化步骤指示器 =====
+function initStepIndicator() {
+    const container = document.getElementById('stepIndicator');
+    container.innerHTML = '';
+    for (let i = 0; i < steps.length; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'step-dot';
+        dot.id = 'dot-' + i;
+        dot.title = steps[i].name;
+        container.appendChild(dot);
+    }
+}
+
+// ===== 更新步骤指示器 =====
+function updateStepIndicator() {
+    for (let i = 0; i < steps.length; i++) {
+        const dot = document.getElementById('dot-' + i);
+        dot.className = 'step-dot';
+        if (i < currentStep) dot.classList.add('done');
+        if (i === currentStep) dot.classList.add('active');
+    }
+}
+
+// ===== 创建矩阵 HTML =====
+function createMatrixHTML(data, cellClass, rowLabels, colLabels) {
+    const rows = data.length;
+    const cols = data[0].length;
+
+    let html = '<div style="display:flex;flex-direction:column;align-items:center;">';
+
+    // 列标签
+    if (colLabels) {
+        html += '<div style="display:flex;gap:3px;margin-left:' + (rowLabels ? '42px' : '0') + ';">';
+        colLabels.forEach(l => {
+            html += '<div class="label-cell">' + l + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // 矩阵内容（含行标签）
+    html += '<div style="display:flex;">';
+
+    // 行标签
+    if (rowLabels) {
+        html += '<div class="row-labels" style="grid-template-rows:repeat(' + rows + ',36px);">';
+        rowLabels.forEach(l => {
+            html += '<div class="label-cell">' + l + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // 矩阵网格
+    html += '<div class="matrix-grid" style="grid-template-columns:repeat(' + cols + ',36px);grid-template-rows:repeat(' + rows + ',36px);">';
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            const val = data[i][j];
+            const displayVal = Number.isInteger(val) ? val : val.toFixed(2);
+            html += '<div class="cell ' + cellClass + '" data-row="' + i + '" data-col="' + j + '" data-val="' + val + '">' + displayVal + '</div>';
+        }
+    }
+    html += '</div>';
+
+    html += '</div>';
+    html += '</div>';
+    return html;
+}
+
+// ===== 创建热力图矩阵 HTML =====
+function createHeatmapHTML(data, cellClass, minVal, maxVal, rowLabels, colLabels) {
+    const rows = data.length;
+    const cols = data[0].length;
+    const range = maxVal - minVal || 1;
+
+    let html = '<div class="heatmap-container" style="display:flex;flex-direction:column;align-items:center;">';
+
+    // 列标签
+    if (colLabels) {
+        html += '<div style="display:flex;gap:3px;margin-left:' + (rowLabels ? '42px' : '0') + ';">';
+        colLabels.forEach(l => {
+            html += '<div class="label-cell">' + l + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // 矩阵内容
+    html += '<div style="display:flex;">';
+
+    if (rowLabels) {
+        html += '<div class="row-labels" style="grid-template-rows:repeat(' + rows + ',36px);">';
+        rowLabels.forEach(l => {
+            html += '<div class="label-cell">' + l + '</div>';
+        });
+        html += '</div>';
+    }
+
+    html += '<div class="matrix-grid" style="grid-template-columns:repeat(' + cols + ',36px);grid-template-rows:repeat(' + rows + ',36px);">';
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            const val = data[i][j];
+            const norm = (val - minVal) / range;
+            const intensity = Math.round(norm * 200 + 30);
+            let bgColor;
+            if (cellClass === 'attn-cell') {
+                bgColor = 'rgba(233, 30, 99, ' + (norm * 0.6 + 0.05).toFixed(2) + ')';
+            } else {
+                bgColor = 'rgba(171, 71, 188, ' + (norm * 0.6 + 0.05).toFixed(2) + ')';
+            }
+            const displayVal = val.toFixed(2);
+            html += '<div class="cell ' + cellClass + '" data-row="' + i + '" data-col="' + j + '" data-val="' + val + '" style="background:' + bgColor + ';">' + displayVal + '</div>';
+        }
+    }
+    html += '</div>';
+
+    html += '</div>';
+    html += '</div>';
+    return html;
+}
+
+// ===== 渲染当前步骤 =====
+function renderStep() {
+    const container = document.getElementById('flowContainer');
+    container.innerHTML = '';
+
+    const tokenLabels = tokens;
+    const dimLabels_d = ['d1', 'd2', 'd3'];
+    const dimLabels_k = ['k1', 'k2'];
+    const dimLabels_v = ['v1', 'v2'];
+
+    // Step 1: 输入 X
+    if (currentStep >= 0) {
+        const card = createCard('X 输入矩阵 [4×3]', 'x-card', '');
+        card.innerHTML += createMatrixHTML(X, 'x-cell', tokenLabels, dimLabels_d);
+        addCardToContainer(container, card, 0);
+    }
+
+    // 箭头 X -> Q
+    if (currentStep >= 1) {
+        addArrow(container, 1, '#42a5f5', '×Wq');
+    }
+
+    // Step 2: Q
+    if (currentStep >= 1) {
+        const card = createCard('Q 查询矩阵 [4×2]', 'q-card', 'q-title');
+        card.innerHTML += createMatrixHTML(Q, 'q-cell', tokenLabels, dimLabels_k);
+        addCardToContainer(container, card, 1);
+    }
+
+    // 箭头 X -> K
+    if (currentStep >= 2) {
+        addArrow(container, 2, '#66bb6a', '×Wk');
+    }
+
+    // Step 3: K
+    if (currentStep >= 2) {
+        const card = createCard('K 键矩阵 [4×2]', 'k-card', 'k-title');
+        card.innerHTML += createMatrixHTML(K, 'k-cell', tokenLabels, dimLabels_k);
+        addCardToContainer(container, card, 2);
+    }
+
+    // 箭头 X -> V
+    if (currentStep >= 3) {
+        addArrow(container, 3, '#ffa726', '×Wv');
+    }
+
+    // Step 4: V
+    if (currentStep >= 3) {
+        const card = createCard('V 值矩阵 [4×2]', 'v-card', 'v-title');
+        card.innerHTML += createMatrixHTML(V, 'v-cell', tokenLabels, dimLabels_v);
+        addCardToContainer(container, card, 3);
+    }
+
+    // Step 5: Score
+    if (currentStep >= 4) {
+        addArrow(container, 4, '#ab47bc', 'Q·K^T/√d_k');
+
+        const card = createCard('Score 相似度矩阵 [4×4]', 'score-card', 'score-title');
+        const minS = Math.min(...scaledScores.flat());
+        const maxS = Math.max(...scaledScores.flat());
+        card.innerHTML += createHeatmapHTML(scaledScores, 'score-cell', minS, maxS, tokenLabels, tokenLabels);
+        addCardToContainer(container, card, 4);
+    }
+
+    // Step 6: Attention Weights
+    if (currentStep >= 5) {
+        addArrow(container, 5, '#e91e63', 'softmax');
+
+        const card = createCard('α 注意力权重矩阵 [4×4]', 'attn-card', 'attn-title');
+        card.innerHTML += createHeatmapHTML(attnWeights, 'attn-cell', 0, 1, tokenLabels, tokenLabels);
+        addCardToContainer(container, card, 5);
+
+        // 添加热力图交互
+        setTimeout(() => setupHeatmapInteraction(), 100);
+    }
+
+    // Step 7: Output
+    if (currentStep >= 6) {
+        addArrow(container, 6, '#ffd740', 'α·V');
+
+        const card = createCard('Output 输出矩阵 [4×2]', 'output-card', 'output-title');
+        card.innerHTML += createMatrixHTML(output, 'output-cell', tokenLabels, dimLabels_v);
+        addCardToContainer(container, card, 6);
+    }
+
+    // 更新公式区域
+    const step = steps[currentStep];
+    document.getElementById('formulaText').textContent = step.formula;
+    document.getElementById('formulaDesc').textContent = step.desc;
+
+    // 更新步骤指示器
+    updateStepIndicator();
+
+    // 更新按钮状态
+    document.getElementById('btnPrev').style.opacity = currentStep > 0 ? '1' : '0.4';
+    document.getElementById('btnNext').style.opacity = currentStep < steps.length - 1 ? '1' : '0.4';
+}
+
+function createCard(title, cardClass, titleClass) {
+    const card = document.createElement('div');
+    card.className = 'matrix-card ' + cardClass;
+    card.innerHTML = '<div class="card-title ' + titleClass + '">' + title + '</div>';
+    return card;
+}
+
+function addCardToContainer(container, card, index) {
+    container.appendChild(card);
+    // 触发动画
+    setTimeout(() => {
+        card.classList.add('visible');
+    }, 50 + index * 80);
+}
+
+function addArrow(container, index, color, label) {
+    const arrowDiv = document.createElement('div');
+    arrowDiv.className = 'arrow-container';
+    arrowDiv.innerHTML = '<svg class="arrow-svg" viewBox="0 0 40 30">' +
+        '<defs><marker id="ah' + index + '" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">' +
+        '<polygon points="0 0, 8 3, 0 6" fill="' + color + '"/></marker></defs>' +
+        '<line x1="5" y1="15" x2="32" y2="15" stroke="' + color + '" stroke-width="2" marker-end="url(#ah' + index + ')"/>' +
+        '<text x="20" y="27" text-anchor="middle" fill="' + color + '" font-size="8">' + label + '</text>' +
+        '</svg>';
+    container.appendChild(arrowDiv);
+    setTimeout(() => {
+        arrowDiv.classList.add('visible');
+    }, 50 + index * 60);
+}
+
+// ===== 热力图交互 =====
+function setupHeatmapInteraction() {
+    const attnCells = document.querySelectorAll('.attn-cell');
+    attnCells.forEach(cell => {
+        cell.addEventListener('mouseenter', function(e) {
+            const row = parseInt(this.dataset.row);
+            const col = parseInt(this.dataset.col);
+
+            // 高亮对应的 Q 行和 K 行
+            highlightQKRow(row, col);
+
+            // 显示 tooltip
+            showTooltip(e, 'α[' + tokens[row] + ', ' + tokens[col] + '] = ' + this.dataset.val);
+        });
+
+        cell.addEventListener('mouseleave', function() {
+            clearHighlights();
+            hideTooltip();
+        });
+
+        cell.addEventListener('click', function() {
+            const row = parseInt(this.dataset.row);
+            showBarChart(row);
+        });
+    });
+}
+
+function highlightQKRow(qRow, kCol) {
+    // 高亮 Q 矩阵中第 qRow 行
+    document.querySelectorAll('.q-cell').forEach(cell => {
+        if (parseInt(cell.dataset.row) === qRow) {
+            cell.classList.add('highlight');
+        }
+    });
+
+    // 高亮 K 矩阵中第 kCol 行
+    document.querySelectorAll('.k-cell').forEach(cell => {
+        if (parseInt(cell.dataset.row) === kCol) {
+            cell.classList.add('highlight');
+        }
+    });
+
+    // 高亮 V 矩阵中第 kCol 行
+    document.querySelectorAll('.v-cell').forEach(cell => {
+        if (parseInt(cell.dataset.row) === kCol) {
+            cell.classList.add('highlight');
+        }
+    });
+
+    // 高亮注意力矩阵中第 qRow 行
+    document.querySelectorAll('.attn-cell').forEach(cell => {
+        if (parseInt(cell.dataset.row) === qRow) {
+            cell.classList.add('highlight');
+        }
+    });
+}
+
+function clearHighlights() {
+    document.querySelectorAll('.cell.highlight').forEach(cell => {
+        cell.classList.remove('highlight');
+    });
+}
+
+// ===== Tooltip =====
+let tooltipEl = null;
+
+function showTooltip(e, text) {
+    if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.className = 'heatmap-tooltip';
+        document.body.appendChild(tooltipEl);
+    }
+    tooltipEl.textContent = text;
+    tooltipEl.style.display = 'block';
+    tooltipEl.style.left = (e.pageX + 12) + 'px';
+    tooltipEl.style.top = (e.pageY - 30) + 'px';
+}
+
+function hideTooltip() {
+    if (tooltipEl) {
+        tooltipEl.style.display = 'none';
+    }
+}
+
+// ===== 条形图 =====
+function showBarChart(queryIdx) {
+    const chartContainer = document.getElementById('barChart');
+    const chartTitle = document.getElementById('barChartTitle');
+    const chartContent = document.getElementById('barChartContent');
+
+    chartTitle.textContent = 'Token「' + tokens[queryIdx] + '」对各位置的注意力权重';
+    chartContent.innerHTML = '';
+
+    const weights = attnWeights[queryIdx];
+    const maxW = Math.max(...weights);
+
+    for (let i = 0; i < tokens.length; i++) {
+        const row = document.createElement('div');
+        row.className = 'bar-row';
+
+        const label = document.createElement('div');
+        label.className = 'bar-label';
+        label.textContent = tokens[i] + ' (K' + i + ')';
+
+        const track = document.createElement('div');
+        track.className = 'bar-track';
+
+        const fill = document.createElement('div');
+        fill.className = 'bar-fill';
+        fill.style.width = '0%';
+        if (i === queryIdx) {
+            fill.style.background = 'linear-gradient(90deg, #ffd740, #ffab00)';
+        }
+
+        const value = document.createElement('div');
+        value.className = 'bar-value';
+        value.textContent = weights[i].toFixed(3);
+
+        track.appendChild(fill);
+        row.appendChild(label);
+        row.appendChild(track);
+        row.appendChild(value);
+        chartContent.appendChild(row);
+
+        // 动画填充
+        setTimeout(() => {
+            fill.style.width = (weights[i] / maxW * 100).toFixed(1) + '%';
+        }, 50 + i * 80);
+    }
+
+    chartContainer.classList.add('visible');
+}
+
+// ===== 控制函数 =====
+function nextStep() {
+    if (currentStep < steps.length - 1) {
+        currentStep++;
+        renderStep();
+    } else if (autoPlaying) {
+        stopAutoPlay();
+    }
+}
+
+function prevStep() {
+    if (currentStep > 0) {
+        currentStep--;
+        renderStep();
+    }
+}
+
+function resetAll() {
+    stopAutoPlay();
+    currentStep = 0;
+    renderStep();
+    document.getElementById('barChart').classList.remove('visible');
+}
+
+function toggleAutoPlay() {
+    if (autoPlaying) {
+        stopAutoPlay();
+    } else {
+        startAutoPlay();
+    }
+}
+
+function startAutoPlay() {
+    autoPlaying = true;
+    const btn = document.getElementById('btnAuto');
+    btn.textContent = '⏸ 暂停';
+    btn.classList.add('active');
+
+    if (currentStep >= steps.length - 1) {
+        currentStep = 0;
+        renderStep();
+    }
+
+    autoTimer = setInterval(() => {
+        if (currentStep < steps.length - 1) {
+            currentStep++;
+            renderStep();
+        } else {
+            stopAutoPlay();
+        }
+    }, 2200);
+}
+
+function stopAutoPlay() {
+    autoPlaying = false;
+    const btn = document.getElementById('btnAuto');
+    btn.textContent = '▶ 自动播放';
+    btn.classList.remove('active');
+    if (autoTimer) {
+        clearInterval(autoTimer);
+        autoTimer = null;
+    }
+}
+
+// ===== 键盘控制 =====
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        nextStep();
+    } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        prevStep();
+    } else if (e.key === 'r' || e.key === 'R') {
+        resetAll();
+    }
+});
+
+// ===== 初始化 =====
+initStepIndicator();
+renderStep();
+</script>
+
+</body>
+</html>
