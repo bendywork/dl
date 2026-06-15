@@ -39,8 +39,28 @@ ENV/
 .AppleDouble
 .LSOverride
 
-# Model files (large binaries, optional)
-# *.bin
-# *.w2v
-# *.npy
+# Model files (large binaries)
+*.bin
+*.safetensors
+*.pt
+*.pkl
+*.npy
+*.pth
 clod.sh
+
+# Large dataset / corpus files
+base/datas/resources/text8
+base/datas/finance/testA.csv
+base/datas/stage01/20news-bydate_py3.pkz
+base/out/finance/processs_datas/test_process_datas.csv
+knowledge/03_NLP自然语言处理/项目实践/文本生成/EnglishWordGeneration/english_gen/datas/text8
+knowledge/03_NLP自然语言处理/项目实践/文本生成/EnglishWordGeneration/notebook/datas/text8
+stage01/13.项目-金融风控贷款违约预测/datas/testA.csv
+stage01/13.项目-金融风控贷款违约预测/processs_datas/test_process_datas.csv
+stage01/datas/20news-bydate_py3.pkz
+
+# TensorBoard logs
+*.tfevents.*
+
+# MNIST raw binary data
+stage04/01.图像分类/01_分类基础概念/base/datas/data/MNIST/raw/train-images-idx3-ubyte
