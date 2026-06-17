@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scaled Dot-Product Attention — √d 缩放因子 数学推导动画</title>
+<style>
+:root {
+  --bg: #0f172a; --card: #1e293b; --border: #334155;
+  --text: #e2e8f0; --text2: #94a3b8; --accent: #38bdf8;
+  --red: #f87171; --green: #4ade80; --yellow: #facc15;
+  --orange: #fb923c; --purple: #c084fc;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; padding: 16px;
+}
+h1 { font-size: 1.4rem; text-align: center; margin-bottom: 12px; }
+h1 span { color: var(--accent); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 1200px; margin: 0 auto; }
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px;
+}
+.card h2 { font-size: 1rem; margin-bottom: 10px; color: var(--accent); }
+.row-split {
+  display: flex; gap: 12px; max-width: 1200px; margin: 12px auto;
+}
+.row-split .card { flex: 1; }
+canvas { display: block; width: 100%; border-radius: 6px; }
+.controls {
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+  margin-top: 10px;
+}
+.controls label { font-size: 0.82rem; color: var(--text2); }
+.controls input[type="range"] { width: 100px; accent-color: var(--accent); }
+.controls span { font-weight: bold; color: var(--accent); min-width: 28px; }
+.formula {
+  background: #0f172a; border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 14px; margin: 8px 0;
+  font-family: 'Courier New', monospace; font-size: 0.85rem;
+  color: var(--text); white-space: pre; overflow-x: auto;
+}
+.formula .hl { color: var(--yellow); }
+.formula .red { color: var(--red); }
+.formula .green { color: var(--green); }
+.formula .blue { color: var(--accent); }
+.desc { font-size: 0.82rem; color: var(--text2); margin-top: 8px; line-height: 1.5; }
+.desc strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<h1>Scaled Dot-Product Attention — <span>√d 缩放因子的数学奥秘</span></h1>
+
+<div class="row-split">
+  <div class="card">
+    <h2>一、点积方差 ≈ 维度 d（方差随 d 线性增长）</h2>
+    <canvas id="canvasVar" width="520" height="260"></canvas>
+    <div class="controls">
+      <label>采样次数</label>
+      <input type="range" id="samples" min="100" max="5000" value="1000" step="100" oninput="redrawAll()">
+      <span id="samplesVal">1000</span>
+      <label style="margin-left:16px">维度 d</label>
+      <input type="range" id="dim" min="4" max="1024" value="64" step="4" oninput="redrawAll()">
+      <span id="dimVal">64</span>
+    </div>
+    <div class="desc">Q 和 K 的每个分量 ~N(0,1)，则 <strong>Var(Q·K) = d</strong>。d 越大，点积越"散"。</div>
+  </div>
+
+  <div class="card">
+    <h2>二、点积值的分布：d 小时紧凑，d 大时扩散</h2>
+    <canvas id="canvasDist" width="520" height="260"></canvas>
+    <div class="controls">
+      <label>对比模式</label>
+      <select id="distMode" onchange="redrawAll()">
+        <option value="compare">d=16 vs d=64 vs d=256</option>
+        <option value="single">只用当前 d</option>
+      </select>
+    </div>
+    <div class="desc">不加缩放时，d=256 的点积能飞到 ±50+ → <strong>丢进 softmax 直接饱和</strong>。</div>
+  </div>
+</div>
+
+<div class="row-split">
+  <div class="card">
+    <h2>三、Softmax 输出：输入值增大 → 从"软"变"硬"</h2>
+    <canvas id="canvasSoftmax" width="520" height="280"></canvas>
+    <div class="controls">
+      <label>缩放方式</label>
+      <select id="scaleMode" onchange="redrawAll()">
+        <option value="none">不加缩放</option>
+        <option value="sqrt">÷ √d（标准）</option>
+      </select>
+      <span id="softmaxInsight" style="color:var(--orange);font-size:0.8rem;margin-left:8px;"></span>
+    </div>
+    <div class="formula" style="font-size:0.8rem;">
+<span class="hl">softmax(z)_i</span> = e^(z_i) / Σe^(z_j)
+当 max(z) 远大于其他 → <span class="red">softmax → [1,0,0,...]  one-hot！</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>四、Softmax 的梯度：输入大 → 梯度趋近 0</h2>
+    <canvas id="canvasGrad" width="520" height="280"></canvas>
+    <div class="desc">∂Sᵢ/∂zⱼ = <strong>Sᵢ(δᵢⱼ − Sⱼ)</strong>。当 Sᵢ≈1 时，(1−Sᵢ)≈0 → <strong>梯度消失</strong>！</div>
+  </div>
+</div>
+
+<div class="row-split">
+  <div class="card" style="flex:2;">
+    <h2>五、完整推导链（交互式验证）</h2>
+    <canvas id="canvasChain" width="760" height="250"></canvas>
+    <div class="controls" style="justify-content:center;">
+      <label>d =</label>
+      <input type="range" id="chainDim" min="4" max="512" value="64" step="4" oninput="redrawAll()">
+      <span id="chainDimVal">64</span>
+      <label style="margin-left:16px">缩放</label>
+      <select id="chainScale" onchange="redrawAll()">
+        <option value="none">无缩放</option>
+        <option value="sqrt">÷ √d</option>
+      </select>
+    </div>
+    <div class="desc" style="text-align:center;">
+      <strong>Var(Q·K) = d</strong> → 不加缩放时，d=512 的 softmax 几乎 one-hot → <strong style="color:var(--red);">梯度≈0</strong> →
+      <strong>÷ √d</strong> 后 Var=1 → <strong style="color:var(--green);">softmax 平滑 → 梯度健康</strong>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======================= Shared state =======================
+function getSlider(id) { return parseInt(document.getElementById(id).value); }
+function updateLabel(id, val) { document.getElementById(id).textContent = val; }
+
+// ======================= Canvas 1: Variance proof =======================
+function drawVariance(canvas) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const d = getSlider('dim');
+  const N = getSlider('samples');
+  updateLabel('dimVal', d);
+  updateLabel('samplesVal', N);
+
+  // Compute dot products for N pairs of random d-dim vectors
+  const dots = [];
+  for(let i=0;i<N;i++){
+    let dot=0;
+    for(let j=0;j<d;j++) dot += rnorm()*rnorm();
+    dots.push(dot);
+  }
+  dots.sort((a,b)=>a-b);
+
+  const margin = {l:50,r:20,t:20,b:40};
+  const pw = W-margin.l-margin.r, ph = H-margin.t-margin.b;
+  const minD = dots[0], maxD = dots[N-1];
+  const range = maxD-minD || 1;
+
+  function x(v){ return margin.l + pw*(v-minD)/range; }
+  function y(h){ return margin.t + ph*(1-h); }
+
+  // histogram
+  const bins = 40;
+  const hist = new Array(bins).fill(0);
+  const binW = range/bins;
+  for(let v of dots){
+    let idx = Math.min(bins-1, Math.floor((v-minD)/binW));
+    hist[idx]++;
+  }
+  const maxH = Math.max(...hist);
+
+  // Bars
+  for(let i=0;i<bins;i++){
+    const bx = x(minD+i*binW), bw = pw/bins - 2;
+    const bh = (hist[i]/maxH)*ph*0.85;
+    ctx.fillStyle = i===Math.floor(bins/2)?'rgba(56,189,248,0.8)':'rgba(56,189,248,0.3)';
+    ctx.fillRect(bx, y(hist[i]/maxH*0.85), Math.max(2,bw), bh);
+  }
+
+  // axes
+  ctx.strokeStyle='#475569'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(margin.l,margin.t); ctx.lineTo(margin.l,margin.t+ph); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(margin.l,margin.t+ph); ctx.lineTo(margin.l+pw,margin.t+ph); ctx.stroke();
+
+  // mean & ±2std lines
+  const mean = dots.reduce((a,b)=>a+b,0)/N;
+  const variance = dots.reduce((s,v)=>s+(v-mean)**2,0)/N;
+  const std = Math.sqrt(variance);
+
+  ctx.setLineDash([5,3]);
+  [mean-2*std, mean, mean+2*std].forEach((v,i)=>{
+    const lx=x(v);
+    ctx.strokeStyle = i===1?'#facc15':(i===0?'#f87171':'#4ade80');
+    ctx.lineWidth = i===1?2:1;
+    ctx.beginPath(); ctx.moveTo(lx,margin.t); ctx.lineTo(lx,margin.t+ph); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // labels
+  ctx.fillStyle='#e2e8f0'; ctx.font='11px monospace';
+  ctx.textAlign='center';
+  ctx.fillText(`方差: ${variance.toFixed(1)} | 标准差: ${std.toFixed(1)} | 预测 d=${d}`, W/2, H-8);
+  ctx.fillText(`μ-2σ`, x(mean-2*std), margin.t-6);
+  ctx.fillText(`μ`, x(mean), margin.t-6);
+  ctx.fillText(`μ+2σ`, x(mean+2*std), margin.t-6);
+}
+
+// ======================= Canvas 2: Distribution compare =======================
+function drawDistribution(canvas) {
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const mode = document.getElementById('distMode').value;
+  const d = getSlider('dim');
+  const dims = mode==='compare'?[16,64,256,512]:[d];
+  const colors = ['#4ade80','#38bdf8','#facc15','#f87171'];
+  const N=2000;
+
+  const margin={l:45,r:15,t:20,b:35};
+  const pw=W-margin.l-margin.r, ph=H-margin.t-margin.b;
+
+  let allDots=[];
+  dims.forEach((dim,idx)=>{
+    const dots=[];
+    for(let i=0;i<N;i++){
+      let dot=0;
+      for(let j=0;j<dim;j++) dot+=rnorm()*rnorm();
+      dots.push(dot);
+    }
+    allDots.push({dim, dots, color:colors[idx]});
+  });
+
+  // find global range
+  const allVals = allDots.flatMap(d=>d.dots);
+  allVals.sort((a,b)=>a-b);
+  const minV=allVals[0], maxV=allVals[allVals.length-1];
+  const range=maxV-minV||1;
+  function x(v){return margin.l+pw*(v-minV)/range;}
+
+  const bins=50; const binW=range/bins;
+  allDots.forEach(({dim,dots,color},idx)=>{
+    const hist=new Array(bins).fill(0);
+    for(let v of dots){
+      let i=Math.min(bins-1,Math.floor((v-minV)/binW));
+      hist[i]++;
+    }
+    const maxH=Math.max(...hist);
+    ctx.beginPath();
+    for(let i=0;i<bins;i++){
+      const bx=x(minV+i*binW), by=margin.t+ph*(1-hist[i]/maxH*0.85);
+      if(i===0) ctx.moveTo(bx,by); else ctx.lineTo(bx+pw/bins,by);
+    }
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
+    // label
+    const std=Math.sqrt(dim);
+    ctx.fillStyle=color; ctx.font='10px monospace';
+    ctx.fillText(`d=${dim} (σ≈${std.toFixed(0)})`, W-120, margin.t+15+idx*18);
+  });
+
+  // axes
+  ctx.strokeStyle='#475569'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(margin.l,margin.t); ctx.lineTo(margin.l,margin.t+ph); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(margin.l,margin.t+ph); ctx.lineTo(margin.l+pw,margin.t+ph); ctx.stroke();
+  ctx.fillStyle='#94a3b8'; ctx.font='10px monospace';
+  ctx.fillText('0',margin.l-15,margin.t+ph+14);
+}
+
+// ======================= Canvas 3: Softmax behavior =======================
+function drawSoftmax(canvas) {
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const scaleMode = document.getElementById('scaleMode').value;
+  const d = getSlider('dim');
+  const margin={l:45,r:15,t:25,b:40};
+  const pw=W-margin.l-margin.r, ph=H-margin.t-margin.b;
+
+  // Generate scores for 5 keys
+  const nKeys = 5;
+  const scoresRaw = [];
+  for(let i=0;i<nKeys;i++){
+    let score=0;
+    for(let j=0;j<d;j++) score += rnorm()*rnorm();
+    scoresRaw.push(score);
+  }
+  const scale = scaleMode==='sqrt'?Math.sqrt(d):1;
+  const scores = scoresRaw.map(s=>s/scale);
+
+  // softmax
+  const maxS = Math.max(...scores);
+  const exps = scores.map(s=>Math.exp(s-maxS));
+  const sumExp = exps.reduce((a,b)=>a+b,0);
+  const softmaxOut = exps.map(e=>e/sumExp);
+
+  // For softmax gradient visualization
+  const maxIdx = softmaxOut.indexOf(Math.max(...softmaxOut));
+  const isSaturated = softmaxOut[maxIdx] > 0.95;
+
+  document.getElementById('softmaxInsight').textContent =
+    scaleMode==='none' && isSaturated
+      ? `⚠ 饱和！最大权重=${softmaxOut[maxIdx].toFixed(4)}，其他≈0`
+      : `✓ 平滑分布，所有权重都在 (0,1)`;
+
+  // draw bars
+  const barW = pw/nKeys*0.6, barGap = pw/nKeys*0.4;
+  const colors = ['#38bdf8','#4ade80','#facc15','#f87171','#c084fc'];
+
+  for(let i=0;i<nKeys;i++){
+    const bx = margin.l + i*(pw/nKeys) + barGap/2;
+    const bh = softmaxOut[i]*ph*0.9;
+    const by = margin.t + ph - bh;
+
+    // Gradient fill (solid bar)
+    ctx.fillStyle = colors[i];
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(bx, by, barW, bh);
+    ctx.globalAlpha = 1;
+
+    // Label
+    ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 10px monospace'; ctx.textAlign='center';
+    ctx.fillText(softmaxOut[i].toFixed(3), bx+barW/2, by-4);
+
+    // Score value below
+    ctx.fillStyle = '#94a3b8'; ctx.font = '10px monospace';
+    ctx.fillText(`K${i+1}`, bx+barW/2, margin.t+ph+16);
+  }
+
+  // axes
+  ctx.strokeStyle='#475569'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(margin.l,margin.t+ph); ctx.lineTo(margin.l+pw,margin.t+ph); ctx.stroke();
+  // 1.0 line
+  ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(margin.l,margin.t); ctx.lineTo(margin.l+pw,margin.t); ctx.stroke();
+  ctx.fillStyle='#94a3b8'; ctx.font='9px monospace'; ctx.textAlign='left';
+  ctx.fillText('1.0', margin.l-28, margin.t+4);
+  ctx.setLineDash([]);
+
+  // title
+  ctx.fillStyle='#e2e8f0'; ctx.font='11px monospace'; ctx.textAlign='center';
+  ctx.fillText(scaleMode==='none'?`无缩放 (d=${d})`:`÷√d = ÷${Math.sqrt(d).toFixed(1)} (方差≈1)`, W/2, 18);
+}
+
+// ======================= Canvas 4: Gradient magnitude =======================
+function drawGradient(canvas) {
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const margin={l:50,r:15,t:20,b:40};
+  const pw=W-margin.l-margin.r, ph=H-margin.t-margin.b;
+
+  // Plot max gradient magnitude as function of max_logit / others_avg ratio
+  const points = [];
+  for(let ratio of Array.from({length:50},(_,i)=>i*0.2)){
+    // simulate: one logit dominates with given ratio
+    const z_max = ratio;
+    const z_others = 0;
+    const nKeys = 3;
+    const z = [z_max, ...Array(nKeys-1).fill(z_others)];
+    const maxZ = Math.max(...z);
+    const exps = z.map(zi=>Math.exp(zi-maxZ));
+    const sumExp = exps.reduce((a,b)=>a+b,0);
+    const S = exps.map(e=>e/sumExp);
+
+    // max gradient magnitude at the winning position
+    const gradMax = S[0]*(1-S[0]);
+    // average gradient on other positions
+    const gradOthers = S.slice(1).reduce((s,si)=>s+Math.abs(-S[0]*si),0)/(nKeys-1);
+    points.push({ratio, gradMax, gradOthers});
+  }
+
+  // normalize
+  const maxGrad = 0.25;
+
+  function x(v){return margin.l+pw*v/10;}
+  function y(v){return margin.t+ph*(1-v/maxGrad);}
+
+  // gradient curve
+  ctx.beginPath();
+  ctx.strokeStyle='#38bdf8'; ctx.lineWidth=2.5;
+  points.forEach((p,i)=>{
+    const px=x(p.ratio), py=y(p.gradMax);
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  });
+  ctx.stroke();
+
+  // "dead zone" indicator
+  ctx.fillStyle='rgba(248,113,113,0.15)';
+  ctx.fillRect(x(4), margin.t, x(10)-x(4), ph);
+  ctx.fillStyle='#f87171'; ctx.font='10px monospace';
+  ctx.fillText('梯度死亡区', x(6.2), margin.t+25);
+
+  // healthy zone
+  ctx.fillStyle='rgba(74,222,128,0.12)';
+  ctx.fillRect(x(0), margin.t, x(2), ph);
+  ctx.fillStyle='#4ade80'; ctx.font='10px monospace';
+  ctx.fillText('健康', x(0.5), margin.t+15);
+
+  // axes
+  ctx.strokeStyle='#475569'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(margin.l,margin.t); ctx.lineTo(margin.l,margin.t+ph); ctx.lineTo(margin.l+pw,margin.t+ph); ctx.stroke();
+  ctx.fillStyle='#e2e8f0'; ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.fillText('max(score) 与 others 的差距', W/2, H-8);
+  ctx.fillText('|∂S/∂z|', margin.l-30, margin.t+ph/2);
+}
+
+// ======================= Canvas 5: Full chain =======================
+function drawChain(canvas) {
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const d = getSlider('chainDim');
+  const scaleMode = document.getElementById('chainScale').value;
+  updateLabel('chainDimVal', d);
+
+  const scale = scaleMode==='sqrt'?Math.sqrt(d):1;
+
+  // Generate 5 random dot-product scores
+  const n=5;
+  const scoresRaw = [];
+  for(let i=0;i<n;i++){
+    let dot=0;
+    for(let j=0;j<d;j++) dot+=rnorm()*rnorm();
+    scoresRaw.push(dot);
+  }
+
+  const scores = scoresRaw.map(s=>s/scale);
+  const maxS = Math.max(...scores);
+  const exps = scores.map(s=>Math.exp(s-maxS));
+  const sumExp = exps.reduce((a,b)=>a+b,0);
+  const S = exps.map(e=>e/sumExp);
+  const maxIdx = S.indexOf(Math.max(...S));
+  const gradMax = S[maxIdx]*(1-S[maxIdx]);
+  const std_raw=Math.sqrt(d);
+
+  const sections = 4;
+  const secW = W/sections;
+
+  function drawBox(x,y,w,h,color,alpha=0.15){
+    ctx.fillStyle=color; ctx.globalAlpha=alpha; ctx.fillRect(x,y,w,h); ctx.globalAlpha=1;
+    ctx.strokeStyle=color; ctx.lineWidth=1; ctx.strokeRect(x,y,w,h);
+  }
+
+  // Section 1: Variance
+  drawBox(10,30,secW-20,H-50,'#38bdf8');
+  ctx.fillStyle='#e2e8f0'; ctx.font='11px monospace'; ctx.textAlign='center';
+  ctx.fillText('① Q·Kᵀ 点积', 10+secW/2, 55);
+  ctx.fillText(`d=${d}`, 10+secW/2, 75);
+  ctx.fillText(`σ² ≈ ${d}`, 10+secW/2, 95);
+  ctx.fillText(`σ ≈ ${std_raw.toFixed(1)}`, 10+secW/2, 115);
+  ctx.fillText(`范围:`, 10+secW/2, 145);
+  const lo=Math.min(...scoresRaw),hi=Math.max(...scoresRaw);
+  ctx.fillText(`[${lo.toFixed(0)}, ${hi.toFixed(0)}]`, 10+secW/2, 163);
+
+  // Arrow
+  ctx.fillStyle='#e2e8f0'; ctx.font='20px monospace'; ctx.fillText('→', secW-3, H/2+5);
+
+  // Section 2: Scale
+  drawBox(secW+10,30,secW-20,H-50, scaleMode==='sqrt'?'#4ade80':'#f87171');
+  ctx.fillText(`② ÷ ${scaleMode==='sqrt'?'√d':'1'}`, 10+secW+secW/2, 55);
+  ctx.fillText(`÷ ${scale.toFixed(0)}`, 10+secW+secW/2, 80);
+  ctx.fillText(`缩放后:`, 10+secW+secW/2, 110);
+  const lo2=Math.min(...scores),hi2=Math.max(...scores);
+  ctx.fillText(`[${lo2.toFixed(2)}, ${hi2.toFixed(2)}]`, 10+secW+secW/2, 130);
+  ctx.fillText(`σ² ≈ ${(d/scale/scale).toFixed(1)}`, 10+secW+secW/2, 155);
+
+  // Arrow
+  ctx.fillText('→', secW*2-3, H/2+5);
+
+  // Section 3: Softmax
+  const isSat = S[maxIdx] > 0.95;
+  drawBox(secW*2+10,30,secW-20,H-50, isSat?'#f87171':'#4ade80');
+  ctx.fillText(`③ Softmax`, 10+secW*2+secW/2, 55);
+  ctx.fillText(`max = ${S[maxIdx].toFixed(4)}`, 10+secW*2+secW/2, 80);
+  S.forEach((s,i)=>{
+    ctx.font='9px monospace';
+    ctx.fillText(`S${i+1}=${s.toFixed(3)}`, 10+secW*2+secW/2, 100+i*18);
+  });
+  ctx.font='12px monospace';
+  ctx.fillText(isSat?'饱和！':'健康', 10+secW*2+secW/2, 100+n*18+10);
+
+  // Arrow
+  ctx.fillText('→', secW*3-3, H/2+5);
+
+  // Section 4: Gradient
+  drawBox(secW*3+10,30,secW-20,H-50, gradMax<0.01?'#f87171':'#4ade80');
+  ctx.fillText('④ ∂S/∂z', 10+secW*3+secW/2, 55);
+  ctx.fillText(`= Sᵢ(1-Sⱼ)`, 10+secW*3+secW/2, 75);
+  ctx.fillText(`max grad:`, 10+secW*3+secW/2, 105);
+  ctx.font='14px monospace';
+  ctx.fillText(gradMax.toFixed(6), 10+secW*3+secW/2, 130);
+  ctx.font='12px monospace';
+  ctx.fillText(gradMax<0.0001?'≈ 0 梯度死了！':(gradMax<0.01?'太小！':'正常'), 10+secW*3+secW/2, 155);
+
+  // Bottom conclusion
+  ctx.fillStyle='#facc15'; ctx.font='12px monospace'; ctx.textAlign='center';
+  const conclusion = scaleMode==='sqrt'
+    ? '✓ ÷√d → 方差=1 → softmax平滑 → 梯度健康 → 能训练'
+    : '✗ 无缩放 → 方差=d → softmax饱和 → 梯度≈0 → 学不动';
+  ctx.fillText(conclusion, W/2, H-8);
+}
+
+// ======================= Helper =======================
+function rnorm(){
+  let u=0,v=0;
+  while(u===0) u=Math.random();
+  while(v===0) v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+
+// ======================= Redraw all =======================
+function redrawAll(){
+  drawVariance(document.getElementById('canvasVar'));
+  drawDistribution(document.getElementById('canvasDist'));
+  drawSoftmax(document.getElementById('canvasSoftmax'));
+  drawGradient(document.getElementById('canvasGrad'));
+  drawChain(document.getElementById('canvasChain'));
+}
+
+// init
+redrawAll();
+</script>
+
+</body>
+</html>

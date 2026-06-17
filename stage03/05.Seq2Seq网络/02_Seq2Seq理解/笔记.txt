@@ -1,0 +1,55 @@
+一、作业
+    作业代码(所有) + 运行截图 + 必要的文字&文档说明邮件发压缩包发1941046624@qq.com并抄送834822435@qq.com
+    20251207:
+        一、基于python原生代码(不依赖任何第三方库的情况)实现一下序号化转换、文本/Token哑编码转换、文本词袋法转换、文本TF-IDF转换的实现
+        二、结合分词、token向量化转换 + 机器学习(LR)/深度学习，完成datas/text_classify文件夹中的文本分类模型的训练
+            完成：
+                训练: 如果替换一个数据集，如何在最小改动的情况下，完成新数据集的模型训练
+                推理：在训练完成的基础上，最终支持给定任何一个文本，返回该文本对应的类别id、类别名称以及预测所属概率，支持返回TopK的结果；
+            PS：可以考虑整个结构采用：分词 + Token2Id + Embedding + RNN/LSTM/GRU + FC + CrossEntropyLoss + SGD
+                数据加载更改为: from torch.utils.data import Dataset, DataLoader
+            讲解时间:
+                1217 + 1219
+        三、参考BP过程理解的代码，将其改成NumPy的结构(矩阵的运算的结构)
+    20251214：
+        一、和20251207的作业二一样，结合LSTM结构完成意图识别的分类模型训练
+        二、基于LSTM/RNN/GRU/BERT等结构完成分词模型的训练、推理、部署等相关操作
+            PS: 如果需要基于分词模型做词性标注任务，如何可以最小改动的完成？
+
+================================================================
+简单总结：
+    参考：
+        https://github.com/CLUEbenchmark/CLUEDatasetSearch
+        https://github.com/SophonPlus/ChineseNlpCorpus/tree/master
+    1. NLP相关知识点脉络
+        分词 -> Word2Vec -> RNN/LSTM/GRU -> Seq2Seq -> Attention -> Transformer -> Bert/T5/GPT -> LLM
+        NOTE:
+            NLP内部神经网络本质上都是在做特征向量提取，在获取token向量以及文本向量；
+            静态词向量: token对应的向量是固定，不受上下文其它token的影响 --> 一般就是一个固定的embedding table映射表
+                代表算法：Word2Vec
+            动态词向量：token对应的向量是非固定的，受上下文其它token的影响，也就是上下文不同的时候，当前token对应的最终词也不一样呀 --> 一般是一个网络结构，需要执行获取token向量
+                代表算法：以Bert为首的一些算法、ELMo(Bi-LSTM)
+    2. 神经网络中的神经元(线性转换 + 激活函数)的作用？
+    3. BP过程？
+    4. Token处理方式的介绍：词、字、笔画、偏旁、Byte
+    5. 序号化处理
+    6. One-Hot哑编码是什么？以及和Word2Vec的区别?
+    7. 词袋法、TF-IDF的执行过程、特点以及和Word2Vec的区别?
+    8. Word2Vec
+        NOTE
+            Word2Vec是什么、特点(低维、稠密向量、语义相似)
+            Word2Vec的两种结构:CBOW和Skip-Gram
+            Word2Vec的两种优化：Hierarchical softmax(霍夫曼树,HS，也叫做层级Softmax,层级分类)和Negative sampling(负样本采样)
+                加快模型训练过程、并且缓解"正负样本"不均衡的问题
+            Word2Vec API相关参数，包括：向量维度大小、窗口大小、二次重采样&计算概率的一些系数等等
+            Word2Vec模型训练完成后，输出&得到的就是一个单词到向量的映射矩阵
+                Word2Vec是一种静态词向量
+        参考：
+            https://www.cnblogs.com/pinard/p/7249903.html
+            https://zhuanlan.zhihu.com/p/371147732
+    9. 其它的向量转换方式：
+        Char2Vec、Doc2Vec、FastText、CW2Vec....
+        NOTE: FastText中的词编码、以及词的n-gram的组合
+    10. RNN\LSTM\GRU: 内部执行逻辑（数学公式）、参数量、计算量、结构图....
+    11. Seq2Seq：结构、局限性
+    12. Attention：结构、QKV的计算过程
