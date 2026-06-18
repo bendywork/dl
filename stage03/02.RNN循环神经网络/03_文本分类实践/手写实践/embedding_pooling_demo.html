@@ -280,3 +280,57 @@ function drawStep4(animT){
   ctx.fillText('[4, 3]', marginX+barMaxW+60, marginY+BS*90/2);
   ctx.restore();
 }
+
+// ============ 主控渲染 ============
+const STEPS = 4;
+let currentStep = 0;
+let animT = 0;
+let playing = false;
+let rafId = null;
+let lastTime = null;
+
+function render(ts){
+  if(lastTime===null) lastTime=ts;
+  const dt = (ts-lastTime)/1000; lastTime=ts;
+  if(playing){ animT = Math.min(animT+dt*0.6, 1); if(animT>=1) playing=false; }
+
+  ctx.clearRect(0,0,W,H);
+  if(currentStep===0) drawStep1(animT);
+  else if(currentStep===1) drawStep2(animT);
+  else if(currentStep===2) drawStep3(animT);
+  else if(currentStep===3) drawStep4(animT);
+
+  // step dots
+  const dotR=6, dotY=H-22, dotSpacing=22;
+  const totalW=(STEPS-1)*dotSpacing;
+  for(let i=0;i<STEPS;i++){
+    const dx = (W-totalW)/2 + i*dotSpacing;
+    ctx.beginPath(); ctx.arc(dx,dotY,dotR,0,Math.PI*2);
+    ctx.fillStyle = i===currentStep?'#58a6ff':'#30363d';
+    ctx.fill();
+    ctx.strokeStyle='#58a6ff'; ctx.lineWidth=1.5;
+    ctx.stroke();
+  }
+  rafId=requestAnimationFrame(render);
+}
+
+function goStep(n){
+  currentStep=clamp(n,0,STEPS-1);
+  animT=0; playing=true; lastTime=null;
+  document.getElementById('stepLabel').textContent='Step '+(currentStep+1)+' / '+STEPS;
+  document.getElementById('btnPrev').disabled=currentStep===0;
+  document.getElementById('btnNext').disabled=currentStep===STEPS-1;
+}
+
+document.getElementById('btnPrev').addEventListener('click',()=>goStep(currentStep-1));
+document.getElementById('btnNext').addEventListener('click',()=>goStep(currentStep+1));
+document.getElementById('btnPlay').addEventListener('click',function(){
+  playing=true; animT=0; lastTime=null;
+  this.textContent='▶ 重播';
+});
+
+goStep(0);
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

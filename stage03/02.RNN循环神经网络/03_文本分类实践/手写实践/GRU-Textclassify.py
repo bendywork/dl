@@ -121,7 +121,7 @@ class GRUClassifyModel(nn.Module):
         self.GRU = nn.GRU(
             input_size=config.VOCA_EMBED_DIM,
             hidden_size=config.HIDDEN_SIZE,
-            num_layers=2,
+            num_layers=1,
             batch_first=True,
             bidirectional=True )
           # 双向GRU需要乘以2
@@ -131,9 +131,9 @@ class GRUClassifyModel(nn.Module):
          # x-shape [bs, t] -> [bs, t, e]
          embeddings = self.embedding(x)
          # 调用GRU [bs, t, e] -> [bs, t, h]
-         outs, h_t = self.GRU(embeddings)
+         outs, (h_t, c_t) = self.GRU(embeddings)
          # GRU取最后时刻的隐藏状态[bs, t, h] -> [bs, h]
-         last_hidden = torch.cat([h_t[-2], h_t[-1]], dim=-1)  # [bs, hidden_size*2]
+         last_hidden = torch.cat([h_t[0], h_t[1]], dim=-1)  # [bs, hidden_size*2]
          # 做分类
          logits = self.classify_layer(last_hidden)
          return logits
@@ -220,6 +220,5 @@ if __name__ == '__main__':
     val_loader = build_data_loader(val_data, vocabulary, config, shuffle=False)
 
     model = GRUClassifyModel(vocabulary, config)
-    model.to(config.DEVICE)
     trainer = GRUClassifyTrain(config, model)
     trainer.train(train_loader, val_loader)
