@@ -1,0 +1,58 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Misc — PyTorch 2.12</title><style>:root{--bg:#0b1120;--card:#111827;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#4ade80;--yellow:#facc15}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto}.nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 20px;flex-wrap:wrap;gap:8px}.nav a{color:var(--accent);text-decoration:none;font-size:.85rem;padding:6px 14px;border:1px solid var(--border);border-radius:6px}.nav a:hover{background:rgba(56,189,248,.1)}h1{font-size:1.4rem;color:var(--accent);margin-bottom:20px}.section{margin-bottom:18px}h2{font-size:.95rem;color:var(--yellow);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:3px}.en{background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:6px;line-height:1.65;font-size:.8rem}.cn{background:rgba(74,222,128,.06);border-left:3px solid var(--green);padding:12px 16px;border-radius:0 8px 8px 0;line-height:1.65;font-size:.8rem;color:#cbd5e1}pre{background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:12px 16px;overflow-x:auto;margin:6px 0;font-size:.76rem;line-height:1.6}code{font-family:'Fira Code','Cascadia Code',monospace;color:#e2e8f0}.en code{background:rgba(56,189,248,.1);padding:1px 5px;border-radius:3px;font-size:.78rem}.cn code{background:rgba(74,222,128,.1);padding:1px 5px;border-radius:3px;font-size:.78rem}pre code{background:none;padding:0}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:.78rem}th,td{border:1px solid var(--border);padding:6px 10px;text-align:left}th{background:rgba(56,189,248,.08);color:var(--accent)}.footer{text-align:center;color:var(--text2);font-size:.68rem;margin-top:28px;border-top:1px solid var(--border);padding-top:14px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:600px){.grid2{grid-template-columns:1fr}}</style></head><body><div class="container"><div class="nav"><a href="index.html">← 索引</a><span style="color:var(--text2)">Misc Topics</span></div>
+<h1>其他模块 — amp · profiler · monitor · futures · testing · Quantization · Type Info · Named Tensors · Config</h1>
+
+<div class="section"><h2>torch.amp · 自动混合精度</h2>
+<div class="en"><p>Automatic Mixed Precision — use fp16/bf16 for compute, fp32 for critical ops, saving memory and boosting speed. <code>with torch.amp.autocast('cuda'): output = model(input)</code>. Pair with <code>GradScaler</code> for fp16 stability.</p></div>
+<div class="cn"><p>自动混合精度 —— fp16/bf16 做计算，fp32 保存关键操作，节省显存并加速。<code>with torch.amp.autocast('cuda'):</code> 上下文触发自动精度切换。配合 <code>GradScaler</code> 解决 fp16 梯度下溢问题。</p></div></div>
+
+<div class="section"><h2>torch.profiler · 性能分析</h2>
+<div class="en"><p>Unified profiler for CPU/GPU. <code>torch.profiler.profile(activities=[...])</code> captures trace. <code>.key_averages().table()</code> prints summary. Export to Chrome trace for visualization.</p></div>
+<div class="cn"><p>CPU/GPU 统一性能分析器。<code>profile()</code> 捕获追踪、<code>.key_averages().table()</code> 打印摘要、导出 Chrome trace 可视化。</p></div></div>
+
+<div class="section"><h2>torch.monitor · 系统监控</h2>
+<div class="en"><p>Monitor system metrics (CPU, GPU, memory) during training. <code>TensorboardEventHandler</code> integrates with TensorBoard.</p></div>
+<div class="cn"><p>训练期间监控系统指标（CPU、GPU、内存）。<code>TensorboardEventHandler</code> 与 TensorBoard 集成。</p></div></div>
+
+<div class="section"><h2>torch.overrides · 重载机制</h2>
+<div class="en"><p><code>__torch_function__</code> protocol — allows custom tensor-like objects to override PyTorch functions. Basis for libraries like functorch, masked tensors.</p></div>
+<div class="cn"><p><code>__torch_function__</code> 协议 —— 允许自定义 tensor 式对象重载 PyTorch 函数。functorch、masked tensors 等库的基础。</p></div></div>
+
+<div class="section"><h2>torch.futures · Future 对象</h2>
+<div class="en"><p>Asynchronous result placeholder. Used in distributed RPC and autograd engine.</p></div>
+<div class="cn"><p>异步结果占位符。用于分布式 RPC 和 autograd 引擎。</p></div></div>
+
+<div class="section"><h2>torch.testing · 测试工具</h2>
+<div class="en"><p><code>assert_close(actual, expected)</code> for numerical comparison with tolerance. <code>make_tensor()</code> for generating test inputs.</p></div>
+<div class="cn"><p><code>assert_close</code>（数值容差比较）、<code>make_tensor</code>（生成测试输入）。</p></div></div>
+
+<div class="section"><h2>nativert · 原生运行时</h2>
+<div class="en"><p>Native Runtime for executing models without Python overhead.</p></div>
+<div class="cn"><p>原生运行时，无需 Python 开销即可执行模型。</p></div></div>
+
+<div class="section"><h2>Quantization · 量化</h2>
+<div class="en"><p><code>torch.ao.quantization</code> — int8 quantization for model compression and faster inference. PTQ (Post-Training) and QAT (Quantization-Aware Training) workflows.</p></div>
+<div class="cn"><p><code>torch.ao.quantization</code> —— 模型 int8 量化（压缩 + 加速推理）。PTQ（训练后量化）和 QAT（量化感知训练）两种流程。</p></div></div>
+
+<div class="section"><h2>Type Info · 类型信息</h2>
+<div class="en"><p><code>torch.iinfo(type)</code> — integer type limits (min, max, bits). <code>torch.finfo(type)</code> — float type info (eps, max, min, tiny). Useful for numerical stability checks.</p></div>
+<div class="cn"><p><code>torch.iinfo(type)</code> 整数类型信息（min、max、bits）。<code>torch.finfo(type)</code> 浮点类型信息（eps、max、min、tiny）。数值稳定性检查必备。</p></div></div>
+
+<div class="section"><h2>Named Tensors · 命名张量</h2>
+<div class="en"><p>Assign names to tensor dimensions for readability and safety. <code>tensor.refine_names('batch', 'channel', 'H', 'W')</code>. Operations align by name instead of position.</p></div>
+<div class="cn"><p>为张量维度命名以提高可读性和安全性。操作按名称对齐而非位置。已合并到主分支但使用有限。</p></div></div>
+
+<div class="section"><h2>Config & Env Vars · 配置</h2>
+<div class="en">
+<p><strong>torch.__config__:</strong> show build configuration (CUDA, MKL, cuDNN versions).<br>
+<strong>torch.__future__:</strong> enable/disable upcoming defaults.<br>
+<strong>torch._logging:</strong> control internal PyTorch log verbosity.<br>
+<strong>Environment Variables:</strong> <code>TORCH_HOME</code> (cache dir), <code>TORCH_CUDA_ARCH_LIST</code> (GPU arch), <code>TORCHINDUCTOR_CACHE_DIR</code>, <code>TORCH_LOGS</code>, <code>TORCH_COMPILE_DEBUG</code> — dozens of flags for controlling PyTorch behavior.</p>
+</div>
+<div class="cn">
+<p><strong>torch.__config__：</strong>显示构建配置（CUDA、MKL、cuDNN 版本）。<br>
+<strong>torch.__future__：</strong>启用/禁用未来默认行为。<br>
+<strong>torch._logging：</strong>控制 PyTorch 内部日志详细度。<br>
+<strong>环境变量：</strong><code>TORCH_HOME</code>（缓存目录）、<code>TORCH_CUDA_ARCH_LIST</code>（GPU 架构）、<code>TORCHINDUCTOR_CACHE_DIR</code>（Inductor 缓存）、<code>TORCH_LOGS</code>（日志级别）、<code>TORCH_COMPILE_DEBUG</code>（编译调试）等数十个控制 PyTorch 行为的环境变量。</p>
+</div></div>
+
+<div class="footer">PyTorch 2.12 · Misc Topics · Bilingual EN/CN</div></div></body></html>

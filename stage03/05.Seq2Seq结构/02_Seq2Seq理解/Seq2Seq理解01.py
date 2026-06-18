@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 torch.manual_seed(24)
 
-
+# Seq2Seq编码器
 class EncoderModule(nn.Module):
     def __init__(self, vocab_size, hidden_size, num_layers):
         super().__init__()
@@ -24,8 +24,8 @@ class EncoderModule(nn.Module):
             input_size=hidden_size,  # 每个token输入的特征向量维度大小
             hidden_size=hidden_size,  # 每个token输出的特征向量维度大小
             num_layers=num_layers,  # 层数
-            batch_first=True,
-            bidirectional=True
+            batch_first=True, # 输入数据格式，[bs,et,feat] bs在第一个维度，et在第二个维度
+            bidirectional=True # 是否双向结构
         )
         # 将RNN输出特征值转换为高阶特征向量C
         self.ctx_feature_layer = nn.Sequential(

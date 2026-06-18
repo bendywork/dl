@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PyTorch 2.12 API 中英对照文档</title>
+<style>
+:root { --bg:#0b1120; --card:#111827; --border:#1e293b; --text:#e2e8f0; --text2:#94a3b8; --accent:#38bdf8; --green:#4ade80; --yellow:#facc15; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:24px; }
+.container { max-width:960px; margin:0 auto; }
+h1 { font-size:1.6rem; text-align:center; color:var(--accent); margin-bottom:6px; }
+.subtitle { text-align:center; color:var(--text2); font-size:0.85rem; margin-bottom:28px; }
+.section { margin-bottom:24px; }
+.section h2 { font-size:1.05rem; color:var(--yellow); margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:4px; }
+.pkg-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:6px; }
+.pkg-card { display:block; background:var(--card); border:1px solid var(--border); border-radius:6px; padding:10px 14px; text-decoration:none; font-size:0.8rem; color:var(--accent); transition:all .2s; }
+.pkg-card:hover { border-color:var(--accent); background:#1a2332; }
+.pkg-card .en { color:var(--text2); font-size:0.68rem; display:block; }
+.badge { display:inline-block; font-size:0.62rem; padding:1px 6px; border-radius:8px; margin-left:4px; vertical-align:middle; }
+.badge-done { background:rgba(74,222,128,0.15); color:var(--green); }
+.footer { text-align:center; color:var(--text2); font-size:0.72rem; margin-top:32px; border-top:1px solid var(--border); padding-top:16px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>PyTorch 2.12 API 中英对照文档</h1>
+<p class="subtitle">Bilingual EN/CN Reference · 每个 Package 一个独立 HTML · 逐段中英对照</p>
+
+<div class="section">
+  <h2>01 · 核心 Tensor API</h2>
+  <div class="pkg-grid">
+    <a class="pkg-card" href="torch_core_ops.html">torch — Tensor 创建/操作/数学 <span class="en">Creation, Ops, Math, BLAS</span></a>
+    <a class="pkg-card" href="torch.Tensor.html">torch.Tensor <span class="en">Tensor Class & Methods</span></a>
+    <a class="pkg-card" href="torch.Tensor_Attributes.html">Tensor Attributes <span class="en">dtype, device, layout, shape</span></a>
+    <a class="pkg-card" href="torch.Tensor_Views.html">Tensor Views <span class="en">view, reshape, transpose</span></a>
+    <a class="pkg-card" href="torch.Size.html">torch.Size <span class="en">Tensor size object</span></a>
+    <a class="pkg-card" href="torch.Storage.html">torch.Storage <span class="en">Untyped storage</span></a>
+    <a class="pkg-card" href="torch.sparse.html">torch.sparse <span class="en">Sparse Tensors</span></a>
+    <a class="pkg-card" href="torch.masked.html">torch.masked <span class="en">Masked Tensors</span></a>
+    <a class="pkg-card" href="torch.nested.html">torch.nested <span class="en">Nested Tensors</span></a>
+    <a class="pkg-card" href="torch.Complex.html">Complex Numbers <span class="en">Complex tensor support</span></a>
+    <a class="pkg-card" href="torch.Named_Tensors.html">Named Tensors <span class="en">Named tensor dimensions</span></a>
+    <a class="pkg-card" href="torch.Named_Tensors_Ops.html">Named Tensors Ops <span class="en">Operator coverage</span></a>
+    <a class="pkg-card" href="torch.Type_Info.html">Type Info <span class="en">iinfo, finfo</span></a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>02 · 神经网络</h2>
+  <div class="pkg-grid">
+    <a class="pkg-card" href="torch.nn.html">torch.nn <span class="en">Module, Sequential, Layers</span></a>
+    <a class="pkg-card" href="torch.nn.functional.html">torch.nn.functional <span class="en">Functional API (relu, conv2d…)</span></a>
+    <a class="pkg-card" href="torch.nn.init.html">torch.nn.init <span class="en">Weight initialization</span></a>
+    <a class="pkg-card" href="torch.nn.attention.html">torch.nn.attention <span class="en">SDPA, FlexAttention</span></a>
+    <a class="pkg-card" href="torch.nn.Aliases.html">Aliases in torch.nn <span class="en">Deprecated aliases</span></a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>03 · 优化器 & 自动微分</h2>
+  <div class="pkg-grid">
+    <a class="pkg-card" href="torch.optim.html">torch.optim <span class="en">SGD, Adam, AdamW, …</span></a>
+    <a class="pkg-card" href="torch.autograd.html">torch.autograd <span class="en">backward, grad, Function</span></a>
+    <a class="pkg-card" href="torch.func.html">torch.func <span class="en">vmap, grad, jacrev</span></a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>04 · 数据加载 & 工具</h2>
+  <div class="pkg-grid">
+    <a class="pkg-card" href="torch.utils.data.html">torch.utils.data <span class="en">Dataset, DataLoader, Sampler</span></a>
+    <a class="pkg-card" href="torch.utils.checkpoint.html">torch.utils.checkpoint <span class="en">Gradient checkpointing</span></a>
+    <a class="pkg-card" href="torch.utils.tensorboard.html">torch.utils.tensorboard <span class="en">TensorBoard writer</span></a>
+    <a class="pkg-card" href="torch.utils.model_zoo.html">torch.utils.model_zoo <span class="en">Model Zoo loader</span></a>
+    <a class="pkg-card" href="torch.utils.dlpack.html">torch.utils.dlpack <span class="en">DLPack converter</span></a>
+    <a class="pkg-card" href="torch.utils.cpp_extension.html">torch.utils.cpp_extension <span class="en">C++/CUDA extensions</span></a>
+    <a class="pkg-card" href="torch.utils.benchmark.html">torch.utils.benchmark <span class="en">Benchmark Utils</span></a>
+    <a class="pkg-card" href="torch.utils.deterministic.html">torch.utils.deterministic <span class="en">Reproducibility</span></a>
+    <a class="pkg-card" href="torch.utils.jit.html">JIT Utils <span class="en">torch.utils.jit</span></a>
+    <a class="pkg-card" href="torch.utils.mobile_optimizer.html">torch.utils.mobile_optimizer <span class="en">Mobile optimization</span></a>
+    <a class="pkg-card" href="torch.utils.module_tracker.html">torch.utils.module_tracker <span class="en">Module tracking</span></a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>05 · 设备 & 后端</h2>
+  <div class="pkg-grid">
+    <a class="pkg-card" href="torch.cpu.html">torch.cpu <span class="en">CPU device</span></a>
+    <a class="pkg-card" href="torch.cuda.html">torch.cuda <span class="en">CUDA / GPU</span></a>
+    <a class="pkg-card" href="torch.cuda_memory.html">torch.cuda.memory <span class="en">CUDA memory management</span></a>
+    <a class="pkg-card" href="torch.mps.html">torch.mps <span class="en">Apple Metal / MPS</span></a>
+    <a class="pkg-card" href="torch.xpu.html">torch.xpu <span class="en">Intel XPU</span></a>
+    <a class="pkg-card" href="torch.mtia.html">torch.mtia <span class="en">MTIA accelerator</span></a>
+    <a class="pkg-card" href="torch.mtia_memory.html">torch.mtia.memory <span class="en">MTIA memory</span></a>
+    <a class="pkg-card" href="torch.mtia_graph.html">torch.mtia.mtia_graph <span class="en">MTIA graph capture</span></a>
+    <a class="pkg-card" href="torch.accelerator.html">torch.accelerator <span class="en">Generic accelerator</span></a>
+    <a class="pkg-card" href="torch.Meta_Device.html">Meta device <span class="en">meta tensor device</span></a>
+    <a class="pkg-card" href="torch.backends.html">torch.backends <span class="en">cuDNN, MKL, OpenMP</span></a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>06 · 分布式训练</h2>
+  <div class="pkg-grid">
+    <a class="pkg-card" href="torch.distributed.html">torch.distributed <span class="en">DDP, init_process_group</span></a>
+    <a class="pkg-card" href="torch.distributed.tensor.html">torch.distributed.tensor <span class="en">DTensor</span></a>
+    <a class="pkg-card" href="torch.distributed.algorithms.join.html">torch.distributed.algorithms.join</a>
+    <a class="pkg-card" href="torch.distributed.elastic.html">torch.distributed.elastic <span class="en">Elastic / TorchRun</span></a>
+    <a class="pkg-card" href="torch.distributed.fsdp.html">torch.distributed.fsdp <span class="en">Fully Sharded Data Parallel</span></a>
+    <a class="pkg-card" href="torch.distributed.fsdp_fully_shard.html">.fsdp.fully_shard <span class="en">FSDP2</span></a>
+    <a class="pkg-card" href="torch.distributed.tensor.parallel.html">.tensor.parallel <span class="en">Tensor Parallelism</span></a>
+    <a class="pkg-card" href="torch.distributed.optim.html">torch.distributed.optim <span class="en">Distributed Optimizer</span></a>
+    <a class="pkg-card" href="torch.distributed.pipelining.html">torch.distributed.pipelining <span class="en">Pipeline Parallelism</span></a>
+    <a class="pkg-card" href="torch.distributed.symmetric_memory.html">._symmetric_memory <span class="en">Symmetric Memory</span></a>
+    <a class="pkg-card" href="torch.distributed.checkpoint.html">.checkpoint <span class="en">Distributed checkpointing</span></a>
+    <a class="pkg-card" href="Distributed_RPC.html">Distributed RPC <span class="en">RPC / RRef</span></a>
+    <a class="pkg-card" href="DDP_Comm_Hooks.html">DDP Communication Hooks <span class="en">Gradient compression</span></a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>07 · 导出 & 编译</h2>
+  <div class="pkg-grid">
+    <a class="pkg-card" href="torch.compiler.html">torch.compiler <span class="en">torch.compile, dynamo</span></a>
+    <a class="pkg-card" href="torch.export.html">torch.export <span class="en">torch.export.export</span></a>
+    <a class="pkg-card" href="torch.fx.html">torch.fx <span class="en">FX graph IR</span></a>
+    <a class="pkg-card" href="torch.fx.experimental.html">torch.fx.experimental <span class="en">FX experimental</span></a>
+    <a class="pkg-card" href="torch.onnx.html">torch.onnx <span class="en">ONNX export</span></a>
+    <a class="pkg-card" href="torch.package.html">torch.package <span class="en">Package format</span></a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>08 · 数学 & 信号处理</h2>
+  <div class="pkg-grid">
+    <a class="pkg-card" href="torch.linalg.html">torch.linalg <span class="en">Linear algebra</span></a>
+    <a class="pkg-card" href="torch.fft.html">torch.fft <span class="en">FFT, IFFT</span></a>
+    <a class="pkg-card" href="torch.signal.html">torch.signal <span class="en">Signal processing windows</span></a>
+    <a class="pkg-card" href="torch.special.html">torch.special <span class="en">Special math functions</span></a>
+    <a class="pkg-card" href="torch.distributions.html">torch.distributions <span class="en">Probability distributions</span></a>
+    <a class="pkg-card" href="torch.random.html">torch.random <span class="en">Random sampling</span></a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>09 · 其他模块</h2>
+  <div class="pkg-grid">
+    <a class="pkg-card" href="torch.amp.html">torch.amp <span class="en">Automatic Mixed Precision</span></a>
+    <a class="pkg-card" href="torch.library.html">torch.library <span class="en">Custom operator registration</span></a>
+    <a class="pkg-card" href="torch.hub.html">torch.hub <span class="en">Model Hub</span></a>
+    <a class="pkg-card" href="torch.profiler.html">torch.profiler <span class="en">Performance profiling</span></a>
+    <a class="pkg-card" href="torch.monitor.html">torch.monitor <span class="en">System monitoring</span></a>
+    <a class="pkg-card" href="torch.overrides.html">torch.overrides <span class="en">__torch_function__</span></a>
+    <a class="pkg-card" href="torch.futures.html">torch.futures <span class="en">Future object</span></a>
+    <a class="pkg-card" href="torch.testing.html">torch.testing <span class="en">Testing utilities</span></a>
+    <a class="pkg-card" href="torch.nativert.html">torch.nativert <span class="en">Native Runtime</span></a>
+    <a class="pkg-card" href="Quantization.html">Quantization <span class="en">torch.ao.quantization</span></a>
+    <a class="pkg-card" href="torch.Config.html">torch.__config__ / __future__ / _logging</a>
+    <a class="pkg-card" href="Torch_Env_Vars.html">Environment Variables <span class="en">TORCH_* env vars</span></a>
+  </div>
+</div>
+
+<p class="footer">PyTorch 2.12 API Reference · Bilingual EN/CN · 共 60+ 个 Package HTML</p>
+</div>
+</body>
+</html>

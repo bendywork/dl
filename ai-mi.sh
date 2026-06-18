@@ -7,14 +7,14 @@ read -p "输入选项 (1/2): " choice
 
 export http_proxy=http://127.0.0.1:7890
 export https_proxy=http://127.0.0.1:7890
-export OPENAI_API_KEY=sk-SvMpwUYNUb0KTPhfAWm2bTSJE7VF9RsdP70ICTdINlF89BPA
-export OPENAI_BASE_URL=https://sinsy.eu.cc/
-export ANTHROPIC_AUTH_TOKEN=sk-SvMpwUYNUb0KTPhfAWm2bTSJE7VF9RsdP70ICTdINlF89BPA
-export ANTHROPIC_BASE_URL=https://sinsy.eu.cc/
+export OPENAI_API_KEY=tp-ccux4zawmz1amfvqjy2p67qegn3zni2mfm41w5svg7rscb8s
+export OPENAI_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1
+export ANTHROPIC_AUTH_TOKEN=tp-ccux4zawmz1amfvqjy2p67qegn3zni2mfm41w5svg7rscb8s
+export ANTHROPIC_BASE_URL=https://token-plan-cn.xiaomimimo.com/anthropic
 
 case $choice in
   1)
-    export ANTHROPIC_MODEL=accounts/fireworks/models/glm-5p2
+    export ANTHROPIC_MODEL=MiMo-V2.5-Pro
     echo "启动 Claude..."
     claude --dangerously-skip-permissions
     ;;

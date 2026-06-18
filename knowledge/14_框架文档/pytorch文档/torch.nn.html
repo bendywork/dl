@@ -1,0 +1,65 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>torch.nn — PyTorch 2.12 中英对照</title>
+<style>:root{--bg:#0b1120;--card:#111827;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#4ade80;--yellow:#facc15}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto}.nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 20px;flex-wrap:wrap;gap:8px}.nav a{color:var(--accent);text-decoration:none;font-size:.85rem;padding:6px 14px;border:1px solid var(--border);border-radius:6px}.nav a:hover{background:rgba(56,189,248,.1);border-color:var(--accent)}h1{font-size:1.4rem;color:var(--accent);margin-bottom:20px}.section{margin-bottom:20px}h2{font-size:1rem;color:var(--yellow);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px}.en{background:var(--card);border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:8px;line-height:1.7;font-size:.84rem}.cn{background:rgba(74,222,128,.06);border-left:3px solid var(--green);padding:14px 18px;border-radius:0 8px 8px 0;line-height:1.7;font-size:.84rem;color:#cbd5e1}pre{background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:14px 18px;overflow-x:auto;margin:8px 0;font-size:.8rem;line-height:1.7}code{font-family:'Fira Code','Cascadia Code',monospace;color:#e2e8f0}.en code{background:rgba(56,189,248,.1);padding:1px 6px;border-radius:4px}.cn code{background:rgba(74,222,128,.1);padding:1px 6px;border-radius:4px}pre code{background:none;padding:0}table{width:100%;border-collapse:collapse;margin:8px 0;font-size:.82rem}th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}th{background:rgba(56,189,248,.08);color:var(--accent)}.footer{text-align:center;color:var(--text2);font-size:.72rem;margin-top:32px;border-top:1px solid var(--border);padding-top:16px}</style></head><body><div class="container"><div class="nav"><a href="index.html">← 索引</a><span style="color:var(--text2)">torch.nn</span><a href="torch.nn.functional.html">下一模块 →</a></div>
+<h1>torch.nn — 神经网络模块</h1>
+<div class="section"><h2>nn.Module · 模块基类</h2><div class="en"><p>Base class for all neural network modules. Your models should subclass this. Automatically tracks parameters, buffers, and sub-modules.</p></div><div class="cn"><p>所有神经网络模块的基类。你的模型应继承此类。自动追踪参数、缓冲区（buffer）和子模块。</p></div>
+<pre><code>class MyModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc = nn.Linear(10, 5)       # 自动注册为子模块
+    def forward(self, x):
+        return self.fc(x)</code></pre>
+<table><tr><th>Method</th><th>Description</th></tr>
+<tr><td><code>.parameters()</code></td><td><span class="en">All trainable params (recursively)</span><br><span class="cn">所有可训练参数（递归）</span></td></tr>
+<tr><td><code>.named_parameters()</code></td><td><span class="en">Parameters with names</span><br><span class="cn">带名称的参数</span></td></tr>
+<tr><td><code>.train() / .eval()</code></td><td><span class="en">Set training/eval mode (affects Dropout, BN)</span><br><span class="cn">训练/评估模式（影响 Dropout、BN）</span></td></tr>
+<tr><td><code>.to(device)</code></td><td><span class="en">Move all params to device</span><br><span class="cn">将所有参数移到指定设备</span></td></tr>
+<tr><td><code>.state_dict()</code></td><td><span class="en">Return params as dict (for save/load)</span><br><span class="cn">以字典形式返回参数（用于保存/加载）</span></td></tr>
+<tr><td><code>.load_state_dict(d)</code></td><td><span class="en">Load params from dict</span><br><span class="cn">从字典加载参数</span></td></tr>
+<tr><td><code>.register_buffer(name, t)</code></td><td><span class="en">Register non-trainable tensor saved in state_dict</span><br><span class="cn">注册不训练但保存在 state_dict 中的 tensor</span></td></tr>
+<tr><td><code>.apply(fn)</code></td><td><span class="en">Apply fn to every submodule recursively</span><br><span class="cn">对每个子模块递归应用 fn</span></td></tr></table></div>
+<div class="section"><h2>Containers · 容器</h2><table><tr><th>Class</th><th>Description</th></tr>
+<tr><td><code>nn.Sequential(*modules)</code></td><td><span class="en">Chain modules sequentially</span><br><span class="cn">顺序串联模块</span></td></tr>
+<tr><td><code>nn.ModuleList(modules)</code></td><td><span class="en">List of modules (params tracked)</span><br><span class="cn">模块列表（参数被追踪）</span></td></tr>
+<tr><td><code>nn.ModuleDict(modules)</code></td><td><span class="en">Dict of modules (params tracked)</span><br><span class="cn">模块字典（参数被追踪）</span></td></tr>
+<tr><td><code>nn.ParameterList</code></td><td><span class="en">List of parameters</span><br><span class="cn">参数列表</span></td></tr>
+<tr><td><code>nn.ParameterDict</code></td><td><span class="en">Dict of parameters</span><br><span class="cn">参数字典</span></td></tr></table></div>
+<div class="section"><h2>Linear Layers · 线性层</h2><table><tr><th>Class</th><th>Formula</th></tr>
+<tr><td><code>nn.Linear(in, out, bias=True)</code></td><td><code>y = xW^T + b</code></td></tr>
+<tr><td><code>nn.Bilinear(in1, in2, out)</code></td><td><code>y = x1^T·A·x2 + b</code></td></tr>
+<tr><td><code>nn.Identity(*args, **kwargs)</code></td><td><code>y = x</code> (placeholder)</td></tr>
+<tr><td><code>nn.LazyLinear(out)</code></td><td><span class="en">Infer in_features from first forward</span><br><span class="cn">从第一次前向推断输入维度</span></td></tr></table></div>
+<div class="section"><h2>Convolution · 卷积</h2><table><tr><th>Class</th><th>Use</th></tr>
+<tr><td><code>nn.Conv1d(in, out, k, stride, padding)</code></td><td><span class="en">1D text / time-series</span><br><span class="cn">1D 文本/时序</span></td></tr>
+<tr><td><code>nn.Conv2d(in, out, k, stride, padding)</code></td><td><span class="en">2D images</span><br><span class="cn">2D 图像</span></td></tr>
+<tr><td><code>nn.Conv3d(in, out, k, stride, padding)</code></td><td><span class="en">3D volumes / video</span><br><span class="cn">3D 体积/视频</span></td></tr>
+<tr><td><code>nn.ConvTranspose2d</code></td><td><span class="en">Upsampling (deconvolution)</span><br><span class="cn">上采样（反卷积）</span></td></tr></table></div>
+<div class="section"><h2>RNN · 循环网络</h2>
+<table><tr><th>Class</th><th>Description</th></tr>
+<tr><td><code>nn.RNN(input, hidden, layers, batch_first, bidirectional)</code></td><td><span class="en">Vanilla RNN / tanh or ReLU</span><br><span class="cn">普通 RNN（tanh 或 ReLU）</span></td></tr>
+<tr><td><code>nn.LSTM(input, hidden, layers, batch_first, bidirectional)</code></td><td><span class="en">Long Short-Term Memory</span><br><span class="cn">长短期记忆网络</span></td></tr>
+<tr><td><code>nn.GRU(input, hidden, layers, batch_first, bidirectional)</code></td><td><span class="en">Gated Recurrent Unit</span><br><span class="cn">门控循环单元</span></td></tr></table></div>
+<div class="section"><h2>Normalization · 归一化</h2><table><tr><th>Class</th><th>Where</th></tr>
+<tr><td><code>nn.BatchNorm1d / 2d / 3d</code></td><td><span class="en">Per-channel batch normalization</span><br><span class="cn">逐通道批量归一化</span></td></tr>
+<tr><td><code>nn.LayerNorm(normalized_shape)</code></td><td><span class="en">Per-sample layer norm (Transformer default)</span><br><span class="cn">逐样本层归一化（Transformer 默认）</span></td></tr>
+<tr><td><code>nn.GroupNorm(groups, channels)</code></td><td><span class="en">Between BatchNorm and LayerNorm</span><br><span class="cn">介于 BN 和 LN 之间</span></td></tr>
+<tr><td><code>nn.RMSNorm(normalized_shape)</code></td><td><span class="en">Root Mean Square (LLaMA-style)</span><br><span class="cn">均方根归一化（LLaMA 式）</span></td></tr></table></div>
+<div class="section"><h2>Regularization · 正则化</h2><table><tr><th>Class</th><th>Description</th></tr>
+<tr><td><code>nn.Dropout(p=0.5)</code></td><td><span class="en">Randomly zero elements with prob p</span><br><span class="cn">以概率 p 随机置零元素</span></td></tr>
+<tr><td><code>nn.Dropout2d(p=0.5)</code></td><td><span class="en">Drop entire channels</span><br><span class="cn">随机丢弃整个通道</span></td></tr></table></div>
+<div class="section"><h2>Activations · 激活函数</h2>
+<table><tr><th>Class</th><th>Formula</th></tr>
+<tr><td><code>nn.ReLU()</code></td><td><code>max(0, x)</code></td></tr>
+<tr><td><code>nn.GELU()</code></td><td><code>x·Φ(x)</code> (Transformer default)</td></tr>
+<tr><td><code>nn.SiLU() / nn.Swish()</code></td><td><code>x·σ(x)</code></td></tr>
+<tr><td><code>nn.Tanh()</code></td><td><code>(e^x - e^{-x})/(e^x + e^{-x})</code></td></tr>
+<tr><td><code>nn.Sigmoid()</code></td><td><code>1/(1 + e^{-x})</code></td></tr>
+<tr><td><code>nn.Softmax(dim)</code></td><td><code>e^x / Σe^x</code></td></tr>
+<tr><td><code>nn.LogSoftmax(dim)</code></td><td><code>log(softmax(x))</code></td></tr></table></div>
+<div class="section"><h2>Loss Functions · 损失函数</h2><table><tr><th>Class</th><th>Task</th></tr>
+<tr><td><code>nn.CrossEntropyLoss()</code></td><td><span class="en">Classification (logits, no softmax)</span><br><span class="cn">分类（输入 logits，不需 softmax）</span></td></tr>
+<tr><td><code>nn.BCEWithLogitsLoss()</code></td><td><span class="en">Binary classification with sigmoid</span><br><span class="cn">二分类，内置 sigmoid</span></td></tr>
+<tr><td><code>nn.MSELoss()</code></td><td><span class="en">Regression L2</span><br><span class="cn">回归 L2 损失</span></td></tr>
+<tr><td><code>nn.L1Loss()</code></td><td><span class="en">Regression L1 (sparse-friendly)</span><br><span class="cn">回归 L1 损失</span></td></tr>
+<tr><td><code>nn.NLLLoss()</code></td><td><span class="en">Negative log-likelihood (with LogSoftmax)</span><br><span class="cn">负对数似然（配合 LogSoftmax）</span></td></tr>
+<tr><td><code>nn.KLDivLoss()</code></td><td><span class="en">KL divergence</span><br><span class="cn">KL 散度</span></td></tr></table></div>
+<div class="footer">PyTorch 2.12 · torch.nn · Bilingual EN/CN</div></div></body></html>

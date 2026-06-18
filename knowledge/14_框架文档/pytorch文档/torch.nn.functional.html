@@ -1,0 +1,44 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>torch.nn.functional — PyTorch 2.12</title><style>:root{--bg:#0b1120;--card:#111827;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#4ade80;--yellow:#facc15}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto}.nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 20px;flex-wrap:wrap;gap:8px}.nav a{color:var(--accent);text-decoration:none;font-size:.85rem;padding:6px 14px;border:1px solid var(--border);border-radius:6px}.nav a:hover{background:rgba(56,189,248,.1)}h1{font-size:1.4rem;color:var(--accent);margin-bottom:20px}.section{margin-bottom:20px}h2{font-size:1rem;color:var(--yellow);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px}.en{background:var(--card);border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:8px;line-height:1.7;font-size:.84rem}.cn{background:rgba(74,222,128,.06);border-left:3px solid var(--green);padding:14px 18px;border-radius:0 8px 8px 0;line-height:1.7;font-size:.84rem;color:#cbd5e1}pre{background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:14px 18px;overflow-x:auto;margin:8px 0;font-size:.8rem;line-height:1.7}code{font-family:'Fira Code','Cascadia Code',monospace;color:#e2e8f0}.en code{background:rgba(56,189,248,.1);padding:1px 6px;border-radius:4px}.cn code{background:rgba(74,222,128,.1);padding:1px 6px;border-radius:4px}pre code{background:none;padding:0}table{width:100%;border-collapse:collapse;margin:8px 0;font-size:.82rem}th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}th{background:rgba(56,189,248,.08);color:var(--accent)}.footer{text-align:center;color:var(--text2);font-size:.72rem;margin-top:32px;border-top:1px solid var(--border);padding-top:16px}</style></head><body><div class="container"><div class="nav"><a href="index.html">← 索引</a><span style="color:var(--text2)">torch.nn.functional</span><a href="torch.nn.init.html">下一模块 →</a></div>
+<h1>torch.nn.functional — 函数式 API (F.relu, F.softmax, ...)</h1>
+<div class="section"><h2>nn.functional vs nn.Module · 函数 vs 模块</h2>
+<div class="en"><p><code>F.relu(x)</code> is stateless (just a function). <code>nn.ReLU()</code> is a Module with state. For ops without learnable parameters, <code>F.*</code> is more concise. For ops with parameters (like <code>nn.Conv2d</code>), use <code>nn.Module</code> so params are tracked.</p></div>
+<div class="cn"><p><code>F.relu(x)</code> 是无状态的（纯函数）。<code>nn.ReLU()</code> 是带状态的 Module。无参数操作用 <code>F.*</code> 更简洁。含可训练参数的操作（如卷积）必须用 <code>nn.Module</code> 子类，否则参数无法被追踪。</p></div></div>
+<div class="section"><h2>Activation Functions · 激活函数</h2>
+<table><tr><th>Function</th><th>Formula</th></tr>
+<tr><td><code>F.relu(x)</code></td><td>max(0, x)<span class="cn"> / 最常用</span></td></tr>
+<tr><td><code>F.gelu(x)</code></td><td>x·Φ(x)<span class="cn"> / Transformer 默认</span></td></tr>
+<tr><td><code>F.silu(x)</code></td><td>x·σ(x)<span class="cn"> / SiLU=SwiGLU 组件</span></td></tr>
+<tr><td><code>F.leaky_relu(x, negative_slope=0.01)</code></td><td><span class="en">Small slope for negative values</span><br><span class="cn">负值区有微小斜率，防止神经元死亡</span></td></tr>
+<tr><td><code>F.elu(x)</code></td><td><span class="en">Exponential Linear Unit</span><br><span class="cn">指数线性单元</span></td></tr>
+<tr><td><code>F.sigmoid(x)</code></td><td><span class="en">1/(1+e^{-x}) → (0,1)</span><br><span class="cn">压到 (0,1)</span></td></tr>
+<tr><td><code>F.tanh(x)</code></td><td><span class="en">→ (-1,1)</span><br><span class="cn">压到 (-1,1)</span></td></tr>
+<tr><td><code>F.softmax(x, dim)</code></td><td><span class="en">e^x/Σe^x → probability distribution</span><br><span class="cn">概率分布，和为 1</span></td></tr>
+<tr><td><code>F.log_softmax(x, dim)</code></td><td><span class="en">log(softmax) — numerically stable</span><br><span class="cn">数值稳定的 log(softmax)</span></td></tr></table></div>
+<div class="section"><h2>Convolution · 卷积函数</h2>
+<div class="en"><p><code>F.conv2d(input, weight, bias, stride, padding, dilation, groups)</code> — the functional backend for <code>nn.Conv2d</code>.</p></div>
+<div class="cn"><p><code>F.conv2d(input, weight, bias, stride, padding, dilation, groups)</code> — <code>nn.Conv2d</code> 的函数式后端。</p></div></div>
+<div class="section"><h2>Pooling · 池化</h2>
+<table><tr><th>Function</th><th>Description</th></tr>
+<tr><td><code>F.max_pool2d(x, kernel_size)</code></td><td><span class="en">Max pooling</span><br><span class="cn">最大池化</span></td></tr>
+<tr><td><code>F.avg_pool2d(x, kernel_size)</code></td><td><span class="en">Average pooling</span><br><span class="cn">平均池化</span></td></tr>
+<tr><td><code>F.adaptive_avg_pool2d(x, output_size)</code></td><td><span class="en">Adaptive: any input → fixed output</span><br><span class="cn">自适应：任意输入 → 固定输出</span></td></tr></table></div>
+<div class="section"><h2>Normalization · 归一化</h2>
+<table><tr><th>Function</th><th>Description</th></tr>
+<tr><td><code>F.batch_norm(x, running_mean, running_var, weight, bias, training)</code></td><td><span class="en">Batch norm functional</span></td></tr>
+<tr><td><code>F.layer_norm(x, normalized_shape, weight, bias)</code></td><td><span class="en">Layer norm functional</span></td></tr>
+<tr><td><code>F.normalize(x, p=2, dim)</code></td><td><span class="en">Lp normalize along dim</span><br><span class="cn">沿 dim 做 Lp 归一化</span></td></tr></table></div>
+<div class="section"><h2>Dropout · 随机丢弃</h2>
+<div class="en"><p><code>F.dropout(x, p=0.5, training=self.training)</code> — randomly zero elements. Behavior differs between train/eval modes.</p></div>
+<div class="cn"><p><code>F.dropout(x, p=0.5, training=self.training)</code> — 随机置零。训练/评估模式下行为不同。</p></div></div>
+<div class="section"><h2>Loss Functions · 损失函数 (F.*)</h2><table><tr><th>Function</th><th>Use</th></tr>
+<tr><td><code>F.cross_entropy(input, target)</code></td><td><span class="en">Classification (combines LogSoftmax+NLLLoss)</span><br><span class="cn">分类（内置LogSoftmax+NLLLoss）</span></td></tr>
+<tr><td><code>F.binary_cross_entropy_with_logits(input, target)</code></td><td><span class="en">Binary classification (stable)</span><br><span class="cn">二分类（数值稳定）</span></td></tr>
+<tr><td><code>F.mse_loss(input, target)</code></td><td><span class="en">Mean Squared Error (L2)</span><br><span class="cn">均方误差</span></td></tr>
+<tr><td><code>F.l1_loss(input, target)</code></td><td><span class="en">Mean Absolute Error (L1)</span><br><span class="cn">平均绝对误差</span></td></tr>
+<tr><td><code>F.nll_loss(input, target)</code></td><td><span class="en">Negative Log Likelihood</span><br><span class="cn">负对数似然</span></td></tr>
+<tr><td><code>F.kl_div(input, target)</code></td><td><span class="en">KL Divergence</span><br><span class="cn">KL 散度</span></td></tr>
+<tr><td><code>F.smooth_l1_loss(input, target)</code></td><td><span class="en">Huber-like (L1 when |x|>beta, else L2)</span><br><span class="cn">Huber 式损失（兼顾 L1 和 L2 优点）</span></td></tr></table></div>
+<div class="section"><h2>Key Rule of Thumb · 使用原则</h2>
+<div class="en"><p>Use <code>nn.*</code> when the layer has learnable parameters (conv, linear, bn). Use <code>F.*</code> for stateless ops (relu, max_pool, softmax) — though <code>nn.ReLU()</code> works fine too.</p></div>
+<div class="cn"><p>有可训练参数时用 <code>nn.*</code>（conv、linear、batchnorm）。无状态操作用 <code>F.*</code> 更简洁（relu、max_pool、softmax）—— 不过 <code>nn.ReLU()</code> 也能用。</p></div></div>
+<div class="footer">PyTorch 2.12 · torch.nn.functional · Bilingual EN/CN</div></div></body></html>

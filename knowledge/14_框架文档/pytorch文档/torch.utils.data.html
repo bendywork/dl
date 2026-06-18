@@ -1,0 +1,39 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>torch.utils.data — PyTorch 2.12</title><style>:root{--bg:#0b1120;--card:#111827;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#4ade80;--yellow:#facc15}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto}.nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 20px;flex-wrap:wrap;gap:8px}.nav a{color:var(--accent);text-decoration:none;font-size:.85rem;padding:6px 14px;border:1px solid var(--border);border-radius:6px}.nav a:hover{background:rgba(56,189,248,.1)}h1{font-size:1.4rem;color:var(--accent);margin-bottom:20px}.section{margin-bottom:20px}h2{font-size:1rem;color:var(--yellow);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px}.en{background:var(--card);border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:8px;line-height:1.7;font-size:.84rem}.cn{background:rgba(74,222,128,.06);border-left:3px solid var(--green);padding:14px 18px;border-radius:0 8px 8px 0;line-height:1.7;font-size:.84rem;color:#cbd5e1}pre{background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:14px 18px;overflow-x:auto;margin:8px 0;font-size:.8rem;line-height:1.7}code{font-family:'Fira Code','Cascadia Code',monospace;color:#e2e8f0}.en code{background:rgba(56,189,248,.1);padding:1px 6px;border-radius:4px}.cn code{background:rgba(74,222,128,.1);padding:1px 6px;border-radius:4px}pre code{background:none;padding:0}table{width:100%;border-collapse:collapse;margin:8px 0;font-size:.82rem}th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}th{background:rgba(56,189,248,.08);color:var(--accent)}.footer{text-align:center;color:var(--text2);font-size:.72rem;margin-top:32px;border-top:1px solid var(--border);padding-top:16px}</style></head><body><div class="container"><div class="nav"><a href="index.html">← 索引</a><span style="color:var(--text2)">torch.utils.data</span><a href="torch.distributed.html">下一模块 →</a></div>
+<h1>torch.utils.data — Dataset, DataLoader, Sampler</h1>
+
+<div class="section"><h2>Dataset · 数据集基类</h2>
+<div class="en"><p>Abstract class representing a dataset. Subclass and implement <code>__len__</code> and <code>__getitem__</code>.</p></div>
+<div class="cn"><p>表示数据集的抽象类。继承并实现 <code>__len__</code> 和 <code>__getitem__</code>。</p></div>
+<pre><code>class MyDataset(Dataset):
+    def __init__(self, data, labels): self.data, self.labels = data, labels
+    def __len__(self): return len(self.data)
+    def __getitem__(self, idx): return self.data[idx], self.labels[idx]</code></pre></div>
+
+<div class="section"><h2>DataLoader · 数据加载器</h2>
+<div class="en"><p>Combines dataset + sampler, provides iterable over batches. Handles batching, shuffling, multiprocessing.</p></div>
+<div class="cn"><p>组合 dataset 和 sampler，提供可迭代的批量数据。处理批量化、随机打乱和多进程。</p></div>
+<pre><code>loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=4,
+                    collate_fn=collate_fn, pin_memory=True, drop_last=True)</code></pre>
+<table><tr><th>Parameter</th><th>Description</th></tr>
+<tr><td><code>batch_size</code></td><td><span class="en">Samples per batch</span><br><span class="cn">每个 batch 的样本数</span></td></tr>
+<tr><td><code>shuffle</code></td><td><span class="en">Shuffle data each epoch</span><br><span class="cn">每个 epoch 打乱数据</span></td></tr>
+<tr><td><code>num_workers</code></td><td><span class="en">Subprocesses for data loading (0=main)</span><br><span class="cn">数据加载子进程数（0=主进程）</span></td></tr>
+<tr><td><code>collate_fn</code></td><td><span class="en">Merge list of samples into batch</span><br><span class="cn">将样本列表合并为一个 batch</span></td></tr>
+<tr><td><code>pin_memory</code></td><td><span class="en">Copy tensors to CUDA pinned memory (faster GPU transfer)</span><br><span class="cn">将 tensor 复制到 CUDA 固定内存（更快传到 GPU）</span></td></tr>
+<tr><td><code>drop_last</code></td><td><span class="en">Drop incomplete last batch</span><br><span class="cn">丢弃不完整的最后一个 batch</span></td></tr>
+<tr><td><code>sampler</code></td><td><span class="en">Custom sampling strategy</span><br><span class="cn">自定义采样策略</span></td></tr></table></div>
+
+<div class="section"><h2>Sampler · 采样器</h2>
+<table><tr><th>Class</th><th>Description</th></tr>
+<tr><td><code>SequentialSampler</code></td><td><span class="en">Sequential order</span><br><span class="cn">顺序采样</span></td></tr>
+<tr><td><code>RandomSampler</code></td><td><span class="en">Random with/without replacement</span><br><span class="cn">随机采样（有/无放回）</span></td></tr>
+<tr><td><code>SubsetRandomSampler</code></td><td><span class="en">Random from given indices</span><br><span class="cn">从给定索引随机采样</span></td></tr>
+<tr><td><code>WeightedRandomSampler</code></td><td><span class="en">Weighted sampling (rebalance classes)</span><br><span class="cn">加权采样（平衡类别）</span></td></tr>
+<tr><td><code>BatchSampler</code></td><td><span class="en">Wrap sampler to yield batches</span><br><span class="cn">包装 sampler 生成 batch</span></td></tr>
+</table></div>
+
+<div class="section"><h2>Built-in Datasets · 内置数据集</h2>
+<div class="en"><p><code>TensorDataset(*tensors)</code> — wraps tensors into a dataset. <code>ConcatDataset([d1, d2])</code> — concatenates datasets. <code>Subset(dataset, indices)</code> — select subset.</p></div>
+<div class="cn"><p><code>TensorDataset(*tensors)</code> 将多个 tensor 包装为数据集；<code>ConcatDataset([d1,d2])</code> 拼接数据集；<code>Subset(dataset, indices)</code> 选取子集。</p></div></div>
+
+<div class="footer">PyTorch 2.12 · torch.utils.data · Bilingual EN/CN</div></div></body></html>

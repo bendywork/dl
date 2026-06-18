@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>01 · PyTorch Hub 概述与模型发布</title>
+<style>
+:root { --bg:#0b1120; --card:#111827; --border:#1e293b; --text:#e2e8f0; --text2:#94a3b8; --accent:#38bdf8; --green:#4ade80; --yellow:#facc15; --red:#f87171; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:20px; }
+.container { max-width:900px; margin:0 auto; }
+.nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:8px; }
+.nav a { color:var(--accent); text-decoration:none; font-size:0.85rem; padding:6px 14px; border:1px solid var(--border); border-radius:6px; }
+.nav a:hover { background:rgba(56,189,248,0.1); }
+.nav span { color:var(--text2); font-size:0.82rem; }
+h1 { font-size:1.3rem; color:var(--accent); margin-bottom:18px; }
+.block { margin-bottom:16px; }
+.block-en { background:var(--card); border-left:3px solid var(--accent); padding:12px 16px; border-radius:0 8px 8px 0; margin-bottom:6px; }
+.block-en p, .block-en li { font-size:0.84rem; line-height:1.65; color:var(--text); }
+.block-zh { background:rgba(74,222,128,0.06); border-left:3px solid var(--green); padding:12px 16px; border-radius:0 8px 8px 0; }
+.block-zh p, .block-zh li { font-size:0.84rem; line-height:1.65; color:#cbd5e1; }
+pre { background:#0f172a; border:1px solid var(--border); border-radius:6px; padding:12px 16px; overflow-x:auto; font-size:0.78rem; line-height:1.6; margin:8px 0; }
+code { font-family:'Fira Code','Courier New',monospace; color:#e2e8f0; }
+h2 { font-size:1.05rem; color:var(--yellow); margin:18px 0 8px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="nav">
+  <a href="index.html">← 目录 Index</a>
+  <span>01 / 06</span>
+  <a href="02_implementation_weights.html">下一章 →</a>
+</div>
+
+<h1>01 · 概述与模型发布 Overview &amp; Publishing Models</h1>
+
+<div class="block">
+<div class="block-en"><p>PyTorch Hub is a pre-trained model repository designed to facilitate research reproducibility.</p></div>
+<div class="block-zh"><p>PyTorch Hub 是一个预训练模型仓库，旨在促进研究的可复现性。</p></div>
+</div>
+
+<h2>Publishing Models 发布模型</h2>
+
+<div class="block">
+<div class="block-en"><p>Publishing models. PyTorch Hub supports publishing pre-trained models (model definitions and pre-trained weights) to a GitHub repository by adding a simple <code>hubconf.py</code> file.</p></div>
+<div class="block-zh"><p>发布模型。PyTorch Hub 支持通过添加一个简单的 <code>hubconf.py</code> 文件，将预训练模型（模型定义和预训练权重）发布到 GitHub 仓库。</p></div>
+</div>
+
+<div class="block">
+<div class="block-en"><p><code>hubconf.py</code> can have multiple entrypoints. Each entrypoint is defined as a Python function.</p></div>
+<div class="block-zh"><p><code>hubconf.py</code> 可以有多个入口点（entrypoint）。每个入口点定义为一个 Python 函数。</p></div>
+</div>
+
+<h2>Entrypoint Function Specification 入口函数规范</h2>
+
+<pre><code>def entrypoint_name(*args, **kwargs):
+    # args & kwargs are optional, for models which take positional/keyword arguments.
+    ...</code></pre>
+
+<div class="block">
+<div class="block-en"><p>Each entrypoint function should return a model (a <code>nn.Module</code>). The <code>*args</code> and <code>**kwargs</code> are passed through to the real callable function. The docstring of the function works as a help message. It is highly recommended to include examples in the docstring. Pretrained weights can either be stored locally in the GitHub repo, or loadable by <code>torch.hub.load_state_dict_from_url()</code>. For weight files less than 2GB, it's recommended to attach them to a project release. Entrypoints prefixed with underscore are treated as helper functions and won't show up in <code>torch.hub.list()</code>. Entrypoints can also return other types such as tokenizers.</p></div>
+<div class="block-zh"><p>每个入口函数应返回一个模型（<code>nn.Module</code>）。<code>*args</code> 和 <code>**kwargs</code> 会透传给实际的可调用函数。函数的文档字符串（docstring）作为帮助信息，强烈建议在文档字符串中包含示例。预训练权重可以存储在 GitHub 仓库的本地，也可以通过 <code>torch.hub.load_state_dict_from_url()</code> 加载。对于小于 2GB 的权重文件，建议附加到项目 release 中。以下划线开头的入口点被视为辅助函数，不会在 <code>torch.hub.list()</code> 中显示。入口点也可以返回其他类型，如分词器（tokenizer）。</p></div>
+</div>
+
+<h2>dependencies 依赖声明</h2>
+
+<div class="block">
+<div class="block-en"><p><code>dependencies</code> is a list of package names required to <em>load</em> the model. Note these might be slightly different from dependencies required for training a model.</p></div>
+<div class="block-zh"><p><code>dependencies</code> 是<em>加载</em>模型所需的包名列表。注意这些依赖可能与训练模型所需的依赖略有不同。</p></div>
+</div>
+
+<h2>Important Notice 重要通知</h2>
+
+<div class="block">
+<div class="block-en"><p>Published models should be at least in a branch/tag. It can't be a random commit.</p></div>
+<div class="block-zh"><p>已发布的模型应至少位于某个分支（branch）或标签（tag）中，不能是一个随机的提交（commit）。</p></div>
+</div>
+
+<div class="nav" style="margin-top:24px;">
+  <a href="index.html">← 目录 Index</a>
+  <span>01 / 06</span>
+  <a href="02_implementation_weights.html">下一章 →</a>
+</div>
+
+</div>
+</body>
+</html>

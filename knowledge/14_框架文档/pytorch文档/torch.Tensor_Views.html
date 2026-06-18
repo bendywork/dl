@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Tensor Views — PyTorch 2.12</title><style>:root{--bg:#0b1120;--card:#111827;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#4ade80;--yellow:#facc15}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto}.nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 20px;flex-wrap:wrap;gap:8px}.nav a{color:var(--accent);text-decoration:none;font-size:.85rem;padding:6px 14px;border:1px solid var(--border);border-radius:6px}.nav a:hover{background:rgba(56,189,248,.1);border-color:var(--accent)}h1{font-size:1.4rem;color:var(--accent);margin-bottom:20px}.section{margin-bottom:20px}h2{font-size:1rem;color:var(--yellow);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px}.en{background:var(--card);border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:8px;line-height:1.7;font-size:.84rem}.cn{background:rgba(74,222,128,.06);border-left:3px solid var(--green);padding:14px 18px;border-radius:0 8px 8px 0;line-height:1.7;font-size:.84rem;color:#cbd5e1}pre{background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:14px 18px;overflow-x:auto;margin:8px 0;font-size:.8rem;line-height:1.7}code{font-family:'Fira Code','Cascadia Code',monospace;color:#e2e8f0}.en code{background:rgba(56,189,248,.1);padding:1px 6px;border-radius:4px}.cn code{background:rgba(74,222,128,.1);padding:1px 6px;border-radius:4px}pre code{background:none;padding:0}table{width:100%;border-collapse:collapse;margin:8px 0;font-size:.82rem}th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}th{background:rgba(56,189,248,.08);color:var(--accent)}.footer{text-align:center;color:var(--text2);font-size:.72rem;margin-top:32px;border-top:1px solid var(--border);padding-top:16px}.warn{background:rgba(248,113,113,.1);border-left:3px solid #f87171;padding:12px 16px;border-radius:0 6px 6px 0;margin:8px 0;font-size:.82rem}</style></head><body><div class="container"><div class="nav"><a href="index.html">← 索引</a><span style="color:var(--text2)">Tensor Views</span><a href="torch.nn.html">下一模块 →</a></div>
+<h1>Tensor Views — view, reshape, transpose 与内存共享</h1>
+
+<div class="section"><h2>Core Concept · 核心概念</h2>
+<div class="en"><p>A <strong>view</strong> of a tensor shares the same underlying data. Modifying the view will change the original tensor. This is different from creating a <strong>copy</strong>.</p></div>
+<div class="cn"><p>tensor 的 <strong>view</strong>（视图）共享相同的底层数据。修改 view 会改变原始 tensor。这与创建 <strong>copy</strong>（副本）不同。</p></div>
+<pre><code>x = torch.randn(3, 4)
+y = x.view(12)          # view: 共享数据
+y[0] = 999
+print(x[0,0])           # 999 — 原始也被改了！
+
+z = x.clone()           # copy: 独立数据，修改 z 不影响 x</code></pre></div>
+
+<div class="section"><h2>Key Functions · 核心函数</h2>
+<table><tr><th>Function</th><th>View or Copy?</th><th>Description</th></tr>
+<tr><td><code>.view(*shape)</code></td><td style="color:#4ade80">View</td><td><span class="en">Reshape shared memory (requires contiguous)</span><br><span class="cn">变形共享内存（要求连续存储）</span></td></tr>
+<tr><td><code>.reshape(*shape)</code></td><td style="color:#facc15">View if possible</td><td><span class="en">Like view but returns copy if not contiguous</span><br><span class="cn">类似 view 但非连续时返回副本</span></td></tr>
+<tr><td><code>.transpose(d0, d1)</code></td><td style="color:#4ade80">View</td><td><span class="en">Swap two dimensions</span><br><span class="cn">交换两个维度</span></td></tr>
+<tr><td><code>.T</code></td><td style="color:#4ade80">View</td><td><span class="en">2D transpose shortcut</span><br><span class="cn">2D 转置快捷方式</span></td></tr>
+<tr><td><code>.permute(*dims)</code></td><td style="color:#4ade80">View</td><td><span class="en">Generalized transpose</span><br><span class="cn">通用维度重排</span></td></tr>
+<tr><td><code>.squeeze(dim)</code></td><td style="color:#4ade80">View</td><td><span class="en">Remove dim of size 1</span><br><span class="cn">移除大小为 1 的维度</span></td></tr>
+<tr><td><code>.unsqueeze(dim)</code></td><td style="color:#4ade80">View</td><td><span class="en">Add dim of size 1</span><br><span class="cn">添加大小为 1 的维度</span></td></tr>
+<tr><td><code>.flatten()</code></td><td style="color:#4ade80">View</td><td><span class="en">Flatten to 1D</span><br><span class="cn">展平到 1D</span></td></tr>
+<tr><td><code>.expand(*sizes)</code></td><td style="color:#4ade80">View</td><td><span class="en">Broadcast without copy (only size-1 dims can expand)</span><br><span class="cn">广播扩展，不复制（仅大小为 1 的维度）</span></td></tr>
+<tr><td><code>.repeat(*sizes)</code></td><td style="color:#f87171">Copy</td><td><span class="en">Repeat tensor (copies data)</span><br><span class="cn">重复 tensor（复制数据）</span></td></tr>
+<tr><td><code>.clone()</code></td><td style="color:#f87171">Copy</td><td><span class="en">Deep copy</span><br><span class="cn">深度复制（新内存）</span></td></tr>
+<tr><td><code>.contiguous()</code></td><td style="color:#facc15">Copy if needed</td><td><span class="en">Return contiguous tensor</span><br><span class="cn">返回内存连续的 tensor</span></td></tr></table></div>
+
+<div class="section"><h2>Contiguity Trap · 连续性陷阱</h2>
+<div class="en"><p><code>transpose()</code> creates a non-contiguous view. Calling <code>.view()</code> on it will fail:</p></div>
+<div class="cn"><p><code>transpose()</code> 产生非连续 view，在其上调用 <code>.view()</code> 会失败：</p></div>
+<pre><code>x = torch.randn(3, 4)
+y = x.transpose(0, 1)    # [4, 3] — 非连续 view
+# y.view(12)              # RuntimeError!
+y.contiguous().view(12)   # 正确：先转连续再 view</code></pre>
+<div class="en"><p><code>.reshape()</code> avoids this problem by falling back to a copy when needed. Safer for general use.</p></div>
+<div class="cn"><p><code>.reshape()</code> 在必要时回退到复制，日常使用更安全。</p></div></div>
+
+<div class="section"><h2>Autograd Warning · 自动梯度警告</h2>
+<div class="warn"><span class="en"><strong>Warning:</strong> In-place modification of views can cause autograd errors. The autograd engine tracks tensor versions — if a tensor saved for backward is modified via a view, backward will raise an error.</span></div>
+<div class="warn"><span class="cn"><strong>警告：</strong>对 view 的原地修改可能导致 autograd 错误。autograd 引擎追踪 tensor 版本 —— 如果为 backward 保存的 tensor 通过 view 被修改，backward 将报错。</span></div></div>
+
+<div class="footer">PyTorch 2.12 · Tensor Views · Bilingual EN/CN</div></div></body></html>

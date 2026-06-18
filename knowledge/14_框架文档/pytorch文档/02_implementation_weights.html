@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02 · 实现示例与权重加载</title>
+<style>
+:root { --bg:#0b1120; --card:#111827; --border:#1e293b; --text:#e2e8f0; --text2:#94a3b8; --accent:#38bdf8; --green:#4ade80; --yellow:#facc15; --red:#f87171; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:20px; }
+.container { max-width:900px; margin:0 auto; }
+.nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:8px; }
+.nav a { color:var(--accent); text-decoration:none; font-size:0.85rem; padding:6px 14px; border:1px solid var(--border); border-radius:6px; }
+.nav a:hover { background:rgba(56,189,248,0.1); }
+.nav span { color:var(--text2); font-size:0.82rem; }
+h1 { font-size:1.3rem; color:var(--accent); margin-bottom:18px; }
+.block { margin-bottom:16px; }
+.block-en { background:var(--card); border-left:3px solid var(--accent); padding:12px 16px; border-radius:0 8px 8px 0; margin-bottom:6px; }
+.block-en p,.block-en li { font-size:0.84rem; line-height:1.65; color:var(--text); }
+.block-zh { background:rgba(74,222,128,0.06); border-left:3px solid var(--green); padding:12px 16px; border-radius:0 8px 8px 0; }
+.block-zh p,.block-zh li { font-size:0.84rem; line-height:1.65; color:#cbd5e1; }
+pre { background:#0f172a; border:1px solid var(--border); border-radius:6px; padding:12px 16px; overflow-x:auto; font-size:0.78rem; line-height:1.6; margin:8px 0; }
+code { font-family:'Fira Code','Courier New',monospace; color:#e2e8f0; }
+h2 { font-size:1.05rem; color:var(--yellow); margin:18px 0 8px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="nav">
+  <a href="index.html">← 目录</a> <a href="01_overview_publishing.html">← 上一章</a>
+  <span>02 / 06</span>
+  <a href="03_list_help.html">下一章 →</a>
+</div>
+
+<h1>02 · 实现示例与权重加载 Implementation &amp; Weight Loading</h1>
+
+<h2>resnet18 Implementation Example 完整示例</h2>
+
+<div class="block">
+<div class="block-en"><p>The <code>hubconf.py</code> file typically declares a <code>dependencies</code> list and one or more entrypoint functions. Here is the complete <code>resnet18</code> example:</p></div>
+<div class="block-zh"><p><code>hubconf.py</code> 文件通常声明一个 <code>dependencies</code> 列表以及一个或多个入口函数。以下是完整的 <code>resnet18</code> 示例：</p></div>
+</div>
+
+<pre><code>dependencies = ['torch']
+from torchvision.models.resnet import resnet18 as _resnet18
+
+# resnet18 is the name of entrypoint
+def resnet18(pretrained=False, **kwargs):
+    """ # This docstring shows up in hub.help()
+    Resnet18 model
+    pretrained (bool): kwargs, load pretrained weights into the model
+    """
+    # Call the model, load pretrained weights
+    model = _resnet18(pretrained=pretrained, **kwargs)
+    return model</code></pre>
+
+<div class="block">
+<div class="block-en"><p><strong>Key points:</strong> <code>dependencies</code> lists packages needed to load (not necessarily train) the model. The function docstring becomes the help message in <code>torch.hub.help()</code>. <code>*args</code> and <code>**kwargs</code> pass through to the underlying model constructor.</p></div>
+<div class="block-zh"><p><strong>关键要点：</strong><code>dependencies</code> 列出加载模型所需的包（不一定是训练所需）。函数文档字符串会成为 <code>torch.hub.help()</code> 中的帮助信息。<code>*args</code> 和 <code>**kwargs</code> 透传给底层的模型构造函数。</p></div>
+</div>
+
+<h2>Loading Pretrained Weights — Local 本地加载权重</h2>
+
+<div class="block">
+<div class="block-en"><p>If pretrained weights are stored locally in the GitHub repository alongside the <code>hubconf.py</code>:</p></div>
+<div class="block-zh"><p>如果预训练权重与 <code>hubconf.py</code> 一起存储在 GitHub 仓库中：</p></div>
+</div>
+
+<pre><code>if pretrained:
+    dirname = os.path.dirname(__file__)
+    checkpoint = os.path.join(dirname, &lt;RELATIVE_PATH_TO_CHECKPOINT&gt;)
+    state_dict = torch.load(checkpoint)
+    model.load_state_dict(state_dict)</code></pre>
+
+<div class="block">
+<div class="block-en"><p><code>__file__</code> refers to the location of <code>hubconf.py</code>. Replace <code>&lt;RELATIVE_PATH_TO_CHECKPOINT&gt;</code> with the actual relative path to your checkpoint file.</p></div>
+<div class="block-zh"><p><code>__file__</code> 指向 <code>hubconf.py</code> 所在位置。将 <code>&lt;RELATIVE_PATH_TO_CHECKPOINT&gt;</code> 替换为检查点文件的实际相对路径。</p></div>
+</div>
+
+<h2>Loading Pretrained Weights — from URL 远程 URL 加载</h2>
+
+<div class="block">
+<div class="block-en"><p>Load weights from a remote URL using <code>torch.hub.load_state_dict_from_url()</code>:</p></div>
+<div class="block-zh"><p>使用 <code>torch.hub.load_state_dict_from_url()</code> 从远程 URL 加载权重：</p></div>
+</div>
+
+<pre><code>checkpoint = 'https://download.pytorch.org/models/resnet18-5c106cde.pth'
+model.load_state_dict(torch.hub.load_state_dict_from_url(checkpoint, progress=False))</code></pre>
+
+<div class="block">
+<div class="block-en"><p>The <code>progress=False</code> flag suppresses the download progress bar. For files under 2GB, attaching them to a GitHub project release is the recommended approach.</p></div>
+<div class="block-zh"><p><code>progress=False</code> 参数会隐藏下载进度条。对于小于 2GB 的文件，推荐将其附加到 GitHub 项目 Release 中。</p></div>
+</div>
+
+<div class="nav" style="margin-top:24px;">
+  <a href="index.html">← 目录</a> <a href="01_overview_publishing.html">← 上一章</a>
+  <span>02 / 06</span>
+  <a href="03_list_help.html">下一章 →</a>
+</div>
+
+</div>
+</body>
+</html>

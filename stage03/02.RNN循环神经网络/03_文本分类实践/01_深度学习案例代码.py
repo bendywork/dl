@@ -255,6 +255,6 @@ def interface02():
 
 
 if __name__ == '__main__':
-    training()
+    # training()
     interface01()
     # interface02()

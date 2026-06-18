@@ -1,0 +1,112 @@
+<!DOCTYPE html><html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>torch.autograd — PyTorch 2.12 中英对照</title>
+<style>
+:root{--bg:#0b1120;--card:#111827;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#4ade80;--yellow:#facc15;--red:#f87171}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
+.container{max-width:900px;margin:0 auto}
+.nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 20px;flex-wrap:wrap;gap:8px}
+.nav a{color:var(--accent);text-decoration:none;font-size:.85rem;padding:6px 14px;border:1px solid var(--border);border-radius:6px}
+.nav a:hover{background:rgba(56,189,248,.1);border-color:var(--accent)}
+h1{font-size:1.4rem;color:var(--accent);margin-bottom:20px}
+.section{margin-bottom:20px}
+h2{font-size:1rem;color:var(--yellow);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px}
+.en{background:var(--card);border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:8px;line-height:1.7;font-size:.84rem}
+.cn{background:rgba(74,222,128,.06);border-left:3px solid var(--green);padding:14px 18px;border-radius:0 8px 8px 0;line-height:1.7;font-size:.84rem;color:#cbd5e1}
+pre{background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:14px 18px;overflow-x:auto;margin:8px 0;font-size:.8rem;line-height:1.7}
+code{font-family:'Fira Code','Cascadia Code','Courier New',monospace;color:#e2e8f0}
+.en code{background:rgba(56,189,248,.1);padding:1px 6px;border-radius:4px}
+.cn code{background:rgba(74,222,128,.1);padding:1px 6px;border-radius:4px}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:.82rem}
+th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}
+th{background:rgba(56,189,248,.08);color:var(--accent)}
+ul,ol{margin-left:24px}.en li,.cn li{margin-bottom:4px}
+.footer{text-align:center;color:var(--text2);font-size:.72rem;margin-top:32px;border-top:1px solid var(--border);padding-top:16px}
+</style></head><body><div class="container">
+<div class="nav"><a href="index.html">← 索引</a><span style="color:var(--text2)">torch.autograd</span><a href="torch.nn.html">下一模块 →</a></div>
+
+<h1>torch.autograd — 自动微分</h1>
+
+<div class="section"><h2>Overview · 概述</h2>
+<div class="en"><p>torch.autograd provides classes and functions implementing <strong>automatic differentiation</strong> of arbitrary scalar valued functions. Tensors needing gradient computation should declare <code>requires_grad=True</code>.</p></div>
+<div class="cn"><p>torch.autograd 提供了对任意标量值函数进行<strong>自动微分</strong>的类和函数。需要梯度计算的 tensor 应声明 <code>requires_grad=True</code>。</p></div></div>
+
+<div class="section"><h2>Core Functions · 核心函数</h2>
+<table><tr><th>Function</th><th>Description</th></tr>
+<tr><td><code>torch.autograd.backward(tensors, ...)</code></td><td><span class="en">Compute sum of gradients of tensors wrt graph leaves</span><br><span class="cn">计算 tensor 相对于计算图叶节点的梯度之和</span></td></tr>
+<tr><td><code>torch.autograd.grad(outputs, inputs, ...)</code></td><td><span class="en">Compute and return sum of gradients of outputs wrt inputs</span><br><span class="cn">计算并返回输出关于输入的梯度之和</span></td></tr></table></div>
+
+<div class="section"><h2>Tensor Autograd · Tensor 自动梯度属性</h2>
+<table><tr><th>Attribute</th><th>Description</th></tr>
+<tr><td><code>.grad</code></td><td><span class="en">None by default; becomes Tensor after backward</span><br><span class="cn">默认为 None；backward 后变为计算出的梯度 Tensor</span></td></tr>
+<tr><td><code>.requires_grad</code></td><td><span class="en">True if gradients needed, False otherwise</span><br><span class="cn">如果该 tensor 需要梯度则为 True</span></td></tr>
+<tr><td><code>.is_leaf</code></td><td><span class="en">All Tensors with requires_grad=False are leaf Tensors</span><br><span class="cn">所有 requires_grad=False 的 tensor 都被视为叶节点</span></td></tr>
+<tr><td><code>.backward()</code></td><td><span class="en">Compute gradient of current tensor wrt graph leaves</span><br><span class="cn">计算当前 tensor 相对于图叶节点的梯度</span></td></tr>
+<tr><td><code>.detach()</code></td><td><span class="en">Return new Tensor detached from the graph</span><br><span class="cn">返回从计算图中分离的新 tensor（不再追踪梯度）</span></td></tr>
+<tr><td><code>.detach_()</code></td><td><span class="en">Detach Tensor in-place, making it a leaf</span><br><span class="cn">就地分离 tensor，使其成为叶节点</span></td></tr>
+<tr><td><code>.register_hook(hook)</code></td><td><span class="en">Register a backward hook</span><br><span class="cn">注册一个反向传播钩子</span></td></tr>
+<tr><td><code>.retain_grad()</code></td><td><span class="en">Enable grad population for non-leaf tensors during backward()</span><br><span class="cn">使非叶节点 tensor 在 backward() 期间也能保存梯度</span></td></tr></table></div>
+
+<div class="section"><h2>Custom Function · 自定义自动微分函数</h2>
+<pre><code>class Exp(Function):
+    @staticmethod
+    def forward(ctx, i):
+        result = i.exp()
+        ctx.save_for_backward(result)
+        return result
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        result, = ctx.saved_tensors
+        return grad_output * result
+
+output = Exp.apply(input)</code></pre>
+<div class="en"><p>Subclass <code>Function</code> and implement <code>forward()</code> + <code>backward()</code> as static methods. Use via <code>.apply()</code> — do not call <code>forward()</code> directly.</p>
+<p><strong>ctx methods:</strong> <code>save_for_backward()</code>, <code>mark_dirty()</code>, <code>mark_non_differentiable()</code>, <code>set_materialize_grads()</code>.</p></div>
+<div class="cn"><p>继承 <code>Function</code> 并实现 <code>forward()</code> + <code>backward()</code> 静态方法。通过 <code>.apply()</code> 使用 —— 不要直接调用 <code>forward()</code>。</p>
+<p><strong>ctx 方法：</strong><code>save_for_backward()</code> 保存 tensor 供 backward 使用、<code>mark_dirty()</code> 标记被修改的 tensor、<code>mark_non_differentiable()</code> 标记输出不可导、<code>set_materialize_grads()</code> 设置是否物化梯度。</p></div></div>
+
+<div class="section"><h2>Functional Higher-Level API · 函数式高级 API (Beta)</h2>
+<table><tr><th>Function</th><th>Description</th></tr>
+<tr><td><code>functional.jacobian(func, inputs)</code></td><td><span class="en">Compute the Jacobian of a function</span><br><span class="cn">计算函数的 Jacobian 矩阵</span></td></tr>
+<tr><td><code>functional.hessian(func, inputs)</code></td><td><span class="en">Compute the Hessian of a scalar function</span><br><span class="cn">计算标量函数的 Hessian 矩阵</span></td></tr>
+<tr><td><code>functional.vjp(func, inputs, v)</code></td><td><span class="en">Vector-Jacobian product: vᵀ · J</span><br><span class="cn">向量-雅可比乘积</span></td></tr>
+<tr><td><code>functional.jvp(func, inputs, v)</code></td><td><span class="en">Jacobian-Vector product: J · v</span><br><span class="cn">雅可比-向量乘积</span></td></tr>
+<tr><td><code>functional.vhp(func, inputs, v)</code></td><td><span class="en">Vector-Hessian product</span><br><span class="cn">向量-海森乘积</span></td></tr>
+<tr><td><code>functional.hvp(func, inputs, v)</code></td><td><span class="en">Hessian-Vector product</span><br><span class="cn">海森-向量乘积</span></td></tr></table></div>
+
+<div class="section"><h2>Profiler · 性能分析器</h2>
+<pre><code>with torch.autograd.profiler.profile() as prof:
+    for _ in range(100):
+        y = x ** 2
+        y.backward()
+print(prof.key_averages().table(sort_by="self_cpu_time_total"))</code></pre>
+<div class="en"><p>Three profiler modes: <strong>profile</strong> (CPU), <strong>emit_nvtx</strong> (NVIDIA nvprof), <strong>emit_itt</strong> (Intel VTune). Most users should use <code>torch.profiler</code> instead.</p></div>
+<div class="cn"><p>三种分析器模式：<strong>profile</strong>（CPU）、<strong>emit_nvtx</strong>（NVIDIA nvprof）、<strong>emit_itt</strong>（Intel VTune）。大多数用户应使用 <code>torch.profiler</code>。</p></div></div>
+
+<div class="section"><h2>Anomaly Detection · 异常检测</h2>
+<pre><code>with torch.autograd.detect_anomaly(check_nan=True):
+    loss.backward()  # 如果梯度出现 NaN，会立即报错并显示前向调用栈</code></pre>
+<div class="en"><p>Enables backward to print the traceback of the forward operation that created the failing backward function. <code>check_nan=True</code> (default) raises an error if any backward computation produces <code>"nan"</code>. Only for debugging — slows down execution.</p></div>
+<div class="cn"><p>使反向传播能够打印出创建失败 backward 函数的前向操作调用栈。<code>check_nan=True</code>（默认）在反向传播产生 <code>nan</code> 时立即报错。仅用于调试 —— 会减慢执行速度。</p></div></div>
+
+<div class="section"><h2>Saved Tensors Hooks · 保存 Tensor 钩子</h2>
+<pre><code>def pack_hook(x): return x.detach()
+def unpack_hook(x): return x
+with torch.autograd.graph.saved_tensors_hooks(pack_hook, unpack_hook):
+    y = a * b
+y.sum().backward()</code></pre>
+<div class="en"><p><strong>save_on_cpu:</strong> Store saved tensors on CPU during forward, copy back for backward. Useful when model doesn't fit in GPU memory.</p></div>
+<div class="cn"><p><strong>save_on_cpu：</strong>前向传播时将保存的 tensor 存储在 CPU 上，反向时复制回 GPU。模型超出 GPU 显存时非常有用。</p></div></div>
+
+<div class="section"><h2>Gradient Layout Best Practice · 梯度布局</h2>
+<div class="en"><p>Let <code>.grad</code> be <code>None</code> before first <code>backward()</code>, or reset to <code>None</code> each accumulation phase:</p></div>
+<div class="cn"><p>让 <code>.grad</code> 在第一次 <code>backward()</code> 之前保持 <code>None</code>，或在每个累积阶段重置为 <code>None</code>：</p></div>
+<pre><code>for param in model.parameters():
+    param.grad = None          # 推荐：比 zero_grad() 更安全
+loss.backward()</code></pre></div>
+
+<div class="footer">PyTorch 2.12 · torch.autograd · Bilingual EN/CN</div>
+</div></body></html>

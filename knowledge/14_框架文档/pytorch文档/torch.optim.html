@@ -1,0 +1,126 @@
+<!DOCTYPE html><html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>torch.optim — PyTorch 2.12 中英对照</title>
+<style>
+:root{--bg:#0b1120;--card:#111827;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#4ade80;--yellow:#facc15;--red:#f87171}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
+.container{max-width:900px;margin:0 auto}
+.nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 20px;flex-wrap:wrap;gap:8px}
+.nav a{color:var(--accent);text-decoration:none;font-size:.85rem;padding:6px 14px;border:1px solid var(--border);border-radius:6px}
+.nav a:hover{background:rgba(56,189,248,.1);border-color:var(--accent)}
+h1{font-size:1.4rem;color:var(--accent);margin-bottom:20px}
+.section{margin-bottom:20px}
+h2{font-size:1rem;color:var(--yellow);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px}
+.en{background:var(--card);border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:8px;line-height:1.7;font-size:.84rem}
+.cn{background:rgba(74,222,128,.06);border-left:3px solid var(--green);padding:14px 18px;border-radius:0 8px 8px 0;line-height:1.7;font-size:.84rem;color:#cbd5e1}
+pre{background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:14px 18px;overflow-x:auto;margin:8px 0;font-size:.8rem;line-height:1.7}
+code{font-family:'Fira Code','Cascadia Code','Courier New',monospace;color:#e2e8f0}
+.en code{background:rgba(56,189,248,.1);padding:1px 6px;border-radius:4px}
+.cn code{background:rgba(74,222,128,.1);padding:1px 6px;border-radius:4px}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:.82rem}
+th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}
+th{background:rgba(56,189,248,.08);color:var(--accent)}
+ul,ol{margin-left:24px}.en li,.cn li{margin-bottom:4px}
+.footer{text-align:center;color:var(--text2);font-size:.72rem;margin-top:32px;border-top:1px solid var(--border);padding-top:16px}
+.done{color:var(--green);font-size:.7rem}
+</style></head><body><div class="container">
+<div class="nav"><a href="index.html">← 索引</a><span style="color:var(--text2)">torch.optim</span><a href="torch.autograd.html">下一模块 →</a></div>
+
+<h1>torch.optim — 优化算法</h1>
+
+<div class="section"><h2>Overview · 概述</h2>
+<div class="en"><p>torch.optim is a package implementing various optimization algorithms. Most commonly used methods are already supported, and the interface is general enough to integrate more sophisticated ones in the future.</p></div>
+<div class="cn"><p>torch.optim 是实现了多种优化算法的包。最常用的方法均已支持，接口足够通用以集成更复杂的算法。</p></div></div>
+
+<div class="section"><h2>How to Use · 如何使用</h2>
+<div class="en"><p>Construct it with an iterable of Parameters (or dicts of parameter groups), then specify optimizer-specific options (lr, weight_decay, etc).</p></div>
+<div class="cn"><p>构造时传入可迭代的 Parameter 对象（或参数组字典），再指定优化器相关的选项（学习率、权重衰减等）。</p></div>
+<pre><code>optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+optimizer = optim.Adam([var1, var2], lr=0.0001)</code></pre></div>
+
+<div class="section"><h2>Per-Parameter Options · 逐参数配置</h2>
+<div class="en"><p>Pass an iterable of dicts with a <code>params</code> key to set per-group options:</p></div>
+<div class="cn"><p>传入字典可迭代对象，使用 <code>params</code> 键设置分组选项：</p></div>
+<pre><code>optim.SGD([
+    {'params': model.base.parameters(), 'lr': 1e-2},
+    {'params': model.classifier.parameters()}
+], lr=1e-3, momentum=0.9)</code></pre>
+<div class="en"><p>model.base gets lr=1e-2, model.classifier uses the default 1e-3, both get momentum 0.9.</p></div>
+<div class="cn"><p>model.base 学习率为 1e-2，model.classifier 使用默认值 1e-3，两者都使用 momentum=0.9。</p></div></div>
+
+<div class="section"><h2>Taking a Step · 执行一步优化</h2>
+<pre><code>for input, target in dataset:
+    optimizer.zero_grad()
+    output = model(input)
+    loss = loss_fn(output, target)
+    loss.backward()
+    optimizer.step()</code></pre></div>
+
+<div class="section"><h2>Base Class · 基类</h2>
+<div class="en"><p><strong><code>class torch.optim.Optimizer(params, defaults)</code></strong> — Base class for all optimizers.</p>
+<p>Parameters need to be specified as collections that have a deterministic ordering consistent between runs.</p></div>
+<div class="cn"><p><strong><code>class torch.optim.Optimizer(params, defaults)</code></strong> — 所有优化器的基类。</p>
+<p>参数需以确定性顺序的集合形式指定，保证运行间一致。</p></div>
+<table><tr><th>Method</th><th>Description</th></tr>
+<tr><td><code>add_param_group</code></td><td><span class="en">Add a param group</span><br><span class="cn">添加参数组</span></td></tr>
+<tr><td><code>load_state_dict</code></td><td><span class="en">Load optimizer state</span><br><span class="cn">加载优化器状态</span></td></tr>
+<tr><td><code>state_dict</code></td><td><span class="en">Return optimizer state as dict</span><br><span class="cn">以字典形式返回优化器状态</span></td></tr>
+<tr><td><code>step</code></td><td><span class="en">Single optimization step (update parameters)</span><br><span class="cn">执行一步优化（更新参数）</span></td></tr>
+<tr><td><code>zero_grad</code></td><td><span class="en">Reset gradients of all optimized Tensors</span><br><span class="cn">清零所有被优化 Tensor 的梯度</span></td></tr></table></div>
+
+<div class="section"><h2>Algorithms · 算法列表</h2>
+<table><tr><th>Algorithm</th><th>Default Impl</th><th>Has fused?</th></tr>
+<tr><td>Adadelta</td><td>foreach</td><td>no</td></tr>
+<tr><td>Adafactor</td><td>for-loop</td><td>no</td></tr>
+<tr><td>Adagrad</td><td>foreach</td><td>yes (CPU)</td></tr>
+<tr><td>Adam</td><td>foreach</td><td>yes</td></tr>
+<tr><td>AdamW</td><td>foreach</td><td>yes</td></tr>
+<tr><td>SparseAdam</td><td>for-loop</td><td>no</td></tr>
+<tr><td>Adamax</td><td>foreach</td><td>no</td></tr>
+<tr><td>ASGD</td><td>foreach</td><td>no</td></tr>
+<tr><td>LBFGS</td><td>for-loop</td><td>no</td></tr>
+<tr><td>NAdam</td><td>foreach</td><td>no</td></tr>
+<tr><td>RAdam</td><td>foreach</td><td>no</td></tr>
+<tr><td>RMSprop</td><td>foreach</td><td>no</td></tr>
+<tr><td>Rprop</td><td>foreach</td><td>no</td></tr>
+<tr><td>SGD</td><td>foreach</td><td>yes</td></tr></table>
+<div class="en"><p>3 implementation categories: <strong>for-loop</strong>, <strong>foreach</strong> (multi-tensor parallel), <strong>fused</strong> (single kernel). Performance: fused > foreach > for-loop.</p></div>
+<div class="cn"><p>3 种实现方式：<strong>for-loop</strong>、<strong>foreach</strong>（多 tensor 并行）、<strong>fused</strong>（单 kernel 融合）。性能：fused > foreach > for-loop。</p></div></div>
+
+<div class="section"><h2>Learning Rate Schedulers · 学习率调度器</h2>
+<div class="en"><p>Apply scheduling <strong>after</strong> optimizer.step(). Calling before skips the first value of the schedule.</p></div>
+<div class="cn"><p>在 optimizer.step() <strong>之后</strong>应用调度。在此之前调用会跳过第一个调度值。</p></div>
+<pre><code>optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+scheduler = ExponentialLR(optimizer, gamma=0.9)
+for epoch in range(20):
+    for input, target in dataset:
+        ... optimizer.zero_grad(); loss.backward(); optimizer.step()
+    scheduler.step()</code></pre>
+<table><tr><th>Scheduler</th><th>Description</th></tr>
+<tr><td>LambdaLR</td><td><span class="en">Set LR via lambda function</span><br><span class="cn">通过 lambda 函数设置学习率</span></td></tr>
+<tr><td>StepLR</td><td><span class="en">Decay LR by gamma every step_size epochs</span><br><span class="cn">每 step_size 个 epoch 乘 gamma</span></td></tr>
+<tr><td>MultiStepLR</td><td><span class="en">Decay LR at given milestones</span><br><span class="cn">在指定里程碑处衰减</span></td></tr>
+<tr><td>ExponentialLR</td><td><span class="en">Decay LR by gamma every epoch</span><br><span class="cn">每个 epoch 乘 gamma</span></td></tr>
+<tr><td>CosineAnnealingLR</td><td><span class="en">Cosine annealing schedule</span><br><span class="cn">余弦退火调度</span></td></tr>
+<tr><td>ReduceLROnPlateau</td><td><span class="en">Reduce LR when metric plateaus</span><br><span class="cn">指标停滞时降低学习率</span></td></tr>
+<tr><td>CyclicLR / OneCycleLR</td><td><span class="en">Cyclical learning rate</span><br><span class="cn">循环学习率</span></td></tr>
+<tr><td>CosineAnnealingWarmRestarts</td><td><span class="en">Cosine with warm restarts</span><br><span class="cn">带热重启的余弦退火</span></td></tr></table></div>
+
+<div class="section"><h2>Weight Averaging (SWA / EMA) · 权重平均</h2>
+<pre><code># SWA
+swa_model = AveragedModel(model)
+swa_scheduler = SWALR(optimizer, swa_lr=0.05)
+
+# EMA
+ema_model = AveragedModel(model, multi_avg_fn=get_ema_multi_avg_fn(0.999))
+ema_model.update_parameters(model)  # after optimizer.step()
+
+# Update BN stats
+torch.optim.swa_utils.update_bn(loader, averaged_model)</code></pre>
+<div class="en"><p><strong>SWA</strong> averages weights for wider optima and better generalization. <strong>EMA</strong> uses exponential weights instead of equal weights. Decay should be close to 1.0 (default 0.999).</p></div>
+<div class="cn"><p><strong>SWA</strong> 平均权重以获得更宽的最优解和更好的泛化。 <strong>EMA</strong> 使用指数权重而非等权。衰减值应接近 1.0（默认 0.999）。</p></div></div>
+
+<div class="footer">PyTorch 2.12 · torch.optim · Bilingual EN/CN</div>
+</div></body></html>

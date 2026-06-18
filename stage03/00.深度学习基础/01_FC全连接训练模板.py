@@ -17,10 +17,7 @@ import numpy as np
 torch.manual_seed(42)
 
 
-# ============================================================
 # 1. 数据准备
-# ============================================================
-
 class TextDataset(Dataset):
     def __init__(self, sequences, labels):
         self.sequences = sequences

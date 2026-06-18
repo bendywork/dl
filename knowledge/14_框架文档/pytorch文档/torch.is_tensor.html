@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>torch.is_tensor — PyTorch 2.12 中英对照</title>
+<style>
+:root { --bg:#0b1120; --card:#111827; --border:#1e293b; --text:#e2e8f0; --text2:#94a3b8; --accent:#38bdf8; --green:#4ade80; --yellow:#facc15; --red:#f87171; --purple:#c084fc; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:20px; }
+.container { max-width:900px; margin:0 auto; }
+.nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:8px; }
+.nav a { color:var(--accent); text-decoration:none; font-size:0.85rem; padding:6px 14px; border:1px solid var(--border); border-radius:6px; transition:all .2s; }
+.nav a:hover { background:rgba(56,189,248,0.1); border-color:var(--accent); }
+h1 { font-size:1.4rem; color:var(--accent); margin-bottom:20px; }
+h1 span { color:var(--text2); font-size:0.85rem; font-weight:normal; }
+.section { margin-bottom:20px; }
+h2 { font-size:1rem; color:var(--yellow); margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:4px; }
+.en-block { background:var(--card); border-left:3px solid var(--accent); padding:14px 18px; border-radius:0 8px 8px 0; margin-bottom:8px; line-height:1.7; font-size:0.84rem; }
+.cn-block { background:rgba(74,222,128,0.06); border-left:3px solid var(--green); padding:14px 18px; border-radius:0 8px 8px 0; line-height:1.7; font-size:0.84rem; color:#cbd5e1; }
+.pre-block { background:#0f172a; border:1px solid var(--border); border-radius:6px; padding:14px 18px; overflow-x:auto; margin:8px 0; }
+.pre-block pre { margin:0; font-size:0.8rem; line-height:1.7; }
+code { font-family:'Fira Code','Cascadia Code','Courier New',monospace; color:#e2e8f0; }
+.en-block code { background:rgba(56,189,248,0.1); padding:1px 6px; border-radius:4px; }
+.cn-block code { background:rgba(74,222,128,0.1); padding:1px 6px; border-radius:4px; }
+.pre-block code { background:none; padding:0; }
+ul,ol { margin-left:24px; }
+.en-block li, .cn-block li { margin-bottom:4px; }
+.footer { text-align:center; color:var(--text2); font-size:0.72rem; margin-top:32px; border-top:1px solid var(--border); padding-top:16px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="nav">
+  <a href="index.html">← 索引 Index</a>
+  <span style="color:var(--text2);font-size:0.82rem;">torch API</span>
+  <a href="torch.is_storage.html">下一 API →</a>
+</div>
+
+<h1>torch.is_tensor <span>— PyTorch 2.12</span></h1>
+
+<!-- Signature -->
+<div class="section">
+<h2>Signature · 签名</h2>
+<div class="en-block"><code>torch.is_tensor(obj, /)</code></div>
+<div class="cn-block"><code>torch.is_tensor(obj, /)</code><br><br><code>/</code> 表示 <code>obj</code> 是一个仅限位置参数（positional-only）。</div>
+</div>
+
+<!-- Description -->
+<div class="section">
+<h2>Description · 描述</h2>
+<div class="en-block"><p>Returns <code>True</code> if <code>obj</code> is a PyTorch tensor.</p></div>
+<div class="cn-block"><p>如果 <code>obj</code> 是一个 PyTorch tensor，则返回 <code>True</code>。</p></div>
+</div>
+
+<!-- Parameters -->
+<div class="section">
+<h2>Parameters · 参数</h2>
+<div class="en-block">
+<ul>
+  <li><strong>obj</strong> (<code>object</code>) — Object to test</li>
+</ul>
+</div>
+<div class="cn-block">
+<ul>
+  <li><strong>obj</strong>（<code>object</code>）— 要检测的对象</li>
+</ul>
+</div>
+</div>
+
+<!-- Return Type -->
+<div class="section">
+<h2>Return Type · 返回类型</h2>
+<div class="en-block"><p><code>TypeIs[Tensor]</code></p></div>
+<div class="cn-block"><p><code>TypeIs[Tensor]</code> — 类型守卫（type guard），用于类型窄化。如果返回 <code>True</code>，类型检查器将把 <code>obj</code> 视为 <code>Tensor</code>。</p></div>
+</div>
+
+<!-- Example -->
+<div class="section">
+<h2>Example · 示例</h2>
+<div class="en-block">
+<div class="pre-block"><pre><code>>>> x = torch.tensor([1, 2, 3])
+>>> torch.is_tensor(x)
+True</code></pre></div>
+</div>
+<div class="cn-block">
+<p>创建一个 tensor 然后用 <code>is_tensor</code> 检测：</p>
+<div class="pre-block"><pre><code>>>> x = torch.tensor([1, 2, 3])
+>>> torch.is_tensor(x)
+True</code></pre></div>
+</div>
+</div>
+
+<div class="footer">PyTorch 2.12 Documentation · Bilingual EN/CN · Source: docs.pytorch.org</div>
+</div>
+</body>
+</html>

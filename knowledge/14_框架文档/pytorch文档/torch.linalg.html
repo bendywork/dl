@@ -1,0 +1,45 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>torch.linalg / fft / signal / special — PyTorch 2.12</title><style>:root{--bg:#0b1120;--card:#111827;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#4ade80;--yellow:#facc15}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto}.nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 20px;flex-wrap:wrap;gap:8px}.nav a{color:var(--accent);text-decoration:none;font-size:.85rem;padding:6px 14px;border:1px solid var(--border);border-radius:6px}.nav a:hover{background:rgba(56,189,248,.1)}h1{font-size:1.4rem;color:var(--accent);margin-bottom:20px}.section{margin-bottom:20px}h2{font-size:1rem;color:var(--yellow);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px}.en{background:var(--card);border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:8px;line-height:1.7;font-size:.84rem}.cn{background:rgba(74,222,128,.06);border-left:3px solid var(--green);padding:14px 18px;border-radius:0 8px 8px 0;line-height:1.7;font-size:.84rem;color:#cbd5e1}pre{background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:14px 18px;overflow-x:auto;margin:8px 0;font-size:.8rem;line-height:1.7}code{font-family:'Fira Code','Cascadia Code',monospace;color:#e2e8f0}.en code{background:rgba(56,189,248,.1);padding:1px 6px;border-radius:4px}.cn code{background:rgba(74,222,128,.1);padding:1px 6px;border-radius:4px}pre code{background:none;padding:0}table{width:100%;border-collapse:collapse;margin:8px 0;font-size:.82rem}th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}th{background:rgba(56,189,248,.08);color:var(--accent)}.footer{text-align:center;color:var(--text2);font-size:.72rem;margin-top:32px;border-top:1px solid var(--border);padding-top:16px}</style></head><body><div class="container"><div class="nav"><a href="index.html">← 索引</a><span style="color:var(--text2)">linalg · fft · signal · special · distributions · func</span><a href="torch.cuda.html">下一模块 →</a></div>
+
+<h1>torch.linalg · fft · signal · special · distributions · func</h1>
+
+<div class="section"><h2>torch.linalg · 线性代数</h2>
+<div class="en"><p>Common linear algebra operations on the last 1-2 dimensions with NumPy-like API.</p></div>
+<div class="cn"><p>在最后 1-2 维上执行常见线性代数操作，API 类似 NumPy。</p></div>
+<table><tr><th>Function</th><th>Description</th></tr>
+<tr><td><code>torch.linalg.inv(A)</code></td><td><span class="en">Matrix inverse</span><br><span class="cn">矩阵求逆</span></td></tr>
+<tr><td><code>torch.linalg.det(A)</code></td><td><span class="en">Determinant</span><br><span class="cn">行列式</span></td></tr>
+<tr><td><code>torch.linalg.norm(x)</code></td><td><span class="en">Vector/matrix norm</span><br><span class="cn">向量/矩阵范数</span></td></tr>
+<tr><td><code>torch.linalg.solve(A, b)</code></td><td><span class="en">Solve Ax=b</span><br><span class="cn">解线性方程组</span></td></tr>
+<tr><td><code>torch.linalg.svd(A)</code></td><td><span class="en">SVD decomposition → U, Σ, Vh</span><br><span class="cn">SVD 分解</span></td></tr>
+<tr><td><code>torch.linalg.eig(A)</code></td><td><span class="en">Eigenvalues</span><br><span class="cn">特征值</span></td></tr>
+<tr><td><code>torch.linalg.eigh(A)</code></td><td><span class="en">Eigenvalues for symmetric/Hermitian</span><br><span class="cn">对称/Hermitian 矩阵特征值</span></td></tr>
+<tr><td><code>torch.linalg.qr(A)</code></td><td><span class="en">QR decomposition</span><br><span class="cn">QR 分解</span></td></tr>
+<tr><td><code>torch.linalg.lstsq(A, b)</code></td><td><span class="en">Least squares solution</span><br><span class="cn">最小二乘解</span></td></tr>
+<tr><td><code>torch.linalg.matrix_rank(A)</code></td><td><span class="en">Matrix rank</span><br><span class="cn">矩阵秩</span></td></tr></table></div>
+
+<div class="section"><h2>torch.fft · 快速傅里叶变换</h2>
+<div class="en"><p>Discrete Fourier Transform functions. Supports real and complex FFT, IFFT, RFFT, IRFFT.</p></div>
+<div class="cn"><p>离散傅里叶变换函数。支持实数/复数 FFT、IFFT、RFFT、IRFFT。</p></div>
+<pre><code>x = torch.randn(1024)
+X = torch.fft.fft(x)           # 1D FFT → complex tensor
+x_rec = torch.fft.ifft(X)      # inverse FFT (recover original)</code></pre></div>
+
+<div class="section"><h2>torch.signal · 信号处理</h2>
+<div class="en"><p>Signal processing window functions: <code>windows.blackman()</code>, <code>windows.hamming()</code>, <code>windows.hann()</code>, <code>windows.kaiser()</code>, <code>windows.bartlett()</code>. Used before FFT to reduce spectral leakage.</p></div>
+<div class="cn"><p>信号处理窗函数：<code>windows.blackman()</code>、<code>windows.hamming()</code>、<code>windows.hann()</code>、<code>windows.kaiser()</code>、<code>windows.bartlett()</code>。FFT 前使用以减少频谱泄漏。</p></div></div>
+
+<div class="section"><h2>torch.special · 特殊数学函数</h2>
+<div class="en"><p>Special math functions: <code>entr()</code>, <code>erf()</code>, <code>erfc()</code>, <code>erfinv()</code>, <code>expit()</code>, <code>logit()</code>, <code>i0()</code>, <code>i0e()</code>, <code>i1()</code>, <code>i1e()</code>, <code>ndtr()</code>, <code>ndtri()</code>, <code>gammaln()</code>, <code>polygamma()</code>, <code>digamma()</code>, <code>psi()</code>, <code>zeta()</code>, <code>multigammaln()</code>, <code>softplus()</code>, <code>log_softmax()</code>.</p></div>
+<div class="cn"><p>特殊函数：误差函数 <code>erf/erfc</code>、逆误差函数 <code>erfinv</code>、sigmoid 的别名 <code>expit</code>、其逆 <code>logit</code>、Bessel 函数 <code>i0/i1</code>、高斯 CDF <code>ndtr</code>、其逆 <code>ndtri</code>、Gamma 对数 <code>gammaln</code>、digamma/polygamma 函数、Riemann zeta <code>zeta</code> 等。</p></div></div>
+
+<div class="section"><h2>torch.distributions · 概率分布</h2>
+<div class="en"><p>Probability distributions for stochastic policies and VAE reparameterization: <code>Normal, Bernoulli, Categorical, Uniform, MultivariateNormal, OneHotCategorical, RelaxedBernoulli, Beta, Gamma, Dirichlet, Poisson</code>. Each has <code>.sample()</code>, <code>.log_prob()</code>, <code>.entropy()</code> methods.</p></div>
+<div class="cn"><p>概率分布（用于随机策略和 VAE 重参数化）：<code>Normal</code>（正态）、<code>Bernoulli</code>（伯努利）、<code>Categorical</code>（类别）、<code>Uniform</code>（均匀）、<code>MultivariateNormal</code>（多元正态）、<code>Beta/Gamma/Dirichlet/Poisson</code>。每个分布有 <code>.sample()</code>（采样）、<code>.log_prob()</code>（对数概率）、<code>.entropy()</code>（熵）。</p></div></div>
+
+<div class="section"><h2>torch.func · 函数变换 (JAX 式 API)</h2>
+<div class="en"><p>Function transforms for per-sample gradients, vectorization, etc. <code>torch.func.vmap(f)(x)</code> auto-vectorizes f. <code>torch.func.grad(f)(x)</code> computes gradient. <code>torch.func.vjp(f, x)</code> computes vector-Jacobian product.</p></div>
+<div class="cn"><p>函数变换（JAX 式 API）：<code>vmap(f)(x)</code> 自动向量化、<code>grad(f)(x)</code> 计算梯度、<code>vjp(f, x)</code> 向量-雅可比乘积、<code>jacrev/jacfwd</code> 雅可比矩阵。</p></div>
+<pre><code># vmap: batch gradient without for-loop
+batch_grads = torch.func.vmap(torch.func.grad(loss_fn))(inputs)</code></pre></div>
+
+<div class="footer">PyTorch 2.12 · linalg/fft/signal/special/distributions/func</div></div></body></html>

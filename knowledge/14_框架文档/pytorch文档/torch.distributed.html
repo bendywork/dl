@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Distributed — PyTorch 2.12</title><style>:root{--bg:#0b1120;--card:#111827;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#4ade80;--yellow:#facc15}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto}.nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 20px;flex-wrap:wrap;gap:8px}.nav a{color:var(--accent);text-decoration:none;font-size:.85rem;padding:6px 14px;border:1px solid var(--border);border-radius:6px}.nav a:hover{background:rgba(56,189,248,.1)}h1{font-size:1.4rem;color:var(--accent);margin-bottom:20px}.section{margin-bottom:20px}h2{font-size:1rem;color:var(--yellow);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px}.en{background:var(--card);border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:8px;line-height:1.7;font-size:.84rem}.cn{background:rgba(74,222,128,.06);border-left:3px solid var(--green);padding:14px 18px;border-radius:0 8px 8px 0;line-height:1.7;font-size:.84rem;color:#cbd5e1}pre{background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:14px 18px;overflow-x:auto;margin:8px 0;font-size:.8rem;line-height:1.7}code{font-family:'Fira Code','Cascadia Code',monospace;color:#e2e8f0}.en code{background:rgba(56,189,248,.1);padding:1px 6px;border-radius:4px}.cn code{background:rgba(74,222,128,.1);padding:1px 6px;border-radius:4px}pre code{background:none;padding:0}table{width:100%;border-collapse:collapse;margin:8px 0;font-size:.82rem}th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}th{background:rgba(56,189,248,.08);color:var(--accent)}.footer{text-align:center;color:var(--text2);font-size:.72rem;margin-top:32px;border-top:1px solid var(--border);padding-top:16px}</style></head><body><div class="container"><div class="nav"><a href="index.html">← 索引</a><span style="color:var(--text2)">Distributed</span><a href="torch.compiler.html">下一模块 →</a></div>
+<h1>分布式训练 — torch.distributed · fsdp · elastic · tensor.parallel · pipelining · checkpoint · RPC</h1>
+
+<div class="section"><h2>torch.distributed · 分布式核心</h2>
+<div class="en"><p>Core distributed communication. Backend options: <strong>NCCL</strong> (GPU, default), <strong>Gloo</strong> (CPU), <strong>MPI</strong>.</p></div><div class="cn"><p>核心分布式通信。后端选项：<strong>NCCL</strong>（GPU，默认）、<strong>Gloo</strong>（CPU）、<strong>MPI</strong>。</p></div>
+<pre><code>torch.distributed.init_process_group(backend='nccl', init_method='env://')
+model = nn.parallel.DistributedDataParallel(model)  # DDP
+torch.distributed.all_reduce(tensor)                # 集合通信</code></pre>
+<table><tr><th>API</th><th>Description</th></tr>
+<tr><td><code>init_process_group</code></td><td><span class="en">Initialize distributed process group</span><br><span class="cn">初始化分布式进程组</span></td></tr>
+<tr><td><code>DistributedDataParallel (DDP)</code></td><td><span class="en">Multi-GPU data parallel</span><br><span class="cn">多 GPU 数据并行</span></td></tr>
+<tr><td><code>all_reduce / all_gather / broadcast / scatter / reduce</code></td><td><span class="en">Collective communication ops</span><br><span class="cn">集合通信操作</span></td></tr>
+<tr><td><code>barrier()</code></td><td><span class="en">Synchronize all processes</span><br><span class="cn">同步所有进程</span></td></tr></table></div>
+
+<div class="section"><h2>torch.distributed.fsdp · FSDP 完全分片</h2>
+<div class="en"><p><strong>F</strong>ully <strong>S</strong>harded <strong>D</strong>ata <strong>P</strong>arallel — shards model parameters, gradients, and optimizer states across GPUs. Memory-efficient for large models. <code>fully_shard</code> is FSDP2 with simplified API.</p></div>
+<div class="cn"><p><strong>FSDP</strong>（完全分片数据并行）—— 将模型参数、梯度和优化器状态分片到多块 GPU。大模型内存高效。<code>fully_shard</code> 是 FSDP2，API 更简洁。</p></div>
+<pre><code>from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+model = FSDP(model)
+# FSDP2:
+from torch.distributed.fsdp import fully_shard
+fully_shard(model)</code></pre></div>
+
+<div class="section"><h2>torch.distributed.tensor.parallel · 张量并行</h2>
+<div class="en"><p>Splits individual layers across devices — each device holds a portion of the weight matrix. Used in large-scale models (alongside FSDP).</p></div>
+<div class="cn"><p>将单个层的权重矩阵拆分到多个设备 —— 每块 GPU 持有一部分权重。大规模模型中使用（配合 FSDP）。</p></div></div>
+
+<div class="section"><h2>torch.distributed.pipelining · 流水线并行</h2>
+<div class="en"><p>Splits model layers across devices, passing activations through the pipeline. Reduces idle time with micro-batching.</p></div>
+<div class="cn"><p>将模型按层拆分到设备，通过管线传递激活值。使用微批处理减少空闲时间。</p></div></div>
+
+<div class="section"><h2>torch.distributed.elastic · 弹性训练</h2>
+<div class="en"><p>Dynamic scaling — nodes can join/leave during training. <code>TorchElastic</code> for fault-tolerant distributed training on preemptible instances.</p></div>
+<div class="cn"><p>动态扩缩容 —— 节点可在训练过程中加入/离开。<code>TorchElastic</code> 用于可抢占实例上的容错分布式训练。</p></div></div>
+
+<div class="section"><h2>Other Distributed APIs</h2>
+<table><tr><th>Module</th><th>Description</th></tr>
+<tr><td><code>torch.distributed.tensor</code></td><td><span class="en">DTensor — sharded tensor abstraction</span><br><span class="cn">DTensor —— 分片 tensor 抽象</span></td></tr>
+<tr><td><code>torch.distributed.optim</code></td><td><span class="en">Distributed optimizer (ZeRO-style)</span><br><span class="cn">分布式优化器（ZeRO 式）</span></td></tr>
+<tr><td><code>torch.distributed.checkpoint</code></td><td><span class="en">Distributed checkpoint save/load</span><br><span class="cn">分布式 checkpoint 保存/加载</span></td></tr>
+<tr><td><code>.algorithms.join</code></td><td><span class="en">Gradient sync for uneven workloads</span><br><span class="cn">不均匀负载的梯度同步</span></td></tr>
+<tr><td><code>._symmetric_memory</code></td><td><span class="en">NVSwitch / NVLink direct memory access</span><br><span class="cn">NVSwitch/NVLink 直接内存访问</span></td></tr>
+<tr><td><code>Distributed RPC</code></td><td><span class="en">Remote Procedure Call for parameter server / peer-to-peer</span><br><span class="cn">远程过程调用（参数服务器 / 点对点）</span></td></tr>
+<tr><td><code>DDP Comm Hooks</code></td><td><span class="en">Gradient compression (QSGD, PowerSGD)</span><br><span class="cn">梯度压缩（QSGD、PowerSGD）</span></td></tr>
+</table></div>
+
+<div class="footer">PyTorch 2.12 · Distributed · Bilingual EN/CN</div></div></body></html>

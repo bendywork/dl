@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>torch.hub — PyTorch 2.12 中英对照</title>
+<style>
+:root { --bg:#0b1120; --card:#111827; --border:#1e293b; --text:#e2e8f0; --text2:#94a3b8; --accent:#38bdf8; --green:#4ade80; --yellow:#facc15; --red:#f87171; --purple:#c084fc; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:20px; }
+.container { max-width:900px; margin:0 auto; }
+.nav { display:flex; justify-content:space-between; align-items:center; margin:0 0 20px; flex-wrap:wrap; gap:8px; }
+.nav a { color:var(--accent); text-decoration:none; font-size:0.85rem; padding:6px 14px; border:1px solid var(--border); border-radius:6px; transition:all .2s; }
+.nav a:hover { background:rgba(56,189,248,0.1); border-color:var(--accent); }
+h1 { font-size:1.4rem; color:var(--accent); margin-bottom:20px; }
+.section { margin-bottom:20px; }
+h2 { font-size:1rem; color:var(--yellow); margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:4px; }
+.en { background:var(--card); border-left:3px solid var(--accent); padding:14px 18px; border-radius:0 8px 8px 0; margin-bottom:8px; line-height:1.7; font-size:0.84rem; }
+.cn { background:rgba(74,222,128,0.06); border-left:3px solid var(--green); padding:14px 18px; border-radius:0 8px 8px 0; line-height:1.7; font-size:0.84rem; color:#cbd5e1; }
+pre { background:#0f172a; border:1px solid var(--border); border-radius:6px; padding:14px 18px; overflow-x:auto; margin:8px 0; font-size:0.8rem; line-height:1.7; }
+code { font-family:'Fira Code','Cascadia Code','Courier New',monospace; color:#e2e8f0; }
+.en code { background:rgba(56,189,248,0.1); padding:1px 6px; border-radius:4px; }
+.cn code { background:rgba(74,222,128,0.1); padding:1px 6px; border-radius:4px; }
+pre code { background:none; padding:0; }
+ul,ol { margin-left:24px; } .en li,.cn li { margin-bottom:4px; }
+table { width:100%; border-collapse:collapse; margin:8px 0; font-size:0.82rem; }
+th,td { border:1px solid var(--border); padding:8px 12px; text-align:left; }
+th { background:rgba(56,189,248,0.08); color:var(--accent); }
+.footer { text-align:center; color:var(--text2); font-size:0.72rem; margin-top:32px; border-top:1px solid var(--border); padding-top:16px; }
+</style>
+</head>
+<body>
+<div class="container">
+<div class="nav">
+  <a href="index.html">← 索引 Index</a>
+  <span style="color:var(--text2);font-size:0.82rem;">torch.hub · PyTorch 2.12</span>
+  <a href="torch_core_ops.html">下一模块 →</a>
+</div>
+
+<h1>torch.hub — 预训练模型仓库</h1>
+
+<!-- OVERVIEW -->
+<div class="section">
+<h2>Overview · 概述</h2>
+<div class="en"><p>PyTorch Hub is a pre-trained model repository designed to facilitate research reproducibility.</p></div>
+<div class="cn"><p>PyTorch Hub 是一个预训练模型仓库，旨在促进研究的可复现性。</p></div>
+</div>
+
+<!-- PUBLISHING -->
+<div class="section">
+<h2>Publishing Models · 发布模型</h2>
+<div class="en"><p>PyTorch Hub supports publishing pre-trained models (model definitions and pre-trained weights) to a GitHub repository by adding a simple <code>hubconf.py</code> file. <code>hubconf.py</code> can have multiple entrypoints. Each entrypoint is defined as a Python function.</p></div>
+<div class="cn"><p>PyTorch Hub 支持通过添加 <code>hubconf.py</code> 文件将预训练模型发布到 GitHub 仓库。每个入口点定义为 Python 函数，可以有多个入口点。</p></div>
+</div>
+
+<div class="section">
+<h2>Entrypoint Spec · 入口函数规范</h2>
+<pre><code>def entrypoint_name(*args, **kwargs):
+    # args & kwargs are optional, for models which take positional/keyword arguments.
+    ...</code></pre>
+<div class="en"><p>Each entrypoint returns a model (<code>nn.Module</code>). Docstring = help message (examples recommended). Functions prefixed with underscore are helper functions, won't show in <code>torch.hub.list()</code>. Published models should be at least in a branch/tag, not a random commit.</p></div>
+<div class="cn"><p>每个入口点返回一个模型（<code>nn.Module</code>）。文档字符串 = 帮助信息（建议包含示例）。以下划线开头的函数为辅助函数，不在 <code>torch.hub.list()</code> 中显示。已发布的模型应至少位于分支/标签中，不能是随机 commit。</p></div>
+</div>
+
+<!-- Implementation Example -->
+<div class="section">
+<h2>Implementation Example · 实现示例 (resnet18)</h2>
+<pre><code>dependencies = ['torch']
+    from torchvision.models.resnet import resnet18 as _resnet18
+
+def resnet18(pretrained=False, **kwargs):
+    """ # This docstring shows up in hub.help()
+    Resnet18 model
+    pretrained (bool): load pretrained weights into the model
+    """
+    model = _resnet18(pretrained=pretrained, **kwargs)
+    return model</code></pre>
+<div class="en"><p><code>dependencies</code> = packages needed to <em>load</em> (may differ from training dependencies). <code>*args</code>/<code>**kwargs</code> pass through to the callable.</p></div>
+<div class="cn"><p><code>dependencies</code> = <em>加载</em>模型所需的包（可能不同于训练所需）。<code>*args</code>/<code>**kwargs</code> 透传给可调用对象。</p></div>
+</div>
+
+<!-- Loading weights -->
+<div class="section">
+<h2>Loading Pretrained Weights · 加载预训练权重</h2>
+
+<div class="en"><p><strong>Local (stored in repo):</strong></p></div>
+<div class="cn"><p><strong>本地加载（权重文件在仓库中）：</strong></p></div>
+<pre><code>if pretrained:
+    dirname = os.path.dirname(__file__)
+    checkpoint = os.path.join(dirname, &lt;RELATIVE_PATH_TO_CHECKPOINT&gt;)
+    state_dict = torch.load(checkpoint)
+    model.load_state_dict(state_dict)</code></pre>
+
+<div class="en"><p><strong>From URL:</strong></p></div>
+<div class="cn"><p><strong>从 URL 加载：</strong></p></div>
+<pre><code>checkpoint = 'https://download.pytorch.org/models/resnet18-5c106cde.pth'
+model.load_state_dict(torch.hub.load_state_dict_from_url(checkpoint, progress=False))</code></pre>
+
+<div class="en"><p>For files &lt; 2GB, attaching to a GitHub project release is recommended.</p></div>
+<div class="cn"><p>对于小于 2GB 的文件，建议附加到 GitHub 项目 release 中。</p></div>
+</div>
+
+<!-- torch.hub.list() -->
+<div class="section">
+<h2>torch.hub.list()</h2>
+<pre><code>torch.hub.list(github, force_reload=False, skip_validation=False, trust_repo='check', verbose=True)</code></pre>
+<div class="en"><p>Lists all callable entrypoints in the specified repo.</p></div>
+<div class="cn"><p>列出指定仓库中所有可调用的入口点。</p></div>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>github</td><td>str</td><td><span class="en">"repo_owner/repo_name[:ref]", ref defaults to main→master</span><br><span class="cn">"repo_owner/repo_name[:ref]"，ref 默认 main，否则 master</span></td></tr>
+<tr><td>force_reload</td><td>bool</td><td><span class="en">Discard cache, force fresh download. Default: False</span><br><span class="cn">丢弃缓存，强制重新下载。默认：False</span></td></tr>
+<tr><td>skip_validation</td><td>bool</td><td><span class="en">Skip GitHub API ownership check. Default: False</span><br><span class="cn">跳过 GitHub API 所有权验证。默认：False</span></td></tr>
+<tr><td>trust_repo</td><td>bool/str</td><td><span class="en">"check"/True/False (v1.12+). "check" verifies against cached trusted repos</span><br><span class="cn">"check"/True/False（v1.12+）。"check" 验证已缓存的信任列表</span></td></tr>
+<tr><td>verbose</td><td>bool</td><td><span class="en">Mute cache-hit messages if False. Default: True</span><br><span class="cn">设为 False 静默缓存命中消息。默认：True</span></td></tr>
+</table>
+<div class="en"><p><strong>Returns:</strong> list — available callable entrypoints</p></div>
+<div class="cn"><p><strong>返回：</strong>list — 可用入口点列表</p></div>
+<pre><code>>>> entrypoints = torch.hub.list("pytorch/vision", force_reload=True)</code></pre>
+</div>
+
+<!-- torch.hub.help() -->
+<div class="section">
+<h2>torch.hub.help()</h2>
+<pre><code>torch.hub.help(github, model, force_reload=False, skip_validation=False, trust_repo='check')</code></pre>
+<div class="en"><p>Shows the docstring of a specific entrypoint.</p></div>
+<div class="cn"><p>显示指定入口点的文档字符串。</p></div>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>github</td><td>str</td><td><span class="en">"repo_owner/repo_name[:ref]"</span><br><span class="cn">"repo_owner/repo_name[:ref]"</span></td></tr>
+<tr><td>model</td><td>str</td><td><span class="en">Entrypoint name in hubconf.py</span><br><span class="cn">hubconf.py 中的入口点名称</span></td></tr>
+<tr><td>force_reload</td><td>bool</td><td><span class="en">Force fresh download. Default: False</span><br><span class="cn">强制重新下载。默认：False</span></td></tr>
+<tr><td>skip_validation</td><td>bool</td><td><span class="en">Skip ownership validation. Default: False</span><br><span class="cn">跳过所有权验证。默认：False</span></td></tr>
+<tr><td>trust_repo</td><td>bool/str</td><td><span class="en">"check"/True/False. Default: "check"</span><br><span class="cn">"check"/True/False。默认："check"</span></td></tr>
+</table>
+<pre><code>>>> print(torch.hub.help("pytorch/vision", "resnet18", force_reload=True))</code></pre>
+</div>
+
+<!-- torch.hub.load() -->
+<div class="section">
+<h2>torch.hub.load()</h2>
+<pre><code>torch.hub.load(repo_or_dir, model, *args, source='github', trust_repo='check', force_reload=False, verbose=True, skip_validation=False, **kwargs)</code></pre>
+<div class="en"><p>Loads a model from a GitHub repo or local directory. Can also load other objects (tokenizers, loss functions, etc.).</p></div>
+<div class="cn"><p>从 GitHub 仓库或本地目录加载模型。也可加载其他对象（分词器、损失函数等）。</p></div>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>repo_or_dir</td><td>str</td><td><span class="en">GitHub: "repo_owner/repo_name[:ref]". Local: path to directory</span><br><span class="cn">GitHub："repo_owner/repo_name[:ref]"。本地：目录路径</span></td></tr>
+<tr><td>model</td><td>str</td><td><span class="en">Entrypoint name in hubconf.py</span><br><span class="cn">hubconf.py 中的入口点名称</span></td></tr>
+<tr><td>*args</td><td></td><td><span class="en">Positional args for the callable</span><br><span class="cn">传递给入口函数的位置参数</span></td></tr>
+<tr><td>source</td><td>str</td><td><span class="en">'github' or 'local'. Default: 'github'</span><br><span class="cn">'github' 或 'local'。默认：'github'</span></td></tr>
+<tr><td>trust_repo</td><td>bool/str</td><td><span class="en">"check"/True/False. Default: "check"</span><br><span class="cn">"check"/True/False。默认："check"</span></td></tr>
+<tr><td>force_reload</td><td>bool</td><td><span class="en">Force fresh download. Default: False</span><br><span class="cn">强制重新下载。默认：False</span></td></tr>
+<tr><td>verbose</td><td>bool</td><td><span class="en">Mute cache-hit msgs. Default: True</span><br><span class="cn">静默缓存消息。默认：True</span></td></tr>
+<tr><td>skip_validation</td><td>bool</td><td><span class="en">Skip ownership check. Default: False</span><br><span class="cn">跳过所有权检查。默认：False</span></td></tr>
+<tr><td>**kwargs</td><td></td><td><span class="en">Keyword args for the callable</span><br><span class="cn">传递给入口函数的关键字参数</span></td></tr>
+</table>
+<pre><code>>>> # from GitHub
+>>> model = torch.hub.load("pytorch/vision", "resnet50", weights="ResNet50_Weights.IMAGENET1K_V1")
+>>> # from local dir
+>>> model = torch.hub.load("/some/local/path/pytorch/vision", "resnet50", weights="ResNet50_Weights.DEFAULT")</code></pre>
+</div>
+
+<!-- download_url_to_file -->
+<div class="section">
+<h2>torch.hub.download_url_to_file()</h2>
+<pre><code>torch.hub.download_url_to_file(url, dst, hash_prefix=None, progress=True)</code></pre>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>url</td><td>str</td><td><span class="en">URL of the object</span><br><span class="cn">下载对象的 URL</span></td></tr>
+<tr><td>dst</td><td>str</td><td><span class="en">Full destination path, e.g. /tmp/temporary_file</span><br><span class="cn">目标完整路径</span></td></tr>
+<tr><td>hash_prefix</td><td>str</td><td><span class="en">If set, SHA256 must start with this prefix. Default: None</span><br><span class="cn">如果设置，SHA256 必须以该前缀开头。默认：None</span></td></tr>
+<tr><td>progress</td><td>bool</td><td><span class="en">Show progress bar. Default: True</span><br><span class="cn">显示进度条。默认：True</span></td></tr>
+</table>
+</div>
+
+<!-- load_state_dict_from_url -->
+<div class="section">
+<h2>torch.hub.load_state_dict_from_url()</h2>
+<pre><code>torch.hub.load_state_dict_from_url(url, model_dir=None, map_location=None, progress=True, check_hash=False, file_name=None, weights_only=False)</code></pre>
+<div class="en"><p>Loads a Torch serialized object from a URL. If the downloaded file is a zip, it is automatically decompressed. Default <code>model_dir</code> = <code>&lt;hub_dir&gt;/checkpoints</code>.</p></div>
+<div class="cn"><p>从 URL 加载 Torch 序列化对象。如果下载的文件是 zip，自动解压。默认 <code>model_dir</code> = <code>&lt;hub_dir&gt;/checkpoints</code>。</p></div>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>url</td><td>str</td><td><span class="en">URL of the object</span><br><span class="cn">对象 URL</span></td></tr>
+<tr><td>model_dir</td><td>str</td><td><span class="en">Directory to save. Default: &lt;hub_dir&gt;/checkpoints</span><br><span class="cn">保存目录。默认：&lt;hub_dir&gt;/checkpoints</span></td></tr>
+<tr><td>map_location</td><td>optional</td><td><span class="en">Function or dict for remapping storage</span><br><span class="cn">重映射存储位置的函数/字典</span></td></tr>
+<tr><td>progress</td><td>bool</td><td><span class="en">Show progress bar. Default: True</span><br><span class="cn">显示进度条。默认：True</span></td></tr>
+<tr><td>check_hash</td><td>bool</td><td><span class="en">Verify SHA256 from filename. Default: False</span><br><span class="cn">从文件名验证 SHA256。默认：False</span></td></tr>
+<tr><td>file_name</td><td>str</td><td><span class="en">Custom filename for downloaded file</span><br><span class="cn">下载文件的自定义名称</span></td></tr>
+<tr><td>weights_only</td><td>bool</td><td><span class="en">Only load weights (safe for untrusted sources). Default: False</span><br><span class="cn">仅加载权重（对不可信来源安全）。默认：False</span></td></tr>
+</table>
+</div>
+
+<!-- Cache & dir -->
+<div class="section">
+<h2>Download Location &amp; Caching · 下载位置与缓存</h2>
+<div class="en"><p>Cache directory priority: ① <code>hub.set_dir(PATH)</code> → ② <code>$TORCH_HOME/hub</code> → ③ <code>$XDG_CACHE_HOME/torch/hub</code> → ④ <code>~/.cache/torch/hub</code></p></div>
+<div class="cn"><p>缓存目录优先级：① <code>hub.set_dir(PATH)</code> → ② <code>$TORCH_HOME/hub</code> → ③ <code>$XDG_CACHE_HOME/torch/hub</code> → ④ <code>~/.cache/torch/hub</code></p></div>
+
+<pre><code>torch.hub.get_dir()       # Get cache dir → str
+torch.hub.set_dir(d)      # Set cache dir → None</code></pre>
+
+<div class="en"><p>Files are not cleaned up by default. <code>force_reload=True</code> deletes cached GitHub folder + weights and re-downloads.</p></div>
+<div class="cn"><p>文件默认不清除。<code>force_reload=True</code> 会删除缓存的 GitHub 文件夹和权重并重新下载。</p></div>
+</div>
+
+<!-- Running a loaded model -->
+<div class="section">
+<h2>Running a Loaded Model · 运行已加载模型</h2>
+<div class="en"><p>After loading, use <code>dir(model)</code> to see methods and <code>help(model.foo)</code> to check arguments. Repo owners should include clear help messages and minimal working examples.</p></div>
+<div class="cn"><p>加载后使用 <code>dir(model)</code> 查看方法，<code>help(model.foo)</code> 查看参数。仓库作者应提供清晰的帮助信息以及最小可用示例。</p></div>
+</div>
+
+<!-- Known Limitations -->
+<div class="section">
+<h2>Known Limitations · 已知限制</h2>
+<div class="en">
+<p><strong>1. Import side effects:</strong> Torch Hub imports packages as if installed, adding to <code>sys.modules</code>. Different repos sharing sub-package names (e.g. <code>model</code>) can cause import errors. Workaround: remove the conflicting sub-package from <code>sys.modules</code>.</p>
+</div>
+<div class="cn">
+<p><strong>1. 导入副作用：</strong>Torch Hub 以安装方式导入包，添加到 <code>sys.modules</code>。不同仓库共享子包名（如 <code>model</code>）可能导致导入错误。解决方法：从 <code>sys.modules</code> 中移除冲突子包。</p>
+</div>
+<div class="en">
+<p><strong>2. Same-repo limitation:</strong> You CANNOT load two different branches of the same repo in the same Python process. Loading in separate processes works fine.</p>
+</div>
+<div class="cn">
+<p><strong>2. 同一仓库限制：</strong>不能在同一 Python 进程中加载同一仓库的两个不同分支。在不同进程中加载则正常工作。</p>
+</div>
+</div>
+
+<div class="footer">PyTorch 2.12 · torch.hub · Bilingual EN/CN · docs.pytorch.org</div>
+</div>
+</body>
+</html>

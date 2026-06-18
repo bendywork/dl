@@ -1,0 +1,36 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>torch.nn.init / nn.attention / Aliases — PyTorch 2.12</title><style>:root{--bg:#0b1120;--card:#111827;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#4ade80;--yellow:#facc15}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}.container{max-width:900px;margin:0 auto}.nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 20px;flex-wrap:wrap;gap:8px}.nav a{color:var(--accent);text-decoration:none;font-size:.85rem;padding:6px 14px;border:1px solid var(--border);border-radius:6px}.nav a:hover{background:rgba(56,189,248,.1)}h1{font-size:1.4rem;color:var(--accent);margin-bottom:20px}.section{margin-bottom:20px}h2{font-size:1rem;color:var(--yellow);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px}.en{background:var(--card);border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:8px;line-height:1.7;font-size:.84rem}.cn{background:rgba(74,222,128,.06);border-left:3px solid var(--green);padding:14px 18px;border-radius:0 8px 8px 0;line-height:1.7;font-size:.84rem;color:#cbd5e1}pre{background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:14px 18px;overflow-x:auto;margin:8px 0;font-size:.8rem;line-height:1.7}code{font-family:'Fira Code','Cascadia Code',monospace;color:#e2e8f0}.en code{background:rgba(56,189,248,.1);padding:1px 6px;border-radius:4px}.cn code{background:rgba(74,222,128,.1);padding:1px 6px;border-radius:4px}pre code{background:none;padding:0}table{width:100%;border-collapse:collapse;margin:8px 0;font-size:.82rem}th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}th{background:rgba(56,189,248,.08);color:var(--accent)}.footer{text-align:center;color:var(--text2);font-size:.72rem;margin-top:32px;border-top:1px solid var(--border);padding-top:16px}</style></head><body><div class="container"><div class="nav"><a href="index.html">← 索引</a><span style="color:var(--text2)">nn.init · nn.attention · Aliases</span><a href="torch.utils.data.html">下一模块 →</a></div>
+<h1>torch.nn.init · nn.attention · Aliases in torch.nn</h1>
+
+<div class="section"><h2>torch.nn.init · 权重初始化</h2>
+<div class="en"><p>Functions for initializing neural network weights. All operate <strong>in-place</strong> on the given tensor.</p></div>
+<div class="cn"><p>神经网络权重初始化函数。全部对给定 tensor <strong>原地操作</strong>。</p></div>
+<pre><code>linear = nn.Linear(100, 50)
+nn.init.xavier_uniform_(linear.weight)    # 推荐：tanh/sigmoid
+nn.init.kaiming_uniform_(linear.weight)   # 推荐：ReLU 族
+nn.init.normal_(linear.weight, 0, 0.02)   # GPT 式初始化
+nn.init.constant_(linear.bias, 0)</code></pre>
+<table><tr><th>Function</th><th>Best for</th></tr>
+<tr><td><code>xavier_uniform_ / xavier_normal_</code></td><td><span class="en">tanh, sigmoid (balances variance)</span><br><span class="cn">tanh、sigmoid（平衡方差）</span></td></tr>
+<tr><td><code>kaiming_uniform_ / kaiming_normal_</code></td><td><span class="en">ReLU, LeakyReLU (corrects for dead neurons)</span><br><span class="cn">ReLU、LeakyReLU（修正死亡神经元）</span></td></tr>
+<tr><td><code>uniform_ / normal_</code></td><td><span class="en">Simple random init</span><br><span class="cn">简单随机初始化</span></td></tr>
+<tr><td><code>orthogonal_</code></td><td><span class="en">Orthogonal matrix (RNN stability)</span><br><span class="cn">正交矩阵（RNN 稳定性）</span></td></tr>
+<tr><td><code>sparse_</code></td><td><span class="en">Sparse init for embeddings</span><br><span class="cn">Embedding 稀疏初始化</span></td></tr>
+<tr><td><code>trunc_normal_</code></td><td><span class="en">Truncated normal (ViT-style)</span><br><span class="cn">截断正态（ViT 式）</span></td></tr>
+</table></div>
+
+<div class="section"><h2>torch.nn.attention · 注意力模块</h2>
+<div class="en"><p>High-performance attention implementations introduced in PyTorch 2.0+.</p></div>
+<div class="cn"><p>PyTorch 2.0+ 引入的高性能注意力实现。</p></div>
+<pre><code># SDPA: Scaled Dot-Product Attention (flash attention backend)
+output = F.scaled_dot_product_attention(query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False)</code></pre>
+<table><tr><th>Function/Class</th><th>Description</th></tr>
+<tr><td><code>F.scaled_dot_product_attention(q,k,v)</code></td><td><span class="en">Unified SDPA (FlashAttention / MemEff / Math)</span><br><span class="cn">统一 SDPA（自动选最优后端）</span></td></tr>
+<tr><td><code>nn.MultiheadAttention</code></td><td><span class="en">Multi-Head Attention Module</span><br><span class="cn">多头注意力模块</span></td></tr>
+<tr><td><code>nn.attention.bias.attn_bias</code></td><td><span class="en">FlexAttention bias blocks</span><br><span class="cn">FlexAttention 偏置块</span></td></tr>
+</table></div>
+
+<div class="section"><h2>Aliases in torch.nn · 别名</h2>
+<div class="en"><p>Legacy compatibility aliases for torch.nn classes. <code>nn.modules.*</code> paths exist for backward compatibility (e.g., <code>nn.modules.activation.ReLU</code> is alias for <code>nn.ReLU</code>). <strong>Use the direct <code>nn.ClassName</code> form in new code.</strong></p></div>
+<div class="cn"><p>torch.nn 类的向后兼容别名。<code>nn.modules.*</code> 路径为向后兼容存在（如 <code>nn.modules.activation.ReLU</code> 是 <code>nn.ReLU</code> 的别名）。<strong>新代码中请使用直接的 <code>nn.ClassName</code> 形式。</strong></p></div></div>
+
+<div class="footer">PyTorch 2.12 · nn.init · nn.attention · Aliases</div></div></body></html>
