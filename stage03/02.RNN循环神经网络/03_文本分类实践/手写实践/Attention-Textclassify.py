@@ -2,17 +2,18 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch._C import dtype
 from torch.utils.data import Dataset, DataLoader
 from datasets import load_dataset
 from collections import Counter
+from Attention import Attention
 import numpy as np
 from sklearn import metrics
 import os
+from torch._C import dtype
 
 
-# FC全连接文本分类任务 手写 FC模型下的参数配置
-class FcClassifyConfig(object):
+# Attention全连接文本分类任务 手写 Attention模型下的参数配置
+class AttentionClassifyConfig(object):
     def __init__(self):
         # 超参数配置 最大词表大小
         self.MAX_VOCABULARY_SIZE = 5000
@@ -20,6 +21,8 @@ class FcClassifyConfig(object):
         self.MAX_SEQUENCE_LENGTH = 256
         # 词向量维度大小
         self.VOCA_EMBED_DIM = 128
+        # 隐藏层维度大小
+        self.HIDDEN_SIZE = 256
         # 批次大小
         self.BATCH_SIZE = 64
         # 训练轮数
@@ -31,8 +34,9 @@ class FcClassifyConfig(object):
         # 训练所使用的数据集
         self.DATASET_NAME = "stanfordnlp/imdb"
 
-# FC全连接文本分类任务手写 FC数据集构建
-class FcClassifyDatasets(object):
+
+# Attention全连接文本分类任务手写 Attention数据集构建
+class AttentionClassifyDatasets(object):
     def __init__(self, data, vocab, config):
         """
         data  huggingface数据集
@@ -64,7 +68,6 @@ class FcClassifyDatasets(object):
         # 6. 转成 tensor 返回 {'x': LongTensor, 'y': LongTensor}
         return {'x' : torch.LongTensor(tokens_ids_), 'y' : torch.tensor(train_data_label, dtype=torch.long)}
 
-
     def __len__(self):
         """
         获取数据集的长度
@@ -72,8 +75,9 @@ class FcClassifyDatasets(object):
         """
         return len(self.data)
 
+
 # 构建词表
-class FcClassifyBuildVocabulary(object):
+class AttentionClassifyBuildVocabulary(object):
     def __init__(self,config, train_data):
         self.config = config
         self.train_data = train_data
@@ -97,38 +101,44 @@ class FcClassifyBuildVocabulary(object):
     def __len__(self):
         return len(self.train_data)
 
+
 # 无状态函数可以直接使用模块化构建不需要单独写一个类
 def build_data_loader(data, vocab, config,  shuffle):
-    ds = FcClassifyDatasets(data, vocab, config)
+    ds = AttentionClassifyDatasets(data, vocab, config)
     return DataLoader(
         dataset = ds,
         batch_size=config.BATCH_SIZE,
         shuffle=shuffle
     )
 
-# FC 文本分类模型结构：
-class FcClassifyModel(nn.Module):
+# Attention 文本分类模型结构：
+class AttentionClassifyModel(nn.Module):
     def __init__(self, vocab, config):
         super().__init__()
         self.vocab = vocab
         self.config = config
         self.embedding = nn.Embedding(len(vocab), config.VOCA_EMBED_DIM, padding_idx= 0)
-        # 做一层分类
-        self.classify_layer = nn.Linear(
-            in_features=config.VOCA_EMBED_DIM,
-            out_features=2,
-            dropout=0.5
-        )
+        # Attention
+        # 双向Attention需要乘以2
+        self.lstm = nn.LSTM(
+            input_size=config.VOCA_EMBED_DIM,
+            hidden_size=config.HIDDEN_SIZE,
+            num_layers=1,
+            batch_first=True,
+            bidirectional=True )
+        self.attention = Attention(config.HIDDEN_SIZE * 2)
+        self.classify_layer = nn.Linear(config.HIDDEN_SIZE * 2, 2)
 
     def forward(self, x):
-         # x-shape [bs, t]
+         # x-shape [bs, t] -> [bs, t, e]
          embeddings = self.embedding(x)
-         # 2. 平均池化: [bs, seq_len, embed_dim] → [bs, embed_dim]
-         polling = embeddings.mean(dim=1)
-         outs = self.classify_layer(polling)
-         return  outs
+         # 调用Attention [bs, t, e] -> [bs, t, h]
+         outs, _ = self.lstm(embeddings)
+         attention_out = self.attention.forward_within_lstm(outs)
+         logits = self.classify_layer(attention_out)
+         return logits
 
-class FcClassifyTrain(object):
+class AttentionClassifyTrain(object):
     def __init__(self, config, model):
         self.config = config
         self.model = model
@@ -165,14 +175,14 @@ class FcClassifyTrain(object):
 
 # if __name__ == '__main__':
 #     from datasets import load_dataset
-#     config = FcClassifyConfig()
+#     config = AttentionClassifyConfig()
 #     dataset = load_dataset(config.DATASET_NAME)
     # print(type(dataset))
     # print(dataset)
     # print("---第一条训练样本---")
-    # vocab = FcClassifyBuildVocabulary(config, dataset['train'])
+    # vocab = AttentionClassifyBuildVocabulary(config, dataset['train'])
     # vocabulary = vocab.build_vocabulary()
-    # my_dataset = FcClassifyDatasets(dataset['train'], vocabulary, config=config)
+    # my_dataset = AttentionClassifyDatasets(dataset['train'], vocabulary, config=config)
     # print(my_dataset[0])
     # print(dataset['train'][0])
     # print("---label---")
@@ -188,15 +198,15 @@ class FcClassifyTrain(object):
     # batch = next(iter(data_loader))
     # print(f"batch x shape: {batch['x'].shape}")
     # print(f"batch y shape: {batch['y'].shape}")
-    # model = FcClassifyModel(vocabulary, config)
+    # model = AttentionClassifyModel(vocabulary, config)
     # batch = next(iter(data_loader))
     # out = model(batch['x'])
     # print(f"output shape: {out.shape}")  # 应该是 [64, 2]
 if __name__ == '__main__':
-    config = FcClassifyConfig()
+    config = AttentionClassifyConfig()
     dataset = load_dataset(config.DATASET_NAME)
 
-    vocab_builder = FcClassifyBuildVocabulary(config, dataset['train'])
+    vocab_builder = AttentionClassifyBuildVocabulary(config, dataset['train'])
     vocabulary = vocab_builder.build_vocabulary()
 
     # 从train里切20%做验证集
@@ -209,6 +219,6 @@ if __name__ == '__main__':
     train_loader = build_data_loader(train_data, vocabulary, config, shuffle=True)
     val_loader = build_data_loader(val_data, vocabulary, config, shuffle=False)
 
-    model = FcClassifyModel(vocabulary, config)
-    trainer = FcClassifyTrain(config, model)
+    model = AttentionClassifyModel(vocabulary, config)
+    trainer = AttentionClassifyTrain(config, model)
     trainer.train(train_loader, val_loader)
