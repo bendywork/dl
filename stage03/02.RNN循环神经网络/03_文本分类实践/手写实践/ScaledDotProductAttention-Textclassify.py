@@ -5,8 +5,8 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from datasets import load_dataset
 from collections import Counter
-from Attention import Attention
-from Attention import Attention
+# from Attention import Attention
+from ScaledDotProductAttention import Attention
 import numpy as np
 from sklearn import metrics
 import os
@@ -17,7 +17,7 @@ from torch._C import dtype
 class AttentionClassifyConfig(object):
     def __init__(self):
         # 超参数配置 最大词表大小
-        self.MAX_VOCABULARY_SIZE = 5000
+        self.MAX_VOCABULARY_SIZE = 20000
         # 句子最大长度
         self.MAX_SEQUENCE_LENGTH = 256
         # 词向量维度大小
@@ -27,7 +27,7 @@ class AttentionClassifyConfig(object):
         # 批次大小
         self.BATCH_SIZE = 64
         # 训练轮数
-        self.EPOCHS = 10
+        self.EPOCHS = 3
         # 学习率（梯度下降的步长）
         self.LEARNING_RATE = 0.001
         # 训练的设备
@@ -134,8 +134,13 @@ class AttentionClassifyModel(nn.Module):
          # x-shape [bs, t] -> [bs, t, e]
          embeddings = self.embedding(x)
          # 调用Attention [bs, t, e] -> [bs, t, h]
-         outs, _ = self.lstm(embeddings)
-         attention_out = self.attention.forward_within_lstm(outs)
+         # outs, _ = self.lstm(embeddings)
+         outs, (h_t,c_t) = self.lstm(embeddings)
+         # LSTM 输出
+         # outs: [bs, t, hidden * 2]  # 所有时刻的输出
+         # h_t: [2, bs, hidden]  # 最后时刻隐藏状态（正向+反向）
+         # c_t: [2, bs, hidden]  # 细胞状态
+         attention_out = self.attention.forward(outs, outs, outs)
          logits = self.classify_layer(attention_out)
          return logits
 

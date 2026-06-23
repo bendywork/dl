@@ -5,19 +5,14 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from datasets import load_dataset
 from collections import Counter
-from Attention import Attention
-from Attention import Attention
-import numpy as np
-from sklearn import metrics
-import os
-from torch._C import dtype
+from PositionalEncoding import PositionalEncoding
 
 
-# Attention全连接文本分类任务 手写 Attention模型下的参数配置
-class AttentionClassifyConfig(object):
+# Transformer全连接文本分类任务 手写 Transformer模型下的参数配置
+class TransformerClassifyConfig(object):
     def __init__(self):
         # 超参数配置 最大词表大小
-        self.MAX_VOCABULARY_SIZE = 5000
+        self.MAX_VOCABULARY_SIZE = 20000
         # 句子最大长度
         self.MAX_SEQUENCE_LENGTH = 256
         # 词向量维度大小
@@ -27,17 +22,24 @@ class AttentionClassifyConfig(object):
         # 批次大小
         self.BATCH_SIZE = 64
         # 训练轮数
-        self.EPOCHS = 10
+        self.EPOCHS = 3
         # 学习率（梯度下降的步长）
         self.LEARNING_RATE = 0.001
         # 训练的设备
         self.DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # 训练所使用的数据集
         self.DATASET_NAME = "stanfordnlp/imdb"
+        # Transformer参数配置（超参数配置）
+        # 模型的维度
+        self.D_MODEL = 128
+        # 多头注意力的头数  # 必须能整除 D_MODEL
+        self.NUM_HEADS = 4
+        # 编码器层数
+        self.NUM_LAYERS = 2
 
 
-# Attention全连接文本分类任务手写 Attention数据集构建
-class AttentionClassifyDatasets(object):
+# Transformer全连接文本分类任务手写 Transformer数据集构建
+class TransformerClassifyDatasets(object):
     def __init__(self, data, vocab, config):
         """
         data  huggingface数据集
@@ -78,7 +80,7 @@ class AttentionClassifyDatasets(object):
 
 
 # 构建词表
-class AttentionClassifyBuildVocabulary(object):
+class TransformerClassifyBuildVocabulary(object):
     def __init__(self,config, train_data):
         self.config = config
         self.train_data = train_data
@@ -105,41 +107,51 @@ class AttentionClassifyBuildVocabulary(object):
 
 # 无状态函数可以直接使用模块化构建不需要单独写一个类
 def build_data_loader(data, vocab, config,  shuffle):
-    ds = AttentionClassifyDatasets(data, vocab, config)
+    ds = TransformerClassifyDatasets(data, vocab, config)
     return DataLoader(
         dataset = ds,
         batch_size=config.BATCH_SIZE,
         shuffle=shuffle
     )
 
-# Attention 文本分类模型结构：
-class AttentionClassifyModel(nn.Module):
+# Transformer 文本分类模型结构：
+class TransformerClassifyModel(nn.Module):
     def __init__(self, vocab, config):
         super().__init__()
-        self.vocab = vocab
-        self.config = config
-        self.embedding = nn.Embedding(len(vocab), config.VOCA_EMBED_DIM, padding_idx= 0)
-        # Attention
-        # 双向Attention需要乘以2
-        self.lstm = nn.LSTM(
-            input_size=config.VOCA_EMBED_DIM,
-            hidden_size=config.HIDDEN_SIZE,
-            num_layers=1,
-            batch_first=True,
-            bidirectional=True )
-        self.attention = Attention(config.HIDDEN_SIZE * 2)
-        self.classify_layer = nn.Linear(config.HIDDEN_SIZE * 2, 2)
+        self.embedding = nn.Embedding(len(vocab), config.D_MODEL, padding_idx=0)
+        self.pe = PositionalEncoding(config.D_MODEL)
+        self.encoder = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=config.D_MODEL,
+                nhead=config.NUM_HEADS,
+                batch_first=True
+            ),
+            num_layers=config.NUM_LAYERS
+        )
+        self.classify = nn.Linear(config.D_MODEL, 2)
+        self.dropout = nn.Dropout(0.3)
 
     def forward(self, x):
-         # x-shape [bs, t] -> [bs, t, e]
-         embeddings = self.embedding(x)
-         # 调用Attention [bs, t, e] -> [bs, t, h]
-         outs, _ = self.lstm(embeddings)
-         attention_out = self.attention.forward_within_lstm(outs)
-         logits = self.classify_layer(attention_out)
-         return logits
+        # x shape: [batch, seq_len]
 
-class AttentionClassifyTrain(object):
+        # 1. Embedding → [batch, seq_len, d_model]
+        x = self.embedding(x)
+
+        # 2. PE → [batch, seq_len, d_model]
+        x = self.pe(x)
+
+        # 3. Encoder → [batch, seq_len, d_model]
+        x = self.encoder(x)
+
+        # 4. mean pooling：把 seq_len 维度平均掉 → [batch, d_model]
+        x = x.mean(dim=1)
+
+        # 5. dropout + Linear → [batch, 2]
+        x = self.dropout(x)
+        x = self.classify(x)
+        return x
+
+class TransformerClassifyTrain(object):
     def __init__(self, config, model):
         self.config = config
         self.model = model
@@ -147,67 +159,41 @@ class AttentionClassifyTrain(object):
         self.criterion = nn.CrossEntropyLoss()
         self.device = config.DEVICE
 
-    def train(self, train_loader, valid_loader):
-        for epoch in range(self.config.EPOCHS):
-            self.model.train()
+    def evaluate(self, model, loader):
+        model.eval()
+        correct, total = 0, 0
+        with torch.no_grad():
+            for batch in loader:
+                x = batch['x'].to(self.device)
+                y = batch['y'].to(self.device)
+                pred = model(x).argmax(dim=1)
+                correct += (pred == y).sum().item()
+                total += y.size(0)
+        return correct / total
+
+    def train(self, model, train_loader, val_loader, config):
+        for epoch in range(config.EPOCHS):  # epoch 循环
+            model.train()
+            total_loss = 0  # 每轮重置
             for batch in train_loader:
                 x = batch['x'].to(self.device)
                 y = batch['y'].to(self.device)
                 self.optimizer.zero_grad()
-                pred = self.model(x)
-                loss = self.criterion(pred, y)
+                out = model(x)
+                loss = self.criterion(out, y)
                 loss.backward()
                 self.optimizer.step()
-                print(f"epoch: {epoch} loss: {loss.item()}")
+                total_loss += loss.item()
 
-            self.model.eval()
-            total_loss, total_correct, total_samples = 0, 0, 0
-            with torch.no_grad():
-                for batch in valid_loader:
-                    x = batch['x'].to(self.device)
-                    y = batch['y'].to(self.device)
-                    pred = self.model(x)
-                    loss = self.criterion(pred, y)
-                    total_loss += loss.item()
-                    total_correct += (pred.argmax(dim=1) == y).sum().item()
-                    total_samples += len(y)
-                acc = total_correct / total_samples
-                print(f"Epoch {epoch} Val Loss: {total_loss / len(valid_loader):.4f} Acc: {acc:.4f}")
+            acc = self.evaluate(model, val_loader)  # 每轮结束验证
+            print(f"Epoch {epoch + 1} | loss: {total_loss / len(train_loader):.4f} | val_acc: {acc:.4f}")
 
-# if __name__ == '__main__':
-#     from datasets import load_dataset
-#     config = AttentionClassifyConfig()
-#     dataset = load_dataset(config.DATASET_NAME)
-    # print(type(dataset))
-    # print(dataset)
-    # print("---第一条训练样本---")
-    # vocab = AttentionClassifyBuildVocabulary(config, dataset['train'])
-    # vocabulary = vocab.build_vocabulary()
-    # my_dataset = AttentionClassifyDatasets(dataset['train'], vocabulary, config=config)
-    # print(my_dataset[0])
-    # print(dataset['train'][0])
-    # print("---label---")
-    # print(dataset['train'][0]['label'])
-    # print("---text前100字---")
-    # print(dataset['train'][0]['text'][:100])
-    #
-    # print(f"词表大小: {len(vocabulary)}")
-    # print(f"'the' 的id: {vocabulary.get('the', 1)}")
-    # print(f"'zzznonsense' 的id: {vocabulary.get('zzznonsense', 1)}")
 
-    # data_loader = build_data_loader(dataset['train'], vocabulary, config, shuffle=True)
-    # batch = next(iter(data_loader))
-    # print(f"batch x shape: {batch['x'].shape}")
-    # print(f"batch y shape: {batch['y'].shape}")
-    # model = AttentionClassifyModel(vocabulary, config)
-    # batch = next(iter(data_loader))
-    # out = model(batch['x'])
-    # print(f"output shape: {out.shape}")  # 应该是 [64, 2]
 if __name__ == '__main__':
-    config = AttentionClassifyConfig()
+    config = TransformerClassifyConfig()
     dataset = load_dataset(config.DATASET_NAME)
 
-    vocab_builder = AttentionClassifyBuildVocabulary(config, dataset['train'])
+    vocab_builder = TransformerClassifyBuildVocabulary(config, dataset['train'])
     vocabulary = vocab_builder.build_vocabulary()
 
     # 从train里切20%做验证集
@@ -220,6 +206,7 @@ if __name__ == '__main__':
     train_loader = build_data_loader(train_data, vocabulary, config, shuffle=True)
     val_loader = build_data_loader(val_data, vocabulary, config, shuffle=False)
 
-    model = AttentionClassifyModel(vocabulary, config)
-    trainer = AttentionClassifyTrain(config, model)
-    trainer.train(train_loader, val_loader)
+    model = TransformerClassifyModel(vocabulary, config)
+    model.to(config.DEVICE)
+    trainer = TransformerClassifyTrain(config, model)
+    trainer.train(model, train_loader, val_loader, config)

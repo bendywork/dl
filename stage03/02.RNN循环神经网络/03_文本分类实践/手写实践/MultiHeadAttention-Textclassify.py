@@ -5,8 +5,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from datasets import load_dataset
 from collections import Counter
-from Attention import Attention
-from Attention import Attention
+from MultiHeadAttention import MultiHeadAttention
 import numpy as np
 from sklearn import metrics
 import os
@@ -17,7 +16,7 @@ from torch._C import dtype
 class AttentionClassifyConfig(object):
     def __init__(self):
         # 超参数配置 最大词表大小
-        self.MAX_VOCABULARY_SIZE = 5000
+        self.MAX_VOCABULARY_SIZE = 20000
         # 句子最大长度
         self.MAX_SEQUENCE_LENGTH = 256
         # 词向量维度大小
@@ -27,7 +26,7 @@ class AttentionClassifyConfig(object):
         # 批次大小
         self.BATCH_SIZE = 64
         # 训练轮数
-        self.EPOCHS = 10
+        self.EPOCHS = 3
         # 学习率（梯度下降的步长）
         self.LEARNING_RATE = 0.001
         # 训练的设备
@@ -127,7 +126,7 @@ class AttentionClassifyModel(nn.Module):
             num_layers=1,
             batch_first=True,
             bidirectional=True )
-        self.attention = Attention(config.HIDDEN_SIZE * 2)
+        self.attention = MultiHeadAttention(d_model=config.HIDDEN_SIZE * 2, num_heads=4)
         self.classify_layer = nn.Linear(config.HIDDEN_SIZE * 2, 2)
 
     def forward(self, x):
@@ -135,8 +134,9 @@ class AttentionClassifyModel(nn.Module):
          embeddings = self.embedding(x)
          # 调用Attention [bs, t, e] -> [bs, t, h]
          outs, _ = self.lstm(embeddings)
-         attention_out = self.attention.forward_within_lstm(outs)
-         logits = self.classify_layer(attention_out)
+         attention_out = self.attention.forward(outs, outs, outs)
+         pooled = attention_out.mean(dim=1)
+         logits = self.classify_layer(pooled)
          return logits
 
 class AttentionClassifyTrain(object):
@@ -221,5 +221,6 @@ if __name__ == '__main__':
     val_loader = build_data_loader(val_data, vocabulary, config, shuffle=False)
 
     model = AttentionClassifyModel(vocabulary, config)
+    model.to(config.DEVICE)
     trainer = AttentionClassifyTrain(config, model)
     trainer.train(train_loader, val_loader)
