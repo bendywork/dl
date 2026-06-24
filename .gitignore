@@ -47,6 +47,12 @@ ENV/
 *.npy
 *.pth
 clod.sh
+ai2.sh
+ai-mi.sh
+ai3.sh
+ai5.sh
+ai34.sh
+start_ai.bat
 
 # Large dataset / corpus files
 base/datas/resources/text8
