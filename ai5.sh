@@ -9,7 +9,7 @@ export http_proxy=http://127.0.0.1:7890
 export https_proxy=http://127.0.0.1:7890
 export OPENAI_API_KEY=sk-SvMpwUYNUb0KTPhfAWm2bTSJE7VF9RsdP70ICTdINlF89BPA
 export OPENAI_BASE_URL=https://sinsy.eu.cc/
-export ANTHROPIC_AUTH_TOKEN=sk-SvMpwUYNUb0KTPhfAWm2bTSJE7VF9RsdP70ICTdINlF89BPA
+export ANTHROPIC_API_KEY=sk-SvMpwUYNUb0KTPhfAWm2bTSJE7VF9RsdP70ICTdINlF89BPA
 export ANTHROPIC_BASE_URL=https://sinsy.eu.cc/
 
 case $choice in
