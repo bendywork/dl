@@ -53,6 +53,9 @@ ai3.sh
 ai5.sh
 ai34.sh
 start_ai.bat
+start_ai.sh
+ai7.bat
+ai7.sh
 
 # Large dataset / corpus files
 base/datas/resources/text8
