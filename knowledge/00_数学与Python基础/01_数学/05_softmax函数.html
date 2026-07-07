@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Softmax</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body style="font-family:sans-serif;padding:20px;background:#1a1a2e;color:#eee">
+<h2>Softmax 函数可视化</h2>
+<canvas id="c" width="600" height="350"></canvas>
+<script>
+const x=[];const y1=[],y2=[],y3=[];
+for(let v=-6;v<=6;v+=0.2){
+  x.push(v.toFixed(1));
+  const vals=[v,0,-2];
+  const exps=vals.map(a=>Math.exp(a));
+  const s=exps.reduce((a,b)=>a+b);
+  y1.push((exps[0]/s).toFixed(4));
+  y2.push((exps[1]/s).toFixed(4));
+  y3.push((exps[2]/s).toFixed(4));
+}
+new Chart(document.getElementById('c'),{
+  type:'line',
+  data:{labels:x,datasets:[
+    {label:'x变化',data:y1,borderColor:'#ff6384',fill:false},
+    {label:'固定=0',data:y2,borderColor:'#36a2eb',fill:false},
+    {label:'固定=-2',data:y3,borderColor:'#ffce56',fill:false}
+  ]},
+  options:{scales:{y:{min:0,max:1}}}
+});
+</script>
+</body>
+</html>
